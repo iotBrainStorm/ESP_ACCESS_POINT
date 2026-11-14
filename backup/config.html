@@ -6,6 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
+    <meta name="theme-color" content="#0b1120" />
     <title>Hub NVS Configuration</title>
     <style>
       :root {
@@ -47,6 +48,7 @@
         box-sizing: border-box;
         margin: 0;
         padding: 0;
+        -webkit-tap-highlight-color: transparent;
       }
 
       body {
@@ -56,8 +58,10 @@
         background: var(--bg);
         color: var(--text);
         min-height: 100vh;
-        padding-bottom: 84px;
+        min-height: 100dvh;
+        padding-bottom: 100px;
         line-height: 1.45;
+        overflow-x: hidden;
       }
 
       /* Header */
@@ -65,8 +69,10 @@
         position: sticky;
         top: 0;
         z-index: 40;
+        background: var(--bg-elev);
         background: color-mix(in srgb, var(--bg-elev) 90%, transparent);
         backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         border-bottom: 1px solid var(--border);
       }
 
@@ -77,7 +83,7 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: 10px;
       }
 
       .back-btn {
@@ -92,6 +98,7 @@
         text-decoration: none;
         font-size: 0.84rem;
         font-weight: 600;
+        flex-shrink: 0;
       }
       .back-btn:hover {
         border-color: var(--accent);
@@ -99,29 +106,35 @@
       }
 
       .header-title {
-        font-size: 1.05rem;
+        font-size: 1.02rem;
         font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .nvs-badge {
-        font-size: 0.74rem;
+        font-size: 0.72rem;
         font-weight: 600;
         padding: 4px 10px;
         border-radius: 999px;
         background: var(--card);
         border: 1px solid var(--border);
         color: var(--text-muted);
+        white-space: nowrap;
+        flex-shrink: 0;
       }
 
       /* Navigation Tabs */
       .nav-tabs {
         max-width: 1040px;
         margin: 14px auto 0;
-        padding: 0 16px;
+        padding: 4px 16px;
         display: flex;
         gap: 8px;
         overflow-x: auto;
         scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
       }
       .nav-tabs::-webkit-scrollbar {
         display: none;
@@ -138,6 +151,7 @@
         cursor: pointer;
         white-space: nowrap;
         transition: 0.15s;
+        flex-shrink: 0;
       }
       .nav-tab.active {
         background: var(--accent-soft);
@@ -189,8 +203,12 @@
         cursor: pointer;
         transition: 0.15s;
       }
-      .btn:hover {
+      .btn:hover:not(:disabled) {
         border-color: var(--accent);
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
       }
       .btn-primary {
         background: var(--accent);
@@ -198,18 +216,18 @@
         color: #031525;
         font-weight: 700;
       }
-      .btn-primary:hover {
+      .btn-primary:hover:not(:disabled) {
         filter: brightness(1.08);
       }
       .btn-danger {
         border-color: rgba(239, 68, 68, 0.4);
         color: var(--err);
       }
-      .btn-danger:hover {
+      .btn-danger:hover:not(:disabled) {
         background: rgba(239, 68, 68, 0.12);
       }
       .btn-sm {
-        padding: 5px 9px;
+        padding: 6px 10px;
         font-size: 0.76rem;
         border-radius: 8px;
       }
@@ -237,7 +255,7 @@
         display: flex;
         align-items: center;
         gap: 12px;
-        min-width: 220px;
+        min-width: 200px;
         flex: 1;
       }
 
@@ -255,12 +273,14 @@
         font-size: 0.92rem;
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
         gap: 6px;
       }
       .dev-row-sub {
         font-size: 0.76rem;
         color: var(--text-muted);
         font-family: ui-monospace, monospace;
+        word-break: break-all;
       }
 
       .badge {
@@ -296,7 +316,7 @@
 
       .form-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
         gap: 12px;
       }
 
@@ -334,8 +354,7 @@
         justify-content: space-between;
         gap: 12px;
         padding: 10px 0;
-        border-bottom: 1px solid
-          color-mix(in srgb, var(--border) 60%, transparent);
+        border-bottom: 1px solid var(--border);
       }
       .toggle-row:last-child {
         border-bottom: none;
@@ -384,12 +403,12 @@
       /* Icon & Color Pickers */
       .picker-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
         gap: 6px;
       }
 
       .pick-item {
-        height: 38px;
+        height: 40px;
         border-radius: 9px;
         border: 1px solid var(--border);
         background: var(--bg);
@@ -411,8 +430,8 @@
         align-items: center;
       }
       .swatch {
-        width: 28px;
-        height: 28px;
+        width: 30px;
+        height: 30px;
         border-radius: 50%;
         border: 2px solid transparent;
         cursor: pointer;
@@ -563,10 +582,55 @@
         pointer-events: none;
         transition: 0.22s;
         z-index: 100;
+        max-width: 92vw;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .toast.show {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
+      }
+
+      /* === MODIFIED #3: Mobile Responsiveness for Config Page === */
+      @media (max-width: 640px) {
+        .topbar-inner {
+          padding: 10px 12px;
+        }
+        .header-title {
+          font-size: 0.92rem;
+        }
+        .container {
+          padding: 0 12px;
+        }
+        .input,
+        .select {
+          font-size: 16px; /* Prevents mobile zoom on focus */
+          height: 40px;
+        }
+        .dev-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .row-actions {
+          width: 100%;
+          justify-content: flex-end;
+          padding-top: 8px;
+          border-top: 1px solid var(--border);
+        }
+        .modal-backdrop {
+          padding: 0;
+          align-items: flex-end;
+        }
+        .modal {
+          max-width: 100%;
+          max-height: 92dvh;
+          border-radius: 18px 18px 0 0;
+          padding: 16px;
+        }
+        .save-bar-inner {
+          flex-wrap: wrap;
+        }
       }
     </style>
   </head>
@@ -612,7 +676,7 @@
 
     <header class="topbar">
       <div class="topbar-inner">
-        <a href="index.html" class="back-btn">&larr; Dashboard</a>
+        <a href="index.html" class="back-btn">&larr; ACCESS POINT</a>
         <div class="header-title">Hub NVS Settings</div>
         <span class="nvs-badge" id="headerNvsSize">0 B / 16 KB</span>
       </div>
@@ -641,9 +705,19 @@
       <section class="panel active" id="tab-devices">
         <div class="panel-header">
           <h2>Saved ESP Devices (<span id="devCountLabel">0</span>)</h2>
-          <button class="btn btn-primary" onclick="openDeviceModal()">
-            + Add Device
-          </button>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <input
+              type="text"
+              id="devFilterInput"
+              class="input"
+              placeholder="Filter devices..."
+              style="width: 180px; height: 36px"
+              oninput="renderDeviceList()"
+            />
+            <button class="btn btn-primary" onclick="openDeviceModal()">
+              + Add Device
+            </button>
+          </div>
         </div>
         <div class="item-list" id="deviceList"></div>
       </section>
@@ -661,7 +735,7 @@
                 type="text"
                 id="newGroupName"
                 class="input"
-                placeholder="e.g., Workshop, Bedroom, Garden"
+                placeholder="e.g., Workshop, Bedroom, Solar"
               />
             </div>
             <div class="field">
@@ -909,7 +983,7 @@
         <div class="card-box" style="border-color: rgba(239, 68, 68, 0.35)">
           <h3 style="color: var(--err)">Danger Zone</h3>
           <div style="display: flex; gap: 10px; flex-wrap: wrap">
-            <button class="btn" onclick="rebootHub()">Reboot ESP32 Hub</button>
+            <button class="btn" onclick="rebootHub()">Restart ESP32 Hub</button>
             <button class="btn btn-danger" onclick="factoryReset()">
               Factory Reset NVS
             </button>
@@ -1108,6 +1182,34 @@
       let editingDeviceId = null;
       let selectedIcon = "chip";
       let selectedColor = "#38bdf8";
+      let lastScannedList = [];
+
+      function sanitizeConfig(raw) {
+        const fallback = {
+          settings: {
+            title: "ACCESS POINT",
+            subtitle: "ESP32 Central Gateway",
+            theme: "dark",
+            preferMdns: false,
+            openNewTab: false,
+            showIpOnCard: true,
+            autoPing: true,
+            pingTimeoutMs: 1500,
+            pin: "",
+          },
+          groups: [{ id: "g1", name: "General", color: "#38bdf8" }],
+          devices: [],
+        };
+        if (!raw || typeof raw !== "object") return fallback;
+        return {
+          settings: { ...fallback.settings, ...(raw.settings || {}) },
+          groups:
+            Array.isArray(raw.groups) && raw.groups.length
+              ? raw.groups
+              : fallback.groups,
+          devices: Array.isArray(raw.devices) ? raw.devices : [],
+        };
+      }
 
       function svgIcon(name, size = 19) {
         return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ICONS.chip}</svg>`;
@@ -1132,28 +1234,16 @@
         try {
           const res = await fetch("/api/config", { cache: "no-store" });
           if (!res.ok) throw new Error();
-          config = await res.json();
+          config = sanitizeConfig(await res.json());
           isOfflinePreview = false;
         } catch (e) {
           isOfflinePreview = true;
-          const cached = localStorage.getItem(STORAGE_KEY);
-          config = cached
-            ? JSON.parse(cached)
-            : {
-                settings: {
-                  title: "Home IoT Hub",
-                  subtitle: "ESP32 Central Gateway",
-                  theme: "dark",
-                  preferMdns: false,
-                  openNewTab: false,
-                  showIpOnCard: true,
-                  autoPing: true,
-                  pingTimeoutMs: 1500,
-                  pin: "",
-                },
-                groups: [{ id: "g1", name: "General", color: "#38bdf8" }],
-                devices: [],
-              };
+          try {
+            const cached = localStorage.getItem(STORAGE_KEY);
+            config = sanitizeConfig(cached ? JSON.parse(cached) : null);
+          } catch (_) {
+            config = sanitizeConfig(null);
+          }
         }
 
         applyTheme();
@@ -1207,6 +1297,9 @@
       /* Devices Management */
       function renderDeviceList() {
         const list = document.getElementById("deviceList");
+        const q = (document.getElementById("devFilterInput")?.value || "")
+          .trim()
+          .toLowerCase();
         document.getElementById("devCountLabel").textContent =
           config.devices.length;
 
@@ -1215,13 +1308,24 @@
           return;
         }
 
-        list.innerHTML = config.devices
-          .map((dev, idx) => {
+        const filtered = config.devices.filter(
+          (d) =>
+            !q ||
+            (d.name && d.name.toLowerCase().includes(q)) ||
+            (d.ip && d.ip.toLowerCase().includes(q)) ||
+            (d.mdns && d.mdns.toLowerCase().includes(q)),
+        );
+
+        list.innerHTML = filtered
+          .map((dev) => {
+            const idx = config.devices.indexOf(dev);
             const g = config.groups.find((x) => x.id === dev.group);
+            const idSafe = escapeHtml(dev.id);
+            const colorSafe = escapeHtml(dev.color || "#38bdf8");
             return `
           <div class="dev-row">
             <div class="dev-row-left">
-              <div class="icon-box" style="background:${dev.color}22;color:${dev.color}">${svgIcon(dev.icon, 20)}</div>
+              <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">${svgIcon(dev.icon, 20)}</div>
               <div>
                 <div class="dev-row-title">
                   ${escapeHtml(dev.name)}
@@ -1234,8 +1338,9 @@
             <div class="row-actions">
               <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveDevice(${idx}, -1)">&uarr;</button>
               <button class="btn btn-sm" title="Move Down" ${idx === config.devices.length - 1 ? "disabled" : ""} onclick="moveDevice(${idx}, 1)">&darr;</button>
-              <button class="btn btn-sm" onclick="openDeviceModal('${dev.id}')">Edit</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteDevice('${dev.id}')">Delete</button>
+              <button class="btn btn-sm" onclick="cloneDevice('${idSafe}')">Clone</button>
+              <button class="btn btn-sm" onclick="openDeviceModal('${idSafe}')">Edit</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteDevice('${idSafe}')">Delete</button>
             </div>
           </div>
         `;
@@ -1252,6 +1357,18 @@
         ];
         markDirty();
         renderDeviceList();
+      }
+
+      function cloneDevice(id) {
+        const orig = config.devices.find((d) => d.id === id);
+        if (!orig) return;
+        const copy = structuredClone(orig);
+        copy.id = "d" + Date.now().toString(36);
+        copy.name = orig.name + " (Copy)";
+        config.devices.push(copy);
+        markDirty();
+        renderDeviceList();
+        showToast("Device cloned");
       }
 
       function deleteDevice(id) {
@@ -1281,7 +1398,10 @@
 
         const groupSel = document.getElementById("devGroup");
         groupSel.innerHTML = config.groups
-          .map((g) => `<option value="${g.id}">${escapeHtml(g.name)}</option>`)
+          .map(
+            (g) =>
+              `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`,
+          )
           .join("");
         groupSel.value = dev?.group || config.groups[0]?.id || "";
 
@@ -1317,10 +1437,17 @@
           `<input type="color" value="${selectedColor}" style="width:32px;height:28px;border:none;background:none" onchange="selectedColor=this.value; renderPickers()" />`;
       }
 
+      function cleanHost(str) {
+        return String(str || "")
+          .trim()
+          .replace(/^https?:\/\//i, "")
+          .replace(/\/+$/, "");
+      }
+
       async function testModalConnection() {
-        const ip = document.getElementById("devIp").value.trim();
-        const mdns = document.getElementById("devMdns").value.trim();
-        const port = document.getElementById("devPort").value || 80;
+        const ip = cleanHost(document.getElementById("devIp").value);
+        const mdns = cleanHost(document.getElementById("devMdns").value);
+        const port = Number(document.getElementById("devPort").value) || 80;
         const host = ip || mdns;
         if (!host) return showToast("Enter an IP or mDNS first");
 
@@ -1333,6 +1460,7 @@
         try {
           await fetch(`http://${host}:${port}/`, {
             mode: "no-cors",
+            cache: "no-store",
             signal: ctrl.signal,
           });
           const ms = Math.round(performance.now() - start);
@@ -1346,12 +1474,15 @@
 
       function saveDeviceForm() {
         const name = document.getElementById("devName").value.trim();
-        const ip = document.getElementById("devIp").value.trim();
-        const mdns = document.getElementById("devMdns").value.trim();
+        const ip = cleanHost(document.getElementById("devIp").value);
+        const mdns = cleanHost(document.getElementById("devMdns").value);
 
         if (!name) return showToast("Device name is required");
         if (!ip && !mdns)
           return showToast("Enter an IP address or mDNS hostname");
+
+        let path = document.getElementById("devPath").value.trim() || "/";
+        if (!path.startsWith("/") && !path.startsWith(":")) path = "/" + path;
 
         const payload = {
           id: editingDeviceId || "d" + Date.now().toString(36),
@@ -1359,7 +1490,7 @@
           ip,
           mdns,
           port: Number(document.getElementById("devPort").value) || 80,
-          path: document.getElementById("devPath").value.trim() || "/",
+          path,
           altLabel: document.getElementById("devAltLabel").value.trim(),
           altPath: document.getElementById("devAltPath").value.trim(),
           note: document.getElementById("devNote").value.trim(),
@@ -1388,17 +1519,18 @@
         list.innerHTML = config.groups
           .map((g, idx) => {
             const count = config.devices.filter((d) => d.group === g.id).length;
+            const gIdSafe = escapeHtml(g.id);
             return `
           <div class="dev-row">
             <div class="dev-row-left">
-              <input type="color" value="${g.color}" style="width:32px;height:32px;border:none;background:none;cursor:pointer" onchange="updateGroup('${g.id}', 'color', this.value)" />
-              <input type="text" class="input" style="max-width:240px" value="${escapeHtml(g.name)}" onchange="updateGroup('${g.id}', 'name', this.value)" />
+              <input type="color" value="${escapeHtml(g.color)}" style="width:32px;height:32px;border:none;background:none;cursor:pointer" onchange="updateGroup('${gIdSafe}', 'color', this.value)" />
+              <input type="text" class="input" style="max-width:240px" value="${escapeHtml(g.name)}" onchange="updateGroup('${gIdSafe}', 'name', this.value)" />
               <span class="badge">${count} devices</span>
             </div>
             <div class="row-actions">
               <button class="btn btn-sm" ${idx === 0 ? "disabled" : ""} onclick="moveGroup(${idx}, -1)">&uarr;</button>
               <button class="btn btn-sm" ${idx === config.groups.length - 1 ? "disabled" : ""} onclick="moveGroup(${idx}, 1)">&darr;</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteGroup('${g.id}')">Delete</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteGroup('${gIdSafe}')">Delete</button>
             </div>
           </div>
         `;
@@ -1494,36 +1626,42 @@
           ];
         }
 
+        lastScannedList = Array.isArray(found) ? found : [];
         btn.disabled = false;
         btn.textContent = "Scan Network (_http._tcp)";
 
-        if (!found.length) {
+        if (!lastScannedList.length) {
           out.innerHTML = `<div class="card-box">No mDNS HTTP devices responded. Ensure your ESP devices call <code>MDNS.addService("http", "tcp", 80)</code>.</div>`;
           return;
         }
 
-        out.innerHTML = found
-          .map((item) => {
+        out.innerHTML = lastScannedList
+          .map((item, idx) => {
             const exists = config.devices.some(
               (d) => d.ip === item.ip || d.mdns === item.mdns,
             );
-            const prefill = JSON.stringify({
-              name: item.name,
-              ip: item.ip,
-              mdns: item.mdns,
-              port: item.port || 80,
-            }).replace(/'/g, "&#39;");
             return `
           <div class="dev-row">
             <div>
               <div class="dev-row-title">${escapeHtml(item.name)} ${exists ? '<span class="badge" style="color:var(--ok)">Already Added</span>' : ""}</div>
               <div class="dev-row-sub">${escapeHtml(item.ip)} • ${escapeHtml(item.mdns)}:${item.port || 80}</div>
             </div>
-            <button class="btn btn-primary btn-sm" onclick='openDeviceModal(null, ${prefill})'>+ Import</button>
+            <button class="btn btn-primary btn-sm" onclick="importScannedItem(${idx})">+ Import</button>
           </div>
         `;
           })
           .join("");
+      }
+
+      function importScannedItem(index) {
+        const item = lastScannedList[index];
+        if (!item) return;
+        openDeviceModal(null, {
+          name: item.name,
+          ip: item.ip,
+          mdns: item.mdns,
+          port: item.port || 80,
+        });
       }
 
       /* Preferences & NVS Storage */
@@ -1546,9 +1684,12 @@
         markDirty();
       }
 
+      function getPayloadByteSize() {
+        return new TextEncoder().encode(JSON.stringify(config)).length;
+      }
+
       function updateNvsMeter() {
-        const minified = JSON.stringify(config);
-        const bytes = new TextEncoder().encode(minified).length;
+        const bytes = getPayloadByteSize();
         const pct = Math.min(100, Math.round((bytes / NVS_MAX_BYTES) * 100));
 
         document.getElementById("headerNvsSize").textContent =
@@ -1566,6 +1707,11 @@
       }
 
       async function saveToNvs() {
+        const bytes = getPayloadByteSize();
+        if (bytes > NVS_MAX_BYTES) {
+          return showToast("Error: Config exceeds 16KB NVS limit!");
+        }
+
         const btn = document.getElementById("saveNvsBtn");
         btn.disabled = true;
         btn.textContent = "Saving...";
@@ -1620,7 +1766,7 @@
             const parsed = JSON.parse(e.target.result);
             if (!parsed.devices || !parsed.groups || !parsed.settings)
               throw new Error();
-            config = parsed;
+            config = sanitizeConfig(parsed);
             markDirty();
             applyTheme();
             renderAll();
@@ -1633,8 +1779,8 @@
       }
 
       async function rebootHub() {
-        if (!confirm("Reboot the central ESP32 hub?")) return;
-        showToast("Rebooting ESP32...");
+        if (!confirm("Restart the central ESP32 hub?")) return;
+        showToast("Restarting ESP32...");
         if (!isOfflinePreview)
           await fetch("/api/reboot", { method: "POST" }).catch(() => {});
         setTimeout(() => (location.href = "index.html"), 4000);
@@ -1644,6 +1790,7 @@
         if (!confirm("Erase all saved devices and reset NVS to defaults?"))
           return;
         localStorage.removeItem(STORAGE_KEY);
+        isDirty = false;
         if (!isOfflinePreview)
           await fetch("/api/reset", { method: "POST" }).catch(() => {});
         showToast("NVS reset complete");
@@ -1663,6 +1810,14 @@
             })[m],
         );
       }
+
+      /* === SAFEGUARD: Warn before closing tab with unsaved NVS changes === */
+      window.addEventListener("beforeunload", (e) => {
+        if (isDirty) {
+          e.preventDefault();
+          e.returnValue = "";
+        }
+      });
 
       init();
     </script>

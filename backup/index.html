@@ -12,7 +12,7 @@
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
-    <title>Home IoT Hub</title>
+    <title>ACCESS POINT</title>
     <style>
       :root {
         --bg: #0b1120;
@@ -23,7 +23,7 @@
         --text: #f1f5f9;
         --text-muted: #94a3b8;
         --accent: #38bdf8;
-        --accent-soft: rgba(56, 189, 248, 0.14);
+        --accent-soft: rgba(56, 189, 248, 0.16);
         --ok: #22c55e;
         --err: #ef4444;
         --warn: #f59e0b;
@@ -52,7 +52,7 @@
         --text: #0f172a;
         --text-muted: #64748b;
         --accent: #0284c7;
-        --accent-soft: rgba(2, 132, 199, 0.1);
+        --accent-soft: rgba(2, 132, 199, 0.12);
         --shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
       }
 
@@ -70,9 +70,11 @@
         background: var(--bg);
         color: var(--text);
         min-height: 100vh;
+        min-height: 100dvh;
         display: flex;
         flex-direction: column;
         line-height: 1.45;
+        overflow-x: hidden;
       }
 
       /* Header */
@@ -80,6 +82,7 @@
         position: sticky;
         top: 0;
         z-index: 40;
+        background: var(--bg-elev);
         background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
@@ -101,6 +104,7 @@
         align-items: center;
         gap: 10px;
         margin-right: auto;
+        min-width: 0;
       }
 
       .brand-icon {
@@ -116,8 +120,11 @@
 
       .brand h1 {
         font-size: 1.08rem;
-        font-weight: 700;
-        letter-spacing: -0.01em;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .brand-sub {
@@ -125,7 +132,8 @@
         color: var(--text-muted);
         display: flex;
         align-items: center;
-        gap: 8px;
+        flex-wrap: wrap;
+        gap: 6px;
       }
 
       .status-pill {
@@ -136,8 +144,9 @@
         border-radius: 999px;
         background: var(--card);
         border: 1px solid var(--border);
-        font-size: 0.72rem;
+        font-size: 0.71rem;
         font-weight: 600;
+        white-space: nowrap;
       }
 
       .dot {
@@ -178,6 +187,7 @@
         display: flex;
         align-items: center;
         gap: 8px;
+        flex-shrink: 0;
       }
 
       .seg-toggle {
@@ -217,6 +227,7 @@
         cursor: pointer;
         text-decoration: none;
         transition: 0.15s;
+        flex-shrink: 0;
       }
 
       .icon-btn:hover {
@@ -258,6 +269,7 @@
 
       .search-input:focus {
         border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
       }
 
       .search-clear {
@@ -269,7 +281,9 @@
         border: none;
         color: var(--text-muted);
         cursor: pointer;
-        font-size: 1rem;
+        font-size: 1.1rem;
+        line-height: 1;
+        padding: 4px;
         display: none;
       }
 
@@ -282,7 +296,7 @@
         flex: 1;
       }
 
-      /* Favorites Dock */
+      /* === MODIFIED #1: Pinned Favorites Dock (Fixed Upper Glow Clipping) === */
       .fav-section {
         margin-bottom: 18px;
       }
@@ -293,7 +307,7 @@
         text-transform: uppercase;
         letter-spacing: 0.06em;
         color: var(--text-muted);
-        margin-bottom: 8px;
+        margin-bottom: 6px;
         display: flex;
         align-items: center;
         gap: 6px;
@@ -303,8 +317,11 @@
         display: flex;
         gap: 10px;
         overflow-x: auto;
-        padding-bottom: 4px;
+        /* Extra top/side/bottom padding so hover lift + glow are never cropped */
+        padding: 8px 6px 10px 6px;
+        margin: -6px -6px 0 -6px;
         scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
       }
       .fav-strip::-webkit-scrollbar {
         display: none;
@@ -324,14 +341,30 @@
         font-weight: 600;
         white-space: nowrap;
         cursor: pointer;
-        transition: 0.15s;
+        transition:
+          transform 0.18s ease,
+          border-color 0.18s ease,
+          background 0.18s ease,
+          box-shadow 0.18s ease;
         flex-shrink: 0;
+        user-select: none;
       }
 
-      .fav-chip:hover {
-        border-color: var(--accent);
+      .fav-chip:hover,
+      .fav-chip:focus-visible,
+      .fav-chip:active {
+        border-color: var(--chip-color, var(--accent));
         background: var(--card-hover);
-        transform: translateY(-1px);
+        transform: translateY(-2px);
+        box-shadow:
+          0 4px 14px var(--accent-soft),
+          0 0 10px
+            color-mix(
+              in srgb,
+              var(--chip-color, var(--accent)) 32%,
+              transparent
+            );
+        outline: none;
       }
 
       /* Group Filter Bar */
@@ -348,9 +381,11 @@
         display: flex;
         gap: 8px;
         overflow-x: auto;
-        padding-bottom: 2px;
+        padding: 6px 4px;
+        margin: -6px -4px;
         scrollbar-width: none;
         flex: 1;
+        -webkit-overflow-scrolling: touch;
       }
       .tabs::-webkit-scrollbar {
         display: none;
@@ -370,6 +405,7 @@
         cursor: pointer;
         white-space: nowrap;
         transition: 0.15s;
+        flex-shrink: 0;
       }
 
       .tab:hover {
@@ -381,6 +417,7 @@
         background: var(--accent-soft);
         border-color: var(--accent);
         color: var(--accent);
+        box-shadow: 0 2px 10px var(--accent-soft);
       }
 
       .tab-count {
@@ -438,9 +475,10 @@
         justify-content: space-between;
         gap: 12px;
         transition:
-          transform 0.15s,
-          border-color 0.15s,
-          background 0.15s;
+          transform 0.16s ease,
+          border-color 0.16s ease,
+          background 0.16s ease,
+          box-shadow 0.16s ease;
         box-shadow: var(--shadow);
         overflow: hidden;
         cursor: pointer;
@@ -475,6 +513,7 @@
         display: grid;
         place-items: center;
         flex-shrink: 0;
+        background: var(--accent-soft);
         background: color-mix(
           in srgb,
           var(--card-accent, var(--accent)) 15%,
@@ -502,6 +541,16 @@
         text-overflow: ellipsis;
       }
 
+      .ping-ms {
+        font-size: 0.68rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--ok);
+        background: rgba(34, 197, 94, 0.12);
+        padding: 1px 6px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+
       .dev-meta {
         font-size: 0.75rem;
         color: var(--text-muted);
@@ -516,7 +565,8 @@
         border: none;
         color: var(--text-muted);
         cursor: pointer;
-        padding: 4px;
+        padding: 6px;
+        margin: -4px -4px 0 0;
         border-radius: 8px;
         display: grid;
         place-items: center;
@@ -538,7 +588,7 @@
         justify-content: space-between;
         gap: 8px;
         padding-top: 10px;
-        border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+        border-top: 1px solid var(--border);
       }
 
       .addr-pill {
@@ -546,7 +596,7 @@
         align-items: center;
         gap: 6px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 0.76rem;
+        font-size: 0.75rem;
         color: var(--text-muted);
         background: var(--bg);
         border: 1px solid var(--border);
@@ -557,6 +607,7 @@
         text-overflow: ellipsis;
         white-space: nowrap;
         cursor: copy;
+        transition: 0.15s;
       }
 
       .addr-pill:hover {
@@ -569,12 +620,13 @@
         align-items: center;
         gap: 6px;
         margin-left: auto;
+        flex-shrink: 0;
       }
 
       .mini-btn {
-        font-size: 0.72rem;
+        font-size: 0.73rem;
         font-weight: 600;
-        padding: 4px 9px;
+        padding: 5px 10px;
         border-radius: 7px;
         border: 1px solid var(--border);
         background: var(--bg-elev);
@@ -607,8 +659,8 @@
         min-width: 0;
       }
       .list-view .dev-icon {
-        width: 34px;
-        height: 34px;
+        width: 36px;
+        height: 36px;
       }
       .list-view .card-bottom {
         border-top: none;
@@ -646,41 +698,70 @@
         cursor: pointer;
       }
 
-      /* Footer */
+      /* === MODIFIED #2: Two-Line Footer (Developer Credit + Core Telemetry) === */
       footer {
         border-top: 1px solid var(--border);
         background: var(--bg-elev);
-        padding: 12px 16px;
-        font-size: 0.75rem;
+        padding: 14px 16px;
+        font-size: 0.76rem;
         color: var(--text-muted);
+        margin-top: auto;
       }
 
       .footer-inner {
         max-width: 1280px;
         margin: 0 auto;
         display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
+        flex-direction: column;
         align-items: center;
-        gap: 10px;
+        justify-content: center;
+        gap: 6px;
+        text-align: center;
       }
 
-      .telemetry {
+      .footer-credit {
+        font-size: 0.8rem;
+        color: var(--text);
+        font-weight: 500;
+        letter-spacing: 0.01em;
+      }
+
+      .footer-credit strong {
+        font-weight: 700;
+      }
+
+      .footer-credit .brand-tag {
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      .footer-telemetry {
         display: flex;
         flex-wrap: wrap;
-        gap: 14px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 0.74rem;
+        color: var(--text-muted);
+      }
+
+      .sep {
+        opacity: 0.45;
+        user-select: none;
       }
 
       .footer-link {
-        color: var(--text-muted);
+        color: var(--accent);
         background: none;
         border: none;
         cursor: pointer;
-        font-size: 0.75rem;
+        font-size: 0.74rem;
+        font-weight: 600;
         text-decoration: underline;
+        padding: 2px 4px;
       }
       .footer-link:hover {
-        color: var(--accent);
+        opacity: 0.85;
       }
 
       /* Toast */
@@ -700,20 +781,60 @@
         pointer-events: none;
         transition: 0.25s ease;
         z-index: 100;
+        max-width: 92vw;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .toast.show {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
       }
 
-      @media (max-width: 600px) {
+      /* === MODIFIED #3: Enhanced Mobile Responsiveness === */
+      @media (max-width: 640px) {
+        .topbar-inner {
+          padding: 10px 12px;
+          gap: 10px;
+        }
+        .brand h1 {
+          font-size: 0.98rem;
+        }
         .search-wrap {
           order: 3;
           max-width: 100%;
-          flex-basis: 100%;
+          flex: 1 1 100%;
+        }
+        /* 16px prevents iOS/Android auto-zoom when tapping search input */
+        .search-input {
+          font-size: 16px;
+          height: 38px;
+        }
+        .container {
+          padding: 12px;
+        }
+        .device-grid {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        .toolbar {
+          gap: 8px;
         }
         .list-view .addr-pill {
           display: none;
+        }
+        .card {
+          padding: 12px;
+        }
+      }
+
+      @media (max-width: 380px) {
+        .brand-sub span#hubSubtitle {
+          display: none;
+        }
+        .seg-btn {
+          padding: 5px 8px;
+          font-size: 0.72rem;
         }
       }
     </style>
@@ -740,14 +861,14 @@
               />
             </svg>
           </div>
-          <div>
-            <h1 id="hubTitle">Home IoT Hub</h1>
+          <div style="min-width: 0">
+            <h1 id="hubTitle">ACCESS POINT</h1>
             <div class="brand-sub">
               <span id="hubSubtitle">ESP32 Central Gateway</span>
-              <span class="status-pill"
-                ><span class="dot online" id="summaryDot"></span
-                ><span id="onlineCounter">0 / 0 Online</span></span
-              >
+              <span class="status-pill">
+                <span class="dot checking" id="summaryDot"></span>
+                <span id="onlineCounter">0 / 0 Online</span>
+              </span>
             </div>
           </div>
         </div>
@@ -890,16 +1011,20 @@
       <div id="devicesContainer"></div>
     </main>
 
+    <!-- === MODIFIED #2: Two-Line Footer === -->
     <footer>
       <div class="footer-inner">
-        <div class="telemetry">
-          <span id="hubModeBadge">Mode: Live ESP32</span>
-          <span id="hubRssi">Wi-Fi: -- dBm</span>
-          <span id="hubUptime">Uptime: --</span>
-          <span id="hubHeap">Free Heap: --</span>
+        <div class="footer-credit">
+          Developer &copy; <strong>M.Maity</strong>
+          <span class="sep">|</span>
+          <span class="brand-tag">iotBrainStorm</span>
         </div>
-        <div>
-          <button class="footer-link" onclick="rebootHub()">Reboot Hub</button>
+        <div class="footer-telemetry">
+          <span id="hubRssi">WiFi: -- dBm</span>
+          <span class="sep">&bull;</span>
+          <span id="hubUptime">Uptime: --</span>
+          <span class="sep">&bull;</span>
+          <button class="footer-link" onclick="rebootHub()">Restart</button>
         </div>
       </div>
     </footer>
@@ -936,7 +1061,7 @@
 
       const DEFAULT_CONFIG = {
         settings: {
-          title: "Home IoT Hub",
+          title: "ACCESS POINT",
           subtitle: "ESP32 Central Gateway",
           theme: "dark",
           preferMdns: false,
@@ -1018,8 +1143,23 @@
       let config = null;
       let activeGroup = "all";
       let viewMode = localStorage.getItem("hub_view_mode") || "grid";
-      let deviceStatus = {}; // { id: 'online' | 'offline' | 'checking' }
+      let deviceStatus = {}; // { [id]: 'online' | 'offline' | 'checking' }
+      let deviceLatency = {}; // { [id]: number (ms) }
       let isOfflinePreview = false;
+
+      /* === SAFEGUARD: Deep Config Validator === */
+      function sanitizeConfig(raw) {
+        const base = structuredClone(DEFAULT_CONFIG);
+        if (!raw || typeof raw !== "object") return base;
+        return {
+          settings: { ...base.settings, ...(raw.settings || {}) },
+          groups:
+            Array.isArray(raw.groups) && raw.groups.length
+              ? raw.groups
+              : base.groups,
+          devices: Array.isArray(raw.devices) ? raw.devices : base.devices,
+        };
+      }
 
       function svgIcon(name, size = 20) {
         const path = ICONS[name] || ICONS.chip;
@@ -1034,17 +1174,28 @@
         t._timer = setTimeout(() => t.classList.remove("show"), 2200);
       }
 
+      function cleanHostInput(h) {
+        return String(h || "")
+          .trim()
+          .replace(/^https?:\/\//i, "")
+          .replace(/\/+$/, "");
+      }
+
       function buildTargetUrl(dev, customPath = null) {
+        if (!dev) return "#";
         const host =
           config.settings.preferMdns && dev.mdns
             ? dev.mdns
             : dev.ip || dev.mdns;
-        const cleanHost = host.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+        const cleanHost = cleanHostInput(host);
+        if (!cleanHost) return "#";
         const portPart =
           dev.port && Number(dev.port) !== 80 ? `:${dev.port}` : "";
         let path = customPath !== null ? customPath : dev.path || "/";
-        if (!path.startsWith("/")) path = "/" + path;
-        return `http://${cleanHost}${portPart}${path}`;
+        if (!path.startsWith("/") && !path.startsWith(":")) path = "/" + path;
+        return path.startsWith(":")
+          ? `http://${cleanHost}${path}`
+          : `http://${cleanHost}${portPart}${path}`;
       }
 
       function getDisplayAddress(dev) {
@@ -1052,31 +1203,32 @@
           config.settings.preferMdns && dev.mdns
             ? dev.mdns
             : dev.ip || dev.mdns;
+        const cleanHost = cleanHostInput(host);
         const portPart =
           dev.port && Number(dev.port) !== 80 ? `:${dev.port}` : "";
-        return `${host}${portPart}`;
+        return `${cleanHost}${portPart}`;
       }
 
       async function loadConfig() {
         try {
           const res = await fetch("/api/config", { cache: "no-store" });
           if (!res.ok) throw new Error("No ESP endpoint");
-          config = await res.json();
+          const remote = await res.json();
+          config = sanitizeConfig(remote);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
           isOfflinePreview = false;
         } catch (e) {
           isOfflinePreview = true;
-          const cached = localStorage.getItem(STORAGE_KEY);
-          config = cached
-            ? JSON.parse(cached)
-            : structuredClone(DEFAULT_CONFIG);
-          if (!cached)
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+          try {
+            const cached = localStorage.getItem(STORAGE_KEY);
+            config = cached
+              ? sanitizeConfig(JSON.parse(cached))
+              : structuredClone(DEFAULT_CONFIG);
+          } catch (_) {
+            config = structuredClone(DEFAULT_CONFIG);
+          }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
         }
-
-        document.getElementById("hubModeBadge").textContent = isOfflinePreview
-          ? "Mode: Local Preview (Browser Storage)"
-          : "Mode: Connected to ESP32 NVS";
 
         applySettingsUI();
         renderAll();
@@ -1086,34 +1238,29 @@
 
       async function loadTelemetry() {
         if (isOfflinePreview) {
-          document.getElementById("hubRssi").textContent =
-            "Wi-Fi: -54 dBm (Demo)";
+          document.getElementById("hubRssi").textContent = "WiFi: -54 dBm";
           document.getElementById("hubUptime").textContent = "Uptime: 3d 14h";
-          document.getElementById("hubHeap").textContent = "Free Heap: 198 KB";
           return;
         }
         try {
-          const res = await fetch("/api/status");
+          const res = await fetch("/api/status", { cache: "no-store" });
           if (!res.ok) return;
           const data = await res.json();
-          if (data.rssi)
+          if (data.rssi !== undefined)
             document.getElementById("hubRssi").textContent =
-              `Wi-Fi: ${data.rssi} dBm`;
-          if (data.uptime)
+              `WiFi: ${data.rssi} dBm`;
+          if (data.uptime !== undefined)
             document.getElementById("hubUptime").textContent =
               `Uptime: ${data.uptime}`;
-          if (data.freeHeap)
-            document.getElementById("hubHeap").textContent =
-              `Free Heap: ${Math.round(data.freeHeap / 1024)} KB`;
         } catch (_) {}
       }
 
       function applySettingsUI() {
         const s = config.settings;
         document.documentElement.setAttribute("data-theme", s.theme || "dark");
-        document.title = s.title || "Home IoT Hub";
+        document.title = s.title || "ACCESS POINT";
         document.getElementById("hubTitle").textContent =
-          s.title || "Home IoT Hub";
+          s.title || "ACCESS POINT";
         document.getElementById("hubSubtitle").textContent =
           s.subtitle || "ESP32 Central Gateway";
         document
@@ -1132,6 +1279,7 @@
 
       function setAddressMode(useMdns) {
         config.settings.preferMdns = useMdns;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
         applySettingsUI();
         renderAll();
         showToast(
@@ -1146,8 +1294,13 @@
         renderDevices();
       }
 
-      function openDevice(dev, customPath = null) {
+      /* === SAFEGUARD: Open by ID instead of inline JSON === */
+      function openDeviceById(id, customPath = null, event = null) {
+        if (event) event.stopPropagation();
+        const dev = config.devices.find((d) => d.id === id);
+        if (!dev) return;
         const url = buildTargetUrl(dev, customPath);
+        if (url === "#") return showToast("Invalid device address");
         if (config.settings.openNewTab) {
           window.open(url, "_blank", "noopener");
         } else {
@@ -1155,10 +1308,34 @@
         }
       }
 
+      /* === SAFEGUARD: HTTP LAN Clipboard Fallback === */
       function copyAddress(e, text) {
         e.stopPropagation();
-        navigator.clipboard?.writeText(text);
-        showToast(`Copied: ${text}`);
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast(`Copied: ${text}`))
+            .catch(() => fallbackCopyText(text));
+        } else {
+          fallbackCopyText(text);
+        }
+      }
+
+      function fallbackCopyText(text) {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+          showToast(`Copied: ${text}`);
+        } catch (_) {
+          showToast(`Address: ${text}`);
+        }
       }
 
       async function toggleFavorite(e, id) {
@@ -1189,6 +1366,7 @@
           config.settings.pingTimeoutMs || 1500,
         );
         const target = buildTargetUrl(dev, "/");
+        const start = performance.now();
 
         try {
           await fetch(target, {
@@ -1197,8 +1375,13 @@
             signal: controller.signal,
           });
           deviceStatus[dev.id] = "online";
+          deviceLatency[dev.id] = Math.max(
+            1,
+            Math.round(performance.now() - start),
+          );
         } catch (err) {
           deviceStatus[dev.id] = "offline";
+          deviceLatency[dev.id] = null;
         } finally {
           clearTimeout(timeout);
           updateStatusIndicators();
@@ -1210,6 +1393,7 @@
         btn.classList.add("spinning");
         await Promise.all(config.devices.map((d) => pingSingleDevice(d)));
         btn.classList.remove("spinning");
+        if (activeGroup === "online") renderDevices();
       }
 
       function updateStatusIndicators() {
@@ -1217,15 +1401,39 @@
         const online = config.devices.filter(
           (d) => deviceStatus[d.id] === "online",
         ).length;
+        const checking = config.devices.some(
+          (d) => deviceStatus[d.id] === "checking",
+        );
+
         document.getElementById("onlineCounter").textContent =
           `${online} / ${total} Online`;
 
+        const summaryDot = document.getElementById("summaryDot");
+        if (checking) {
+          summaryDot.className = "dot checking";
+        } else if (online > 0) {
+          summaryDot.className = "dot online";
+        } else {
+          summaryDot.className = "dot offline";
+        }
+
         config.devices.forEach((dev) => {
           const st = deviceStatus[dev.id] || "checking";
+          const ms = deviceLatency[dev.id];
           document
             .querySelectorAll(`[data-status-id="${dev.id}"]`)
             .forEach((dot) => {
               dot.className = `dot ${st}`;
+            });
+          document
+            .querySelectorAll(`[data-ping-id="${dev.id}"]`)
+            .forEach((badge) => {
+              if (st === "online" && ms) {
+                badge.style.display = "inline-block";
+                badge.textContent = `${ms}ms`;
+              } else {
+                badge.style.display = "none";
+              }
             });
         });
       }
@@ -1244,10 +1452,12 @@
         strip.innerHTML = favs
           .map((dev) => {
             const st = deviceStatus[dev.id] || "checking";
+            const idSafe = escapeHtml(dev.id);
+            const colorSafe = escapeHtml(dev.color || "#38bdf8");
             return `
-          <div class="fav-chip" onclick='openDevice(${JSON.stringify(dev).replace(/'/g, "&#39;")})'>
-            <span class="dot ${st}" data-status-id="${dev.id}"></span>
-            <span style="color:${dev.color || "var(--accent)"};display:grid">${svgIcon(dev.icon, 16)}</span>
+          <div class="fav-chip" style="--chip-color:${colorSafe}" onclick="openDeviceById('${idSafe}')">
+            <span class="dot ${st}" data-status-id="${idSafe}"></span>
+            <span style="color:${colorSafe};display:grid">${svgIcon(dev.icon, 16)}</span>
             <span>${escapeHtml(dev.name)}</span>
           </div>
         `;
@@ -1258,18 +1468,26 @@
       function renderTabs() {
         const tabsEl = document.getElementById("groupTabs");
         const allCount = config.devices.length;
+        const onlineCount = config.devices.filter(
+          (d) => deviceStatus[d.id] === "online",
+        ).length;
 
         let html = `
         <button class="tab ${activeGroup === "all" ? "active" : ""}" onclick="selectGroup('all')">
           All Devices <span class="tab-count">${allCount}</span>
         </button>
+        <button class="tab ${activeGroup === "online" ? "active" : ""}" onclick="selectGroup('online')">
+          <span class="dot online"></span>
+          Online <span class="tab-count">${onlineCount}</span>
+        </button>
       `;
 
         config.groups.forEach((g) => {
           const count = config.devices.filter((d) => d.group === g.id).length;
+          const gIdSafe = escapeHtml(g.id);
           html += `
-          <button class="tab ${activeGroup === g.id ? "active" : ""}" onclick="selectGroup('${g.id}')">
-            <span class="dot" style="background:${g.color}"></span>
+          <button class="tab ${activeGroup === g.id ? "active" : ""}" onclick="selectGroup('${gIdSafe}')">
+            <span class="dot" style="background:${escapeHtml(g.color)}"></span>
             ${escapeHtml(g.name)}
             <span class="tab-count">${count}</span>
           </button>
@@ -1287,30 +1505,33 @@
 
       function createCardHtml(dev) {
         const st = deviceStatus[dev.id] || "checking";
+        const ms = deviceLatency[dev.id];
         const addr = getDisplayAddress(dev);
         const showAddr = config.settings.showIpOnCard !== false;
-        const devJson = JSON.stringify(dev).replace(/'/g, "&#39;");
+        const idSafe = escapeHtml(dev.id);
+        const altPathSafe = escapeHtml(dev.altPath || "");
 
         return `
-        <article class="card" style="--card-accent:${dev.color || "var(--accent)"}" onclick='openDevice(${devJson})'>
+        <article class="card" style="--card-accent:${escapeHtml(dev.color || "var(--accent)")}" onclick="openDeviceById('${idSafe}')">
           <div class="card-top">
             <div class="dev-icon">${svgIcon(dev.icon, 21)}</div>
             <div class="dev-info">
               <div class="dev-title-row">
-                <span class="dot ${st}" data-status-id="${dev.id}" title="Status: ${st}"></span>
+                <span class="dot ${st}" data-status-id="${idSafe}" title="Status: ${st}"></span>
                 <h2 class="dev-name">${escapeHtml(dev.name)}</h2>
+                <span class="ping-ms" data-ping-id="${idSafe}" style="display:${st === "online" && ms ? "inline-block" : "none"}">${ms ? ms + "ms" : ""}</span>
               </div>
               <div class="dev-meta">${escapeHtml(dev.note || getGroupName(dev.group))}</div>
             </div>
-            <button class="fav-btn ${dev.fav ? "active" : ""}" title="Pin to Favorites" onclick="toggleFavorite(event, '${dev.id}')">
+            <button class="fav-btn ${dev.fav ? "active" : ""}" title="Pin to Favorites" onclick="toggleFavorite(event, '${idSafe}')">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="${dev.fav ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </button>
           </div>
           <div class="card-bottom">
-            ${showAddr ? `<span class="addr-pill" title="Click to copy address" onclick="copyAddress(event, '${escapeHtml(addr)}')">${escapeHtml(addr)}</span>` : "<span></span>"}
+            ${showAddr ? `<span class="addr-pill" title="Tap to copy address" onclick="copyAddress(event, '${escapeHtml(addr)}')">${escapeHtml(addr)}</span>` : "<span></span>"}
             <div class="card-links">
-              ${dev.altLabel && dev.altPath ? `<button class="mini-btn" onclick='event.stopPropagation(); openDevice(${devJson}, "${escapeHtml(dev.altPath)}")'>${escapeHtml(dev.altLabel)}</button>` : ""}
-              <button class="mini-btn" onclick='event.stopPropagation(); openDevice(${devJson})'>Open &rarr;</button>
+              ${dev.altLabel && dev.altPath ? `<button class="mini-btn" onclick="openDeviceById('${idSafe}', '${altPathSafe}', event)">${escapeHtml(dev.altLabel)}</button>` : ""}
+              <button class="mini-btn" onclick="openDeviceById('${idSafe}', null, event)">Open &rarr;</button>
             </div>
           </div>
         </article>
@@ -1325,12 +1546,17 @@
           .toLowerCase();
 
         const filtered = config.devices.filter((d) => {
-          const matchesGroup = activeGroup === "all" || d.group === activeGroup;
+          const matchesGroup =
+            activeGroup === "all"
+              ? true
+              : activeGroup === "online"
+                ? deviceStatus[d.id] === "online"
+                : d.group === activeGroup;
           if (!matchesGroup) return false;
           if (!query) return true;
           const gName = getGroupName(d.group).toLowerCase();
           return (
-            d.name.toLowerCase().includes(query) ||
+            (d.name && d.name.toLowerCase().includes(query)) ||
             (d.ip && d.ip.toLowerCase().includes(query)) ||
             (d.mdns && d.mdns.toLowerCase().includes(query)) ||
             (d.note && d.note.toLowerCase().includes(query)) ||
@@ -1359,7 +1585,7 @@
             html += `
             <section class="group-block">
               <div class="group-header">
-                <span class="group-bar" style="background:${g.color}"></span>
+                <span class="group-bar" style="background:${escapeHtml(g.color)}"></span>
                 <h3 class="group-title">${escapeHtml(g.name)}</h3>
                 <span class="tab-count">${groupDevs.length}</span>
               </div>
@@ -1414,8 +1640,8 @@
       }
 
       async function rebootHub() {
-        if (!confirm("Reboot the central ESP32 hub now?")) return;
-        showToast("Sending reboot command...");
+        if (!confirm("Restart the central ESP32 hub now?")) return;
+        showToast("Sending restart command...");
         if (!isOfflinePreview) {
           await fetch("/api/reboot", { method: "POST" }).catch(() => {});
         }
@@ -1452,6 +1678,11 @@
           searchInput.blur();
         }
       });
+
+      // Refresh telemetry every 15s when live
+      setInterval(() => {
+        if (!isOfflinePreview) loadTelemetry();
+      }, 15000);
 
       loadConfig();
     </script>
