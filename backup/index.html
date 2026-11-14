@@ -1,0 +1,1522 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#090d16" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="ACCESS POINT" />
+    <title>ACCESS POINT | IoT Gateway</title>
+    <style>
+      :root {
+        --bg-base: #070b12;
+        --bg-card: rgba(17, 25, 40, 0.78);
+        --bg-card-hover: rgba(24, 36, 58, 0.92);
+        --glass-border: rgba(255, 255, 255, 0.09);
+        --glass-highlight: rgba(6, 182, 212, 0.35);
+        --cyan: #06b6d4;
+        --cyan-glow: rgba(6, 182, 212, 0.25);
+        --emerald: #10b981;
+        --emerald-glow: rgba(16, 185, 129, 0.25);
+        --amber: #f59e0b;
+        --rose: #f43f5e;
+        --text-main: #f1f5f9;
+        --text-muted: #94a3b8;
+        --text-dim: #64748b;
+        --radius: 16px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter,
+          sans-serif;
+        background-color: var(--bg-base);
+        background-image:
+          radial-gradient(
+            at 10% 10%,
+            rgba(6, 182, 212, 0.12) 0px,
+            transparent 45%
+          ),
+          radial-gradient(
+            at 90% 15%,
+            rgba(16, 185, 129, 0.1) 0px,
+            transparent 45%
+          ),
+          radial-gradient(
+            at 50% 90%,
+            rgba(6, 182, 212, 0.07) 0px,
+            transparent 50%
+          );
+        background-attachment: fixed;
+        color: var(--text-main);
+        min-height: 100vh;
+        padding-bottom: 80px;
+      }
+
+      /* Top Header */
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        background: rgba(7, 11, 18, 0.82);
+        border-bottom: 1px solid var(--glass-border);
+        padding: 14px 20px;
+      }
+
+      .topbar-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(
+          135deg,
+          rgba(6, 182, 212, 0.2),
+          rgba(16, 185, 129, 0.2)
+        );
+        border: 1px solid rgba(6, 182, 212, 0.4);
+        display: grid;
+        place-items: center;
+        box-shadow: 0 0 18px var(--cyan-glow);
+        color: var(--cyan);
+      }
+
+      .brand-title {
+        font-size: 1.35rem;
+        font-weight: 800;
+        letter-spacing: 2.5px;
+        background: linear-gradient(90deg, #ffffff, #67e8f9, #34d399);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .brand-sub {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .pulse-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--emerald);
+        box-shadow: 0 0 8px var(--emerald);
+        display: inline-block;
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 14px;
+        border-radius: 11px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-main);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s ease;
+      }
+
+      .btn:hover {
+        background: rgba(6, 182, 212, 0.14);
+        border-color: var(--glass-highlight);
+        transform: translateY(-1px);
+      }
+
+      .btn-primary {
+        background: linear-gradient(
+          135deg,
+          rgba(6, 182, 212, 0.25),
+          rgba(16, 185, 129, 0.25)
+        );
+        border-color: rgba(6, 182, 212, 0.45);
+        color: #a5f3fc;
+      }
+
+      /* Main Container */
+      .container {
+        max-width: 1280px;
+        margin: 22px auto 0;
+        padding: 0 18px;
+      }
+
+      /* Telemetry Summary Ribbon */
+      .stats-bar {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+
+      .stat-pill {
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 14px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        backdrop-filter: blur(12px);
+      }
+
+      .stat-label {
+        font-size: 0.73rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+      }
+
+      .stat-value {
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin-top: 2px;
+      }
+
+      /* Search, Routing Mode & Filter Controls */
+      .control-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
+        align-items: center;
+      }
+
+      .search-wrap {
+        flex: 1;
+        min-width: 240px;
+        position: relative;
+      }
+
+      .search-input {
+        width: 100%;
+        padding: 12px 38px 12px 40px;
+        border-radius: 13px;
+        border: 1px solid var(--glass-border);
+        background: var(--bg-card);
+        color: var(--text-main);
+        font-size: 0.9rem;
+        outline: none;
+        transition:
+          border 0.2s,
+          box-shadow 0.2s;
+      }
+
+      .search-input:focus {
+        border-color: var(--cyan);
+        box-shadow: 0 0 0 3px var(--cyan-glow);
+      }
+
+      .search-icon {
+        position: absolute;
+        left: 13px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        pointer-events: none;
+      }
+
+      .mode-switch {
+        display: flex;
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 3px;
+        gap: 4px;
+      }
+
+      .mode-btn {
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        padding: 7px 11px;
+        border-radius: 9px;
+        font-size: 0.76rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+
+      .mode-btn.active {
+        background: rgba(6, 182, 212, 0.22);
+        color: #67e8f9;
+        border: 1px solid rgba(6, 182, 212, 0.35);
+      }
+
+      /* Category / Group Tabs */
+      .tabs-bar {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 8px;
+        margin-bottom: 20px;
+        scrollbar-width: none;
+      }
+      .tabs-bar::-webkit-scrollbar {
+        display: none;
+      }
+
+      .tab-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 15px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        white-space: nowrap;
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .tab-chip.active {
+        background: linear-gradient(
+          135deg,
+          rgba(6, 182, 212, 0.25),
+          rgba(16, 185, 129, 0.2)
+        );
+        color: #fff;
+        border-color: var(--cyan);
+        box-shadow: 0 0 14px var(--cyan-glow);
+      }
+
+      .tab-count {
+        font-size: 0.68rem;
+        padding: 1px 6px;
+        border-radius: 99px;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-main);
+      }
+
+      /* Section Headers */
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 22px 0 12px;
+      }
+
+      .section-title {
+        font-size: 0.88rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* Device Grid */
+      .device-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+        gap: 15px;
+      }
+
+      .device-grid.compact {
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 10px;
+      }
+
+      .device-card {
+        position: relative;
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius);
+        padding: 16px;
+        backdrop-filter: blur(14px);
+        transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 14px;
+        overflow: hidden;
+      }
+
+      .device-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: var(--card-accent, var(--cyan));
+        opacity: 0.8;
+      }
+
+      .device-card:hover {
+        background: var(--bg-card-hover);
+        border-color: var(--glass-highlight);
+        transform: translateY(-3px);
+        box-shadow:
+          0 12px 28px -8px rgba(0, 0, 0, 0.6),
+          0 0 18px var(--cyan-glow);
+      }
+
+      .card-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .device-identity {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        flex: 1;
+      }
+
+      .device-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        display: grid;
+        place-items: center;
+        font-size: 1.35rem;
+        flex-shrink: 0;
+      }
+
+      .device-name {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-main);
+        line-height: 1.25;
+      }
+
+      .device-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 4px;
+        flex-wrap: wrap;
+      }
+
+      .badge {
+        font-size: 0.66rem;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.07);
+        color: var(--text-muted);
+        letter-spacing: 0.3px;
+      }
+
+      .badge-chip {
+        background: rgba(6, 182, 212, 0.14);
+        color: #67e8f9;
+        border: 1px solid rgba(6, 182, 212, 0.25);
+      }
+
+      .card-tools {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .icon-btn {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+
+      .icon-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-main);
+      }
+
+      .icon-btn.fav-active {
+        color: var(--amber);
+        background: rgba(245, 158, 11, 0.14);
+        border-color: rgba(245, 158, 11, 0.3);
+      }
+
+      /* Address & Status Box */
+      .address-box {
+        background: rgba(7, 11, 18, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 10px;
+        padding: 9px 11px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 0.76rem;
+      }
+
+      .addr-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .addr-link {
+        color: #a5f3fc;
+        text-decoration: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .addr-link:hover {
+        text-decoration: underline;
+      }
+
+      .mdns-link {
+        color: #6ee7b7;
+        text-decoration: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .mdns-link:hover {
+        text-decoration: underline;
+      }
+
+      .copy-mini {
+        background: none;
+        border: none;
+        color: var(--text-dim);
+        cursor: pointer;
+        font-size: 0.7rem;
+        padding: 2px 5px;
+        border-radius: 4px;
+      }
+      .copy-mini:hover {
+        color: var(--text-main);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      /* Quick Shortcuts inside Card */
+      .shortcuts-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .shortcut-pill {
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 5px 10px;
+        border-radius: 8px;
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.28);
+        color: #6ee7b7;
+        cursor: pointer;
+        transition: all 0.15s;
+        text-decoration: none;
+      }
+
+      .shortcut-pill:hover {
+        background: rgba(16, 185, 129, 0.25);
+        transform: translateY(-1px);
+      }
+
+      /* Card Footer */
+      .card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.73rem;
+        color: var(--text-muted);
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--text-dim);
+      }
+      .status-dot.online {
+        background: var(--emerald);
+        box-shadow: 0 0 8px var(--emerald);
+      }
+      .status-dot.offline {
+        background: var(--rose);
+      }
+      .status-dot.checking {
+        background: var(--amber);
+        animation: blink 1s infinite;
+      }
+
+      @keyframes blink {
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      .launch-group {
+        display: flex;
+        gap: 6px;
+      }
+
+      .launch-btn {
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        border: 1px solid rgba(6, 182, 212, 0.4);
+        background: linear-gradient(
+          135deg,
+          rgba(6, 182, 212, 0.22),
+          rgba(16, 185, 129, 0.18)
+        );
+        color: #e0f2fe;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.15s;
+      }
+
+      .launch-btn:hover {
+        background: linear-gradient(
+          135deg,
+          rgba(6, 182, 212, 0.4),
+          rgba(16, 185, 129, 0.35)
+        );
+        box-shadow: 0 0 12px var(--cyan-glow);
+      }
+
+      /* Modal Iframe Preview */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(3, 7, 18, 0.85);
+        backdrop-filter: blur(10px);
+        z-index: 100;
+        display: none;
+        place-items: center;
+        padding: 16px;
+      }
+      .modal-backdrop.open {
+        display: grid;
+      }
+
+      .modal-window {
+        width: 100%;
+        max-width: 1020px;
+        height: 85vh;
+        background: #0b111e;
+        border: 1px solid var(--glass-highlight);
+        border-radius: 18px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+      }
+
+      .modal-header {
+        padding: 12px 18px;
+        background: rgba(17, 25, 40, 0.95);
+        border-bottom: 1px solid var(--glass-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .modal-iframe {
+        width: 100%;
+        flex: 1;
+        border: none;
+        background: #fff;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 22px;
+        right: 22px;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid var(--cyan);
+        color: var(--text-main);
+        padding: 11px 16px;
+        border-radius: 12px;
+        font-size: 0.82rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        transform: translateY(80px);
+        opacity: 0;
+        transition: all 0.25s ease;
+        z-index: 200;
+      }
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 48px 20px;
+        background: var(--bg-card);
+        border: 1px dashed var(--glass-border);
+        border-radius: var(--radius);
+        color: var(--text-muted);
+      }
+
+      @media (max-width: 640px) {
+        .brand-title {
+          font-size: 1.15rem;
+        }
+        .stats-bar {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Top Navigation Header -->
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+              <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+              <line x1="12" y1="20" x2="12.01" y2="20"></line>
+            </svg>
+          </div>
+          <div>
+            <h1 class="brand-title" id="portalHeading">ACCESS POINT</h1>
+            <div class="brand-sub">
+              <span class="pulse-dot"></span>
+              <span id="gatewaySubtitle">ESP32 Central IoT Hub</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="top-actions">
+          <button
+            class="btn"
+            id="pingAllBtn"
+            title="Ping all ESP devices on LAN"
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            <span>Ping LAN</span>
+          </button>
+          <a href="config.html" class="btn btn-primary">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="3"></circle>
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+              ></path>
+            </svg>
+            <span>NVS Config</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <!-- Quick Stats Bar -->
+      <section class="stats-bar">
+        <div class="stat-pill">
+          <div>
+            <div class="stat-label">Total Nodes</div>
+            <div class="stat-value" id="statTotal">0</div>
+          </div>
+          <span style="font-size: 1.5rem">📡</span>
+        </div>
+        <div class="stat-pill">
+          <div>
+            <div class="stat-label">Online Now</div>
+            <div
+              class="stat-value"
+              id="statOnline"
+              style="color: var(--emerald)"
+            >
+              0
+            </div>
+          </div>
+          <span style="font-size: 1.5rem">⚡</span>
+        </div>
+        <div class="stat-pill">
+          <div>
+            <div class="stat-label">Pinned Favorites</div>
+            <div class="stat-value" id="statFavs" style="color: var(--amber)">
+              0
+            </div>
+          </div>
+          <span style="font-size: 1.5rem">⭐</span>
+        </div>
+        <div class="stat-pill">
+          <div>
+            <div class="stat-label">Active Groups</div>
+            <div class="stat-value" id="statGroups" style="color: var(--cyan)">
+              0
+            </div>
+          </div>
+          <span style="font-size: 1.5rem">🗂️</span>
+        </div>
+      </section>
+
+      <!-- Search & Global Routing Preferences -->
+      <section class="control-bar">
+        <div class="search-wrap">
+          <svg
+            class="search-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="Search by device name, IP, mDNS, group, or chip (Press '/' to focus)..."
+          />
+        </div>
+
+        <!-- Address Priority Toggle (IP vs mDNS) -->
+        <div
+          class="mode-switch"
+          title="Choose whether clicking a card redirects via IP address or mDNS (.local)"
+        >
+          <button class="mode-btn active" data-route="ip" id="routeIpBtn">
+            Use IP
+          </button>
+          <button class="mode-btn" data-route="mdns" id="routeMdnsBtn">
+            Use mDNS
+          </button>
+        </div>
+
+        <!-- Target Tab Toggle (Redirect Same Tab vs New Tab) -->
+        <div
+          class="mode-switch"
+          title="Redirect in current tab or open a new tab"
+        >
+          <button
+            class="mode-btn active"
+            data-target="_self"
+            id="targetSelfBtn"
+          >
+            Redirect
+          </button>
+          <button class="mode-btn" data-target="_blank" id="targetBlankBtn">
+            New Tab
+          </button>
+        </div>
+      </section>
+
+      <!-- Group Filter Chips -->
+      <nav class="tabs-bar" id="groupTabs"></nav>
+
+      <!-- Pinned Favorites Section -->
+      <div id="favoritesSection" style="display: none">
+        <div class="section-head">
+          <div class="section-title">
+            <span>⭐ Pinned Favorites</span>
+          </div>
+        </div>
+        <div class="device-grid" id="favoritesGrid"></div>
+      </div>
+
+      <!-- Main Devices Container -->
+      <div id="mainDevicesContainer"></div>
+    </main>
+
+    <!-- Live Iframe Quick-View Modal -->
+    <div class="modal-backdrop" id="previewModal">
+      <div class="modal-window">
+        <div class="modal-header">
+          <div>
+            <strong id="modalTitle" style="color: var(--text-main)"
+              >Device Preview</strong
+            >
+            <span
+              id="modalUrl"
+              style="
+                font-size: 0.75rem;
+                color: var(--cyan);
+                margin-left: 10px;
+                font-family: monospace;
+              "
+            ></span>
+          </div>
+          <div style="display: flex; gap: 8px">
+            <a id="modalExternalBtn" href="#" target="_blank" class="btn"
+              >Open Full Page ↗</a
+            >
+            <button class="btn" id="closeModalBtn">✕ Close</button>
+          </div>
+        </div>
+        <iframe class="modal-iframe" id="modalFrame" src="about:blank"></iframe>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">Copied!</div>
+
+    <script>
+      const STORAGE_KEY = 'esp32_access_point_nvs_v1';
+
+      // Default starter dataset if NVS / localStorage is empty
+      const DEFAULT_NVS_DATA = {
+        settings: {
+          title: 'ACCESS POINT',
+          subtitle: 'ESP32 Central IoT Gateway',
+          preferredRoute: 'ip',      // 'ip' | 'mdns'
+          redirectTarget: '_self',   // '_self' | '_blank'
+          autoPingOnLoad: true,
+          pingTimeoutMs: 2500
+        },
+        groups: [
+          { id: 'solar', name: 'Solar & Power', icon: '☀️', color: '#10b981' },
+          { id: 'sensors', name: 'Telemetry & Lab', icon: '📟', color: '#06b6d4' },
+          { id: 'home', name: 'Home Automation', icon: '🏠', color: '#f59e0b' },
+          { id: 'media', name: 'Displays & Media', icon: '🟦', color: '#8b5cf6' }
+        ],
+        devices: [
+          {
+            id: 'dev-1',
+            name: 'Smart Solar Monitor',
+            ip: '192.168.1.101',
+            port: 80,
+            mdns: 'solar-modbus.local',
+            path: '/',
+            group: 'solar',
+            chip: 'ESP32',
+            icon: '☀️',
+            favorite: true,
+            notes: 'RS485 Modbus + BH1750 Lux & Panel Temp',
+            shortcuts: [
+              { label: 'Live Metrics', path: '/metrics' },
+              { label: 'Reboot', path: '/reboot' }
+            ]
+          },
+          {
+            id: 'dev-2',
+            name: '100A DC Clamp Meter',
+            ip: '192.168.1.102',
+            port: 80,
+            mdns: 'dc-ammeter.local',
+            path: '/',
+            group: 'solar',
+            chip: 'ESP32-C3',
+            icon: '⚡',
+            favorite: true,
+            notes: 'Hall Sensor + ADS1115 16-bit ADC',
+            shortcuts: [
+              { label: 'Zero Calibrate', path: '/calibrate' },
+              { label: 'JSON API', path: '/api/current' }
+            ]
+          },
+          {
+            id: 'dev-3',
+            name: 'MAX7219 LED Matrix Hub',
+            ip: '192.168.1.105',
+            port: 80,
+            mdns: 'led-matrix.local',
+            path: '/',
+            group: 'media',
+            chip: 'ESP32',
+            icon: '🟦',
+            favorite: true,
+            notes: 'Chained Matrix Web Controller',
+            shortcuts: [
+              { label: 'Send Text', path: '/msg' },
+              { label: 'Brightness', path: '/dim' }
+            ]
+          },
+          {
+            id: 'dev-4',
+            name: 'Split-Flap Display',
+            ip: '192.168.1.108',
+            port: 80,
+            mdns: 'split-flap.local',
+            path: '/',
+            group: 'media',
+            chip: 'ESP32-S3',
+            icon: '🔤',
+            favorite: false,
+            notes: '8-Module 74HC595 + AHT10 Sensor',
+            shortcuts: [
+              { label: 'Home Flaps', path: '/reset' }
+            ]
+          },
+          {
+            id: 'dev-5',
+            name: 'Bedroom BLDC & Relay Node',
+            ip: '192.168.1.112',
+            port: 80,
+            mdns: 'room-node.local',
+            path: '/',
+            group: 'home',
+            chip: 'ESP32',
+            icon: '🌀',
+            favorite: false,
+            notes: 'Main Distribution & Environment Node',
+            shortcuts: [
+              { label: 'Toggle Load', path: '/toggle' }
+            ]
+          },
+          {
+            id: 'dev-6',
+            name: 'ESP32-S3 CAM Node',
+            ip: '192.168.1.120',
+            port: 80,
+            mdns: 'esp-cam.local',
+            path: '/',
+            group: 'sensors',
+            chip: 'ESP32-S3',
+            icon: '📷',
+            favorite: false,
+            notes: 'N16R8 Stream & Snapshot Server',
+            shortcuts: [
+              { label: 'Stream', path: ':81/stream' },
+              { label: 'Snapshot', path: '/capture' }
+            ]
+          }
+        ]
+      };
+
+      let state = null;
+      let activeGroupFilter = 'all';
+      let searchQuery = '';
+      let pingStatuses = {}; // { [deviceId]: { status: 'online'|'offline'|'checking', latency: 42 } }
+
+      async function loadData() {
+        // 1. Try fetching from ESP32 NVS REST API if hosted on the microcontroller
+        try {
+          const res = await fetch('/api/nvs', { cache: 'no-store' });
+          if (res.ok) {
+            const espData = await res.json();
+            if (espData && Array.isArray(espData.devices)) {
+              state = espData;
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+              return;
+            }
+          }
+        } catch (_) {
+          // Fallback to localStorage when running standalone or before .ino backend is flashed
+        }
+
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          try {
+            state = JSON.parse(raw);
+          } catch (e) {
+            state = structuredClone(DEFAULT_NVS_DATA);
+          }
+        } else {
+          state = structuredClone(DEFAULT_NVS_DATA);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+      }
+
+      function saveDataLocal() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+
+      function buildDeviceUrl(dev, customPath = null, forceMode = null) {
+        const mode = forceMode || state.settings.preferredRoute || 'ip';
+        const protocol = dev.protocol || 'http';
+        const portPart = (dev.port && Number(dev.port) !== 80) ? `:${dev.port}` : '';
+        const host = (mode === 'mdns' && dev.mdns) ? dev.mdns.replace(/^https?:\/\//, '') : dev.ip;
+        const suffix = customPath !== null ? customPath : (dev.path || '/');
+        if (suffix.startsWith(':')) {
+          return `${protocol}://${host}${suffix}`;
+        }
+        return `${protocol}://${host}${portPart}${suffix.startsWith('/') ? suffix : '/' + suffix}`;
+      }
+
+      function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+      }
+
+      function copyText(txt, label) {
+        navigator.clipboard.writeText(txt).then(() => showToast(`Copied ${label}: ${txt}`));
+      }
+
+      function toggleFavorite(id, ev) {
+        ev.stopPropagation();
+        const dev = state.devices.find(d => d.id === id);
+        if (!dev) return;
+        dev.favorite = !dev.favorite;
+        saveDataLocal();
+        // Also notify ESP32 backend non-blocking if present
+        fetch('/api/nvs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(state)
+        }).catch(() => {});
+        renderAll();
+      }
+
+      function openDevice(dev, customPath = null) {
+        const url = buildDeviceUrl(dev, customPath);
+        const target = state.settings.redirectTarget || '_self';
+        if (target === '_blank') {
+          window.open(url, '_blank');
+        } else {
+          window.location.href = url;
+        }
+      }
+
+      function openPreviewModal(dev, ev) {
+        ev.stopPropagation();
+        const url = buildDeviceUrl(dev);
+        document.getElementById('modalTitle').textContent = `${dev.icon || '📟'} ${dev.name}`;
+        document.getElementById('modalUrl').textContent = url;
+        document.getElementById('modalExternalBtn').href = url;
+        document.getElementById('modalFrame').src = url;
+        document.getElementById('previewModal').classList.add('open');
+      }
+
+      // Probe device reachability over LAN using no-cors fetch timing
+      async function pingDevice(dev) {
+        pingStatuses[dev.id] = { status: 'checking', latency: null };
+        updateCardStatusUI(dev.id);
+
+        const url = buildDeviceUrl(dev, '/');
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), state.settings.pingTimeoutMs || 2500);
+        const start = performance.now();
+
+        try {
+          await fetch(url, { mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+          clearTimeout(timeout);
+          const ms = Math.round(performance.now() - start);
+          pingStatuses[dev.id] = { status: 'online', latency: ms };
+        } catch (err) {
+          clearTimeout(timeout);
+          pingStatuses[dev.id] = { status: 'offline', latency: null };
+        }
+        updateCardStatusUI(dev.id);
+        updateStatsBar();
+      }
+
+      function pingAllDevices() {
+        state.devices.forEach(d => pingDevice(d));
+      }
+
+      function updateCardStatusUI(devId) {
+        const info = pingStatuses[devId] || { status: 'idle', latency: null };
+        document.querySelectorAll(`[data-status-id="${devId}"]`).forEach(el => {
+          const dot = el.querySelector('.status-dot');
+          const txt = el.querySelector('.status-text');
+          dot.className = 'status-dot ' + (info.status || '');
+          if (info.status === 'online') {
+            txt.textContent = `Online (${info.latency} ms)`;
+            txt.style.color = 'var(--emerald)';
+          } else if (info.status === 'checking') {
+            txt.textContent = 'Pinging...';
+            txt.style.color = 'var(--amber)';
+          } else if (info.status === 'offline') {
+            txt.textContent = 'Unreachable';
+            txt.style.color = 'var(--rose)';
+          } else {
+            txt.textContent = 'Ready';
+            txt.style.color = 'var(--text-muted)';
+          }
+        });
+      }
+
+      function getGroupObj(groupId) {
+        return state.groups.find(g => g.id === groupId) || { id: 'other', name: 'Uncategorized', icon: '📁', color: '#06b6d4' };
+      }
+
+      function createDeviceCardHTML(dev) {
+        const grp = getGroupObj(dev.group);
+        const st = pingStatuses[dev.id] || { status: 'idle', latency: null };
+        const primaryUrl = buildDeviceUrl(dev);
+        const shortcutsHTML = (dev.shortcuts || []).map(sc => {
+          const scUrl = buildDeviceUrl(dev, sc.path);
+          return `<a href="${scUrl}" target="${state.settings.redirectTarget || '_self'}" class="shortcut-pill" onclick="event.stopPropagation()">⚡ ${escapeHtml(sc.label)}</a>`;
+        }).join('');
+
+        return `
+          <article class="device-card" style="--card-accent: ${grp.color || '#06b6d4'}">
+            <div>
+              <div class="card-top">
+                <div class="device-identity" onclick="triggerCardLaunch('${dev.id}')">
+                  <div class="device-icon">${dev.icon || '📟'}</div>
+                  <div>
+                    <div class="device-name">${escapeHtml(dev.name)}</div>
+                    <div class="device-meta">
+                      <span class="badge badge-chip">${escapeHtml(dev.chip || 'ESP32')}</span>
+                      <span class="badge">${grp.icon} ${escapeHtml(grp.name)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card-tools">
+                  <button class="icon-btn ${dev.favorite ? 'fav-active' : ''}" onclick="toggleFavorite('${dev.id}', event)" title="Pin to Favorites">
+                    ★
+                  </button>
+                  <button class="icon-btn" onclick="openPreviewModalById('${dev.id}', event)" title="Live Popup Preview">
+                    ⧉
+                  </button>
+                </div>
+              </div>
+
+              ${dev.notes ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:10px;">${escapeHtml(dev.notes)}</div>` : ''}
+
+              <div class="address-box" style="margin-top:12px;">
+                <div class="addr-row">
+                  <span style="color:var(--text-dim)">IP:</span>
+                  <a class="addr-link" href="http://${dev.ip}${dev.port && dev.port != 80 ? ':'+dev.port : ''}${dev.path || '/'}" target="${state.settings.redirectTarget || '_self'}">${escapeHtml(dev.ip)}${dev.port && dev.port != 80 ? ':' + dev.port : ''}</a>
+                  <button class="copy-mini" onclick="copyText('${dev.ip}', 'IP')">Copy</button>
+                </div>
+                ${dev.mdns ? `
+                <div class="addr-row">
+                  <span style="color:var(--text-dim)">mDNS:</span>
+                  <a class="mdns-link" href="http://${dev.mdns.replace(/^https?:\/\//, '')}${dev.path || '/'}" target="${state.settings.redirectTarget || '_self'}">${escapeHtml(dev.mdns)}</a>
+                  <button class="copy-mini" onclick="copyText('${dev.mdns}', 'mDNS')">Copy</button>
+                </div>` : ''}
+              </div>
+
+              ${shortcutsHTML ? `<div class="shortcuts-row" style="margin-top:10px;">${shortcutsHTML}</div>` : ''}
+            </div>
+
+            <div class="card-footer">
+              <div class="status-indicator" data-status-id="${dev.id}" onclick="pingSingle('${dev.id}')" style="cursor:pointer;" title="Click to re-ping device">
+                <span class="status-dot ${st.status || ''}"></span>
+                <span class="status-text">${st.status === 'online' ? `Online (${st.latency} ms)` : st.status === 'offline' ? 'Unreachable' : 'Tap to Ping'}</span>
+              </div>
+              <div class="launch-group">
+                <button class="launch-btn" onclick="triggerCardLaunch('${dev.id}')">
+                  <span>Connect</span>
+                  <span>→</span>
+                </button>
+              </div>
+            </div>
+          </article>
+        `;
+      }
+
+      function triggerCardLaunch(id) {
+        const dev = state.devices.find(d => d.id === id);
+        if (dev) openDevice(dev);
+      }
+
+      function openPreviewModalById(id, ev) {
+        const dev = state.devices.find(d => d.id === id);
+        if (dev) openPreviewModal(dev, ev);
+      }
+
+      function pingSingle(id) {
+        const dev = state.devices.find(d => d.id === id);
+        if (dev) pingDevice(dev);
+      }
+
+      function escapeHtml(str) {
+        return String(str || '').replace(/[&<>"']/g, m => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": ''' }[m]));
+      }
+
+      function updateStatsBar() {
+        document.getElementById('statTotal').textContent = state.devices.length;
+        const onlineCount = Object.values(pingStatuses).filter(s => s.status === 'online').length;
+        document.getElementById('statOnline').textContent = onlineCount;
+        document.getElementById('statFavs').textContent = state.devices.filter(d => d.favorite).length;
+        document.getElementById('statGroups').textContent = state.groups.length;
+      }
+
+      function renderGroupTabs() {
+        const tabsEl = document.getElementById('groupTabs');
+        const total = state.devices.length;
+        const favCount = state.devices.filter(d => d.favorite).length;
+
+        let html = `
+          <button class="tab-chip ${activeGroupFilter === 'all' ? 'active' : ''}" onclick="setGroupFilter('all')">
+            <span>🌐 All Devices</span>
+            <span class="tab-count">${total}</span>
+          </button>
+          <button class="tab-chip ${activeGroupFilter === 'fav' ? 'active' : ''}" onclick="setGroupFilter('fav')">
+            <span>⭐ Favorites</span>
+            <span class="tab-count">${favCount}</span>
+          </button>
+        `;
+
+        state.groups.forEach(g => {
+          const count = state.devices.filter(d => d.group === g.id).length;
+          html += `
+            <button class="tab-chip ${activeGroupFilter === g.id ? 'active' : ''}" onclick="setGroupFilter('${g.id}')">
+              <span>${g.icon} ${escapeHtml(g.name)}</span>
+              <span class="tab-count">${count}</span>
+            </button>
+          `;
+        });
+
+        tabsEl.innerHTML = html;
+      }
+
+      function setGroupFilter(groupId) {
+        activeGroupFilter = groupId;
+        renderAll();
+      }
+
+      function filterDevicesList() {
+        const q = searchQuery.trim().toLowerCase();
+        return state.devices.filter(d => {
+          const matchesGroup =
+            activeGroupFilter === 'all' ? true :
+            activeGroupFilter === 'fav' ? Boolean(d.favorite) :
+            d.group === activeGroupFilter;
+
+          if (!matchesGroup) return false;
+          if (!q) return true;
+
+          const grpName = getGroupObj(d.group).name.toLowerCase();
+          return (
+            (d.name && d.name.toLowerCase().includes(q)) ||
+            (d.ip && d.ip.toLowerCase().includes(q)) ||
+            (d.mdns && d.mdns.toLowerCase().includes(q)) ||
+            (d.chip && d.chip.toLowerCase().includes(q)) ||
+            (d.notes && d.notes.toLowerCase().includes(q)) ||
+            grpName.includes(q)
+          );
+        });
+      }
+
+      function renderAll() {
+        document.getElementById('portalHeading').textContent = state.settings.title || 'ACCESS POINT';
+        document.getElementById('gatewaySubtitle').textContent = state.settings.subtitle || 'ESP32 Central IoT Hub';
+
+        // Sync mode buttons
+        document.getElementById('routeIpBtn').classList.toggle('active', state.settings.preferredRoute !== 'mdns');
+        document.getElementById('routeMdnsBtn').classList.toggle('active', state.settings.preferredRoute === 'mdns');
+        document.getElementById('targetSelfBtn').classList.toggle('active', state.settings.redirectTarget !== '_blank');
+        document.getElementById('targetBlankBtn').classList.toggle('active', state.settings.redirectTarget === '_blank');
+
+        renderGroupTabs();
+        updateStatsBar();
+
+        const filtered = filterDevicesList();
+
+        // Favorites Top Bar (shown when on "All Devices" view and no search filter active)
+        const favSection = document.getElementById('favoritesSection');
+        const favGrid = document.getElementById('favoritesGrid');
+        const favDevices = state.devices.filter(d => d.favorite);
+
+        if (activeGroupFilter === 'all' && !searchQuery.trim() && favDevices.length > 0) {
+          favSection.style.display = 'block';
+          favGrid.innerHTML = favDevices.map(createDeviceCardHTML).join('');
+        } else {
+          favSection.style.display = 'none';
+        }
+
+        // Main Grouped or Filtered View
+        const mainContainer = document.getElementById('mainDevicesContainer');
+        if (filtered.length === 0) {
+          mainContainer.innerHTML = `
+            <div class="empty-state">
+              <div style="font-size:2rem; margin-bottom:8px;">🔍</div>
+              <h3>No ESP devices match your filter</h3>
+              <p style="font-size:0.85rem; margin-top:6px;">Try clearing your search or add a new device in <a href="config.html" style="color:var(--cyan);">NVS Config</a>.</p>
+            </div>
+          `;
+          return;
+        }
+
+        if (activeGroupFilter === 'all' && !searchQuery.trim()) {
+          // Render organized by group
+          let sectionsHTML = '';
+          state.groups.forEach(g => {
+            const groupDevs = filtered.filter(d => d.group === g.id);
+            if (groupDevs.length === 0) return;
+            sectionsHTML += `
+              <div class="section-head">
+                <div class="section-title">
+                  <span>${g.icon} ${escapeHtml(g.name)}</span>
+                  <span class="badge">${groupDevs.length}</span>
+                </div>
+              </div>
+              <div class="device-grid">
+                ${groupDevs.map(createDeviceCardHTML).join('')}
+              </div>
+            `;
+          });
+
+          // Any uncategorized devices
+          const knownIds = new Set(state.groups.map(g => g.id));
+          const others = filtered.filter(d => !knownIds.has(d.group));
+          if (others.length > 0) {
+            sectionsHTML += `
+              <div class="section-head">
+                <div class="section-title">📁 Uncategorized</div>
+              </div>
+              <div class="device-grid">${others.map(createDeviceCardHTML).join('')}</div>
+            `;
+          }
+          mainContainer.innerHTML = sectionsHTML;
+        } else {
+          mainContainer.innerHTML = `
+            <div class="section-head">
+              <div class="section-title">Matching Devices (${filtered.length})</div>
+            </div>
+            <div class="device-grid">${filtered.map(createDeviceCardHTML).join('')}</div>
+          `;
+        }
+
+        // Refresh status indicators
+        state.devices.forEach(d => updateCardStatusUI(d.id));
+      }
+
+      // Event Listeners
+      document.getElementById('searchInput').addEventListener('input', e => {
+        searchQuery = e.target.value;
+        renderAll();
+      });
+
+      document.addEventListener('keydown', e => {
+        if (e.key === '/' && document.activeElement !== document.getElementById('searchInput')) {
+          e.preventDefault();
+          document.getElementById('searchInput').focus();
+        } else if (e.key === 'Escape') {
+          document.getElementById('previewModal').classList.remove('open');
+          document.getElementById('modalFrame').src = 'about:blank';
+        }
+      });
+
+      document.getElementById('routeIpBtn').addEventListener('click', () => {
+        state.settings.preferredRoute = 'ip';
+        saveDataLocal();
+        renderAll();
+        showToast('Routing mode: Direct IP Address');
+      });
+
+      document.getElementById('routeMdnsBtn').addEventListener('click', () => {
+        state.settings.preferredRoute = 'mdns';
+        saveDataLocal();
+        renderAll();
+        showToast('Routing mode: mDNS (.local)');
+      });
+
+      document.getElementById('targetSelfBtn').addEventListener('click', () => {
+        state.settings.redirectTarget = '_self';
+        saveDataLocal();
+        renderAll();
+        showToast('Click behavior: Redirect Current Tab');
+      });
+
+      document.getElementById('targetBlankBtn').addEventListener('click', () => {
+        state.settings.redirectTarget = '_blank';
+        saveDataLocal();
+        renderAll();
+        showToast('Click behavior: Open in New Tab');
+      });
+
+      document.getElementById('pingAllBtn').addEventListener('click', () => {
+        showToast('Pinging all LAN devices...');
+        pingAllDevices();
+      });
+
+      document.getElementById('closeModalBtn').addEventListener('click', () => {
+        document.getElementById('previewModal').classList.remove('open');
+        document.getElementById('modalFrame').src = 'about:blank';
+      });
+
+      // Initialize
+      (async function init() {
+        await loadData();
+        renderAll();
+        if (state.settings.autoPingOnLoad) {
+          pingAllDevices();
+        }
+      })();
+    </script>
+  </body>
+</html>

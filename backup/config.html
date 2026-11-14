@@ -1,0 +1,1083 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#090d16" />
+    <title>NVS Configuration | ACCESS POINT</title>
+    <style>
+      :root {
+        --bg-base: #070b12;
+        --bg-card: rgba(17, 25, 40, 0.82);
+        --glass-border: rgba(255, 255, 255, 0.09);
+        --cyan: #06b6d4;
+        --cyan-glow: rgba(6, 182, 212, 0.25);
+        --emerald: #10b981;
+        --amber: #f59e0b;
+        --rose: #f43f5e;
+        --text-main: #f1f5f9;
+        --text-muted: #94a3b8;
+        --text-dim: #64748b;
+        --radius: 16px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter,
+          sans-serif;
+        background-color: var(--bg-base);
+        background-image:
+          radial-gradient(
+            at 15% 15%,
+            rgba(6, 182, 212, 0.12) 0px,
+            transparent 45%
+          ),
+          radial-gradient(
+            at 85% 20%,
+            rgba(16, 185, 129, 0.1) 0px,
+            transparent 45%
+          );
+        background-attachment: fixed;
+        color: var(--text-main);
+        min-height: 100vh;
+        padding-bottom: 90px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        backdrop-filter: blur(18px);
+        background: rgba(7, 11, 18, 0.86);
+        border-bottom: 1px solid var(--glass-border);
+        padding: 14px 20px;
+      }
+
+      .topbar-inner {
+        max-width: 1240px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+
+      .title-group h1 {
+        font-size: 1.2rem;
+        font-weight: 800;
+        letter-spacing: 1.4px;
+        color: #fff;
+      }
+
+      .title-group p {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 15px;
+        border-radius: 10px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-main);
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--glass-border);
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.18s;
+      }
+
+      .btn:hover {
+        border-color: var(--cyan);
+        background: rgba(6, 182, 212, 0.15);
+      }
+
+      .btn-emerald {
+        background: linear-gradient(
+          135deg,
+          rgba(16, 185, 129, 0.28),
+          rgba(6, 182, 212, 0.25)
+        );
+        border-color: rgba(16, 185, 129, 0.5);
+        color: #a7f3d0;
+      }
+
+      .btn-danger {
+        background: rgba(244, 63, 94, 0.12);
+        border-color: rgba(244, 63, 94, 0.35);
+        color: #fda4af;
+      }
+
+      .container {
+        max-width: 1240px;
+        margin: 22px auto 0;
+        padding: 0 18px;
+        display: grid;
+        grid-template-columns: 380px 1fr;
+        gap: 20px;
+        align-items: start;
+      }
+
+      @media (max-width: 960px) {
+        .container {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel {
+        background: var(--bg-card);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius);
+        padding: 18px;
+        backdrop-filter: blur(14px);
+        margin-bottom: 18px;
+      }
+
+      .panel-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #67e8f9;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--glass-border);
+        padding-bottom: 10px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin-bottom: 12px;
+      }
+
+      .form-group.full {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        font-size: 0.74rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--glass-border);
+        background: rgba(7, 11, 18, 0.75);
+        color: var(--text-main);
+        font-size: 0.86rem;
+        outline: none;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: var(--cyan);
+        box-shadow: 0 0 0 2px var(--cyan-glow);
+      }
+
+      /* NVS Memory Meter */
+      .nvs-meter {
+        background: rgba(7, 11, 18, 0.65);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 16px;
+      }
+
+      .meter-bar {
+        height: 8px;
+        border-radius: 99px;
+        background: rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+        margin-top: 8px;
+      }
+
+      .meter-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--cyan), var(--emerald));
+        width: 25%;
+        transition: width 0.3s ease;
+      }
+
+      /* Device Table / List in Config */
+      .device-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgba(7, 11, 18, 0.55);
+        border: 1px solid var(--glass-border);
+        margin-bottom: 10px;
+        transition: border 0.15s;
+      }
+
+      .device-row:hover {
+        border-color: rgba(6, 182, 212, 0.4);
+      }
+
+      .row-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .row-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.05);
+        display: grid;
+        place-items: center;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+      }
+
+      .row-title {
+        font-weight: 700;
+        font-size: 0.92rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .row-sub {
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        font-family: monospace;
+        margin-top: 2px;
+      }
+
+      .row-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
+      .sm-btn {
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 0.74rem;
+        font-weight: 600;
+        border: 1px solid var(--glass-border);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-main);
+        cursor: pointer;
+      }
+
+      .sm-btn:hover {
+        border-color: var(--cyan);
+      }
+      .sm-btn.del:hover {
+        border-color: var(--rose);
+        color: var(--rose);
+      }
+
+      /* Shortcut Builder Row */
+      .sc-item {
+        display: grid;
+        grid-template-columns: 1fr 1fr auto;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+
+      /* Group Tags */
+      .group-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: rgba(7, 11, 18, 0.55);
+        border: 1px solid var(--glass-border);
+        border-radius: 10px;
+        margin-bottom: 8px;
+        font-size: 0.84rem;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 22px;
+        right: 22px;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid var(--emerald);
+        color: var(--text-main);
+        padding: 12px 18px;
+        border-radius: 12px;
+        font-size: 0.84rem;
+        transform: translateY(80px);
+        opacity: 0;
+        transition: all 0.25s ease;
+        z-index: 200;
+      }
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="title-group">
+          <h1>⚙️ NVS CONFIGURATION MANAGER</h1>
+          <p>Add, modify, reorder, or backup ESP32 & IoT node endpoints</p>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap">
+          <a href="index.html" class="btn">← Back to ACCESS POINT</a>
+          <button class="btn btn-emerald" id="commitNvsBtn">
+            💾 Commit All to ESP32 NVS
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <!-- Left Column: Add/Edit Device Form & NVS Usage -->
+      <div>
+        <section class="panel">
+          <div class="panel-title">
+            <span id="formHeaderTitle">➕ Add New ESP Device</span>
+            <button class="sm-btn" id="resetFormBtn" style="display: none">
+              Cancel Edit
+            </button>
+          </div>
+
+          <form id="deviceForm">
+            <input type="hidden" id="editDeviceId" value="" />
+
+            <div class="form-group full">
+              <label>Device Name *</label>
+              <input
+                type="text"
+                id="devName"
+                required
+                placeholder="e.g., Solar Charge Monitor"
+              />
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label>IPv4 Address *</label>
+                <input
+                  type="text"
+                  id="devIp"
+                  required
+                  placeholder="192.168.1.105"
+                  pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$|^[a-zA-Z0-9.-]+$"
+                />
+              </div>
+              <div class="form-group">
+                <label>HTTP Port</label>
+                <input
+                  type="number"
+                  id="devPort"
+                  value="80"
+                  min="1"
+                  max="65535"
+                />
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label>mDNS Hostname (.local)</label>
+                <input
+                  type="text"
+                  id="devMdns"
+                  placeholder="solar-node.local"
+                />
+              </div>
+              <div class="form-group">
+                <label>Default Path</label>
+                <input
+                  type="text"
+                  id="devPath"
+                  value="/"
+                  placeholder="/ or /dashboard"
+                />
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Group / Zone</label>
+                <select id="devGroup"></select>
+              </div>
+              <div class="form-group">
+                <label>Hardware / Chip</label>
+                <select id="devChip">
+                  <option value="ESP32">ESP32</option>
+                  <option value="ESP32-S3">ESP32-S3</option>
+                  <option value="ESP32-C3">ESP32-C3</option>
+                  <option value="ESP8266">ESP8266</option>
+                  <option value="ESP32-CAM">ESP32-CAM</option>
+                  <option value="Other IoT">Other IoT</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Icon Emoji</label>
+                <input type="text" id="devIcon" value="📟" maxlength="4" />
+              </div>
+              <div class="form-group">
+                <label>Pin to Favorites</label>
+                <select id="devFav">
+                  <option value="false">No</option>
+                  <option value="true">⭐ Yes (Favorite)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group full">
+              <label>Hardware Notes / Sensors Connected</label>
+              <input
+                type="text"
+                id="devNotes"
+                placeholder="e.g., ADS1115 + Hall Sensor, MAC: 24:6F:28:..."
+              />
+            </div>
+
+            <!-- Custom Quick Endpoint Shortcuts inside Card -->
+            <div class="form-group full">
+              <label
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                "
+              >
+                <span>Quick-Action Card Buttons (Optional)</span>
+                <button type="button" class="sm-btn" id="addShortcutRowBtn">
+                  + Add Button
+                </button>
+              </label>
+              <div id="shortcutsContainer" style="margin-top: 6px"></div>
+            </div>
+
+            <button
+              type="submit"
+              class="btn btn-emerald"
+              style="width: 100%; justify-content: center; margin-top: 6px"
+              id="saveDeviceBtn"
+            >
+              Save Device Entry
+            </button>
+          </form>
+        </section>
+
+        <!-- Group / Category Manager -->
+        <section class="panel">
+          <div class="panel-title">🗂️ Manage Groups</div>
+          <div id="groupsList"></div>
+          <div class="form-grid" style="margin-top: 10px">
+            <input
+              type="text"
+              id="newGroupName"
+              placeholder="Group Name (e.g., Roof)"
+            />
+            <div style="display: flex; gap: 6px">
+              <input
+                type="text"
+                id="newGroupIcon"
+                value="📡"
+                style="width: 52px; text-align: center"
+              />
+              <input
+                type="color"
+                id="newGroupColor"
+                value="#06b6d4"
+                style="width: 48px; padding: 3px; height: 38px"
+              />
+              <button
+                type="button"
+                class="btn btn-emerald"
+                id="addGroupBtn"
+                style="flex: 1; justify-content: center"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Right Column: Saved Devices List, Subnet Discovery & NVS System Tools -->
+      <div>
+        <!-- NVS Storage Estimator & System Preferences -->
+        <section class="panel">
+          <div class="panel-title">
+            <span>🧠 ESP32 NVS Memory & Portal Settings</span>
+            <span
+              id="nvsBytesLabel"
+              style="font-size: 0.76rem; color: var(--emerald)"
+              >0 KB / 16 KB Used</span
+            >
+          </div>
+
+          <div class="nvs-meter">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.76rem;
+                color: var(--text-muted);
+              "
+            >
+              <span>NVS Namespace: <code>iot_portal</code></span>
+              <span id="nvsPercentLabel">12%</span>
+            </div>
+            <div class="meter-bar">
+              <div class="meter-fill" id="nvsMeterFill"></div>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Home Page Heading</label>
+              <input type="text" id="cfgTitle" value="ACCESS POINT" />
+            </div>
+            <div class="form-group">
+              <label>Gateway Subtitle</label>
+              <input
+                type="text"
+                id="cfgSubtitle"
+                value="ESP32 Central IoT Hub"
+              />
+            </div>
+            <div class="form-group">
+              <label>Default Address Priority</label>
+              <select id="cfgRoute">
+                <option value="ip">Direct IP Address First</option>
+                <option value="mdns">mDNS (.local) Hostname First</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Auto-Ping LAN on Startup</label>
+              <select id="cfgAutoPing">
+                <option value="true">Enabled</option>
+                <option value="false">Disabled</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn" id="savePortalSettingsBtn">
+            Apply Gateway Settings
+          </button>
+        </section>
+
+        <!-- Saved Devices List -->
+        <section class="panel">
+          <div class="panel-title">
+            <span
+              >📋 Stored Devices (<span id="deviceCountBadge">0</span>)</span
+            >
+            <input
+              type="text"
+              id="filterConfigInput"
+              placeholder="Filter list..."
+              style="width: 190px; padding: 6px 10px; font-size: 0.78rem"
+            />
+          </div>
+          <div id="configDevicesList"></div>
+        </section>
+
+        <!-- LAN Subnet HTTP Scanner -->
+        <section class="panel">
+          <div class="panel-title">
+            <span>🔎 Local Subnet HTTP Webserver Scanner</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted)"
+              >Find active ESP nodes on router</span
+            >
+          </div>
+          <div
+            style="
+              display: flex;
+              gap: 10px;
+              flex-wrap: wrap;
+              align-items: flex-end;
+              margin-bottom: 12px;
+            "
+          >
+            <div style="flex: 1; min-width: 160px">
+              <label>Subnet Prefix</label>
+              <input
+                type="text"
+                id="scanSubnet"
+                value="192.168.1."
+                placeholder="192.168.1."
+              />
+            </div>
+            <div style="width: 90px">
+              <label>Start IP</label>
+              <input
+                type="number"
+                id="scanStart"
+                value="100"
+                min="1"
+                max="254"
+              />
+            </div>
+            <div style="width: 90px">
+              <label>End IP</label>
+              <input type="number" id="scanEnd" value="130" min="1" max="254" />
+            </div>
+            <button class="btn btn-emerald" id="startScanBtn">
+              Start Sweep
+            </button>
+          </div>
+          <div
+            id="scanResults"
+            style="font-size: 0.8rem; color: var(--text-muted)"
+          ></div>
+        </section>
+
+        <!-- Backup, Restore & Factory Reset -->
+        <section class="panel">
+          <div class="panel-title">📦 NVS JSON Backup & Restore</div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap">
+            <button class="btn" id="exportJsonBtn">⬇ Export NVS JSON</button>
+            <label class="btn" style="cursor: pointer; margin: 0">
+              ⬆ Import JSON File
+              <input
+                type="file"
+                id="importJsonInput"
+                accept=".json"
+                style="display: none"
+              />
+            </label>
+            <button
+              class="btn btn-danger"
+              id="factoryResetBtn"
+              style="margin-left: auto"
+            >
+              ⚠️ Reset to Defaults
+            </button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <div class="toast" id="toast">Saved!</div>
+
+    <script>
+      const STORAGE_KEY = 'esp32_access_point_nvs_v1';
+      let state = null;
+
+      async function loadConfigState() {
+        try {
+          const res = await fetch('/api/nvs', { cache: 'no-store' });
+          if (res.ok) {
+            state = await res.json();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            return;
+          }
+        } catch (_) {}
+
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          try { state = JSON.parse(raw); } catch (_) {}
+        }
+        if (!state || !Array.isArray(state.devices)) {
+          // Redirect once to index.html or initialize empty structure
+          state = {
+            settings: { title: 'ACCESS POINT', subtitle: 'ESP32 Central IoT Hub', preferredRoute: 'ip', redirectTarget: '_self', autoPingOnLoad: true },
+            groups: [
+              { id: 'solar', name: 'Solar & Power', icon: '☀️', color: '#10b981' },
+              { id: 'sensors', name: 'Telemetry & Lab', icon: '📟', color: '#06b6d4' },
+              { id: 'home', name: 'Home Automation', icon: '🏠', color: '#f59e0b' },
+              { id: 'media', name: 'Displays & Media', icon: '🟦', color: '#8b5cf6' }
+            ],
+            devices: []
+          };
+        }
+      }
+
+      async function persistState(commitToEsp = false) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        updateNvsMeter();
+        if (commitToEsp) {
+          try {
+            const res = await fetch('/api/nvs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(state)
+            });
+            if (res.ok) {
+              showToast('✅ Flashed configuration to ESP32 NVS!');
+              return;
+            }
+          } catch (_) {}
+          showToast('💾 Saved locally (Ready for ESP32 NVS sync)');
+        }
+      }
+
+      function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+      }
+
+      function escapeHtml(str) {
+        return String(str || '').replace(/[&<>"']/g, m => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": ''' }[m]));
+      }
+
+      function updateNvsMeter() {
+        const bytes = new Blob([JSON.stringify(state)]).size;
+        const maxBytes = 16384; // Typical 16KB NVS partition budget for JSON blob
+        const pct = Math.min(100, Math.round((bytes / maxBytes) * 100));
+        document.getElementById('nvsBytesLabel').textContent = `${(bytes / 1024).toFixed(2)} KB / 16.00 KB`;
+        document.getElementById('nvsPercentLabel').textContent = `${pct}%`;
+        document.getElementById('nvsMeterFill').style.width = `${pct}%`;
+      }
+
+      function addShortcutInputRow(label = '', path = '') {
+        const wrap = document.getElementById('shortcutsContainer');
+        const div = document.createElement('div');
+        div.className = 'sc-item';
+        div.innerHTML = `
+          <input type="text" class="sc-label" placeholder="Button Label (e.g. Reboot)" value="${escapeHtml(label)}" />
+          <input type="text" class="sc-path" placeholder="Path (e.g. /reboot)" value="${escapeHtml(path)}" />
+          <button type="button" class="sm-btn del" onclick="this.parentElement.remove()">✕</button>
+        `;
+        wrap.appendChild(div);
+      }
+
+      function renderGroupSelectAndList() {
+        const sel = document.getElementById('devGroup');
+        sel.innerHTML = state.groups.map(g => `<option value="${g.id}">${g.icon} ${escapeHtml(g.name)}</option>`).join('');
+
+        const listEl = document.getElementById('groupsList');
+        listEl.innerHTML = state.groups.map(g => `
+          <div class="group-item">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:12px; height:12px; border-radius:50%; background:${g.color}; display:inline-block;"></span>
+              <span>${g.icon} <strong>${escapeHtml(g.name)}</strong></span>
+            </div>
+            <button class="sm-btn del" onclick="deleteGroup('${g.id}')">Delete</button>
+          </div>
+        `).join('');
+      }
+
+      function deleteGroup(id) {
+        if (state.groups.length <= 1) {
+          showToast('At least one group is required');
+          return;
+        }
+        state.groups = state.groups.filter(g => g.id !== id);
+        persistState();
+        renderAllConfig();
+        showToast('Group removed');
+      }
+
+      function renderDevicesList() {
+        const q = document.getElementById('filterConfigInput').value.trim().toLowerCase();
+        const listEl = document.getElementById('configDevicesList');
+        document.getElementById('deviceCountBadge').textContent = state.devices.length;
+
+        const filtered = state.devices.filter(d =>
+          !q ||
+          d.name.toLowerCase().includes(q) ||
+          d.ip.toLowerCase().includes(q) ||
+          (d.mdns && d.mdns.toLowerCase().includes(q))
+        );
+
+        if (filtered.length === 0) {
+          listEl.innerHTML = `<div style="text-align:center; padding:24px; color:var(--text-muted);">No devices configured.</div>`;
+          return;
+        }
+
+        listEl.innerHTML = filtered.map((d, idx) => `
+          <div class="device-row">
+            <div class="row-left">
+              <div class="row-icon">${d.icon || '📟'}</div>
+              <div>
+                <div class="row-title">
+                  <span>${escapeHtml(d.name)}</span>
+                  ${d.favorite ? '<span style="color:var(--amber)">★</span>' : ''}
+                  <span style="font-size:0.68rem; padding:2px 6px; border-radius:5px; background:rgba(6,182,212,0.15); color:#67e8f9;">${escapeHtml(d.chip || 'ESP32')}</span>
+                </div>
+                <div class="row-sub">
+                  IP: ${escapeHtml(d.ip)}:${d.port || 80}${d.path || '/'} ${d.mdns ? ` | mDNS: ${escapeHtml(d.mdns)}` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="row-actions">
+              <button class="sm-btn" onclick="moveDevice('${d.id}', -1)" title="Move Up">↑</button>
+              <button class="sm-btn" onclick="moveDevice('${d.id}', 1)" title="Move Down">↓</button>
+              <button class="sm-btn" onclick="editDevice('${d.id}')">Edit</button>
+              <button class="sm-btn" onclick="cloneDevice('${d.id}')">Clone</button>
+              <button class="sm-btn del" onclick="deleteDevice('${d.id}')">Delete</button>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      function editDevice(id) {
+        const d = state.devices.find(item => item.id === id);
+        if (!d) return;
+        document.getElementById('editDeviceId').value = d.id;
+        document.getElementById('devName').value = d.name || '';
+        document.getElementById('devIp').value = d.ip || '';
+        document.getElementById('devPort').value = d.port || 80;
+        document.getElementById('devMdns').value = d.mdns || '';
+        document.getElementById('devPath').value = d.path || '/';
+        document.getElementById('devGroup').value = d.group || (state.groups[0] && state.groups[0].id);
+        document.getElementById('devChip').value = d.chip || 'ESP32';
+        document.getElementById('devIcon').value = d.icon || '📟';
+        document.getElementById('devFav').value = String(Boolean(d.favorite));
+        document.getElementById('devNotes').value = d.notes || '';
+
+        const scWrap = document.getElementById('shortcutsContainer');
+        scWrap.innerHTML = '';
+        (d.shortcuts || []).forEach(sc => addShortcutInputRow(sc.label, sc.path));
+
+        document.getElementById('formHeaderTitle').textContent = `✏️ Edit: ${d.name}`;
+        document.getElementById('saveDeviceBtn').textContent = 'Update Device in NVS';
+        document.getElementById('resetFormBtn').style.display = 'inline-block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function cloneDevice(id) {
+        const orig = state.devices.find(item => item.id === id);
+        if (!orig) return;
+        const copy = structuredClone(orig);
+        copy.id = 'dev-' + Date.now();
+        copy.name = orig.name + ' (Copy)';
+        state.devices.push(copy);
+        persistState();
+        renderDevicesList();
+        showToast('Cloned device entry');
+      }
+
+      function deleteDevice(id) {
+        state.devices = state.devices.filter(d => d.id !== id);
+        persistState();
+        renderDevicesList();
+        showToast('Device deleted');
+      }
+
+      function moveDevice(id, dir) {
+        const idx = state.devices.findIndex(d => d.id === id);
+        if (idx < 0) return;
+        const targetIdx = idx + dir;
+        if (targetIdx < 0 || targetIdx >= state.devices.length) return;
+        const [item] = state.devices.splice(idx, 1);
+        state.devices.splice(targetIdx, 0, item);
+        persistState();
+        renderDevicesList();
+      }
+
+      function resetForm() {
+        document.getElementById('deviceForm').reset();
+        document.getElementById('editDeviceId').value = '';
+        document.getElementById('shortcutsContainer').innerHTML = '';
+        document.getElementById('formHeaderTitle').textContent = '➕ Add New ESP Device';
+        document.getElementById('saveDeviceBtn').textContent = 'Save Device Entry';
+        document.getElementById('resetFormBtn').style.display = 'none';
+      }
+
+      function renderAllConfig() {
+        document.getElementById('cfgTitle').value = state.settings.title || 'ACCESS POINT';
+        document.getElementById('cfgSubtitle').value = state.settings.subtitle || 'ESP32 Central IoT Hub';
+        document.getElementById('cfgRoute').value = state.settings.preferredRoute || 'ip';
+        document.getElementById('cfgAutoPing').value = String(Boolean(state.settings.autoPingOnLoad));
+
+        renderGroupSelectAndList();
+        renderDevicesList();
+        updateNvsMeter();
+      }
+
+      // Form Submit
+      document.getElementById('deviceForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const editId = document.getElementById('editDeviceId').value;
+
+        const shortcuts = [];
+        document.querySelectorAll('#shortcutsContainer .sc-item').forEach(row => {
+          const label = row.querySelector('.sc-label').value.trim();
+          const path = row.querySelector('.sc-path').value.trim();
+          if (label && path) shortcuts.push({ label, path });
+        });
+
+        const payload = {
+          id: editId || ('dev-' + Date.now()),
+          name: document.getElementById('devName').value.trim(),
+          ip: document.getElementById('devIp').value.trim(),
+          port: Number(document.getElementById('devPort').value) || 80,
+          mdns: document.getElementById('devMdns').value.trim(),
+          path: document.getElementById('devPath').value.trim() || '/',
+          group: document.getElementById('devGroup').value,
+          chip: document.getElementById('devChip').value,
+          icon: document.getElementById('devIcon').value.trim() || '📟',
+          favorite: document.getElementById('devFav').value === 'true',
+          notes: document.getElementById('devNotes').value.trim(),
+          shortcuts
+        };
+
+        if (editId) {
+          const idx = state.devices.findIndex(d => d.id === editId);
+          if (idx >= 0) state.devices[idx] = payload;
+        } else {
+          state.devices.push(payload);
+        }
+
+        persistState();
+        resetForm();
+        renderDevicesList();
+        showToast(editId ? 'Updated device!' : 'Added new device!');
+      });
+
+      document.getElementById('resetFormBtn').addEventListener('click', resetForm);
+      document.getElementById('addShortcutRowBtn').addEventListener('click', () => addShortcutInputRow());
+      document.getElementById('filterConfigInput').addEventListener('input', renderDevicesList);
+
+      // Add Group
+      document.getElementById('addGroupBtn').addEventListener('click', () => {
+        const name = document.getElementById('newGroupName').value.trim();
+        const icon = document.getElementById('newGroupIcon').value.trim() || '📁';
+        const color = document.getElementById('newGroupColor').value;
+        if (!name) return showToast('Enter a group name');
+        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now().toString().slice(-3);
+        state.groups.push({ id, name, icon, color });
+        document.getElementById('newGroupName').value = '';
+        persistState();
+        renderGroupSelectAndList();
+        showToast(`Added group: ${name}`);
+      });
+
+      // Save Gateway Settings
+      document.getElementById('savePortalSettingsBtn').addEventListener('click', () => {
+        state.settings.title = document.getElementById('cfgTitle').value.trim() || 'ACCESS POINT';
+        state.settings.subtitle = document.getElementById('cfgSubtitle').value.trim();
+        state.settings.preferredRoute = document.getElementById('cfgRoute').value;
+        state.settings.autoPingOnLoad = document.getElementById('cfgAutoPing').value === 'true';
+        persistState(true);
+      });
+
+      document.getElementById('commitNvsBtn').addEventListener('click', () => persistState(true));
+
+      // Subnet Scanner
+      document.getElementById('startScanBtn').addEventListener('click', async () => {
+        const prefix = document.getElementById('scanSubnet').value.trim();
+        const start = Number(document.getElementById('scanStart').value);
+        const end = Number(document.getElementById('scanEnd').value);
+        const out = document.getElementById('scanResults');
+        out.innerHTML = 'Scanning subnet for responsive HTTP servers...';
+        const found = [];
+
+        const promises = [];
+        for (let i = start; i <= end; i++) {
+          const ip = `${prefix}${i}`;
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 1600);
+          promises.push(
+            fetch(`http://${ip}/`, { mode: 'no-cors', cache: 'no-store', signal: ctrl.signal })
+              .then(() => { clearTimeout(t); found.push(ip); })
+              .catch(() => clearTimeout(t))
+          );
+        }
+
+        await Promise.all(promises);
+        if (found.length === 0) {
+          out.innerHTML = 'No active HTTP servers responded in that range.';
+        } else {
+          out.innerHTML = found.map(ip => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3); border-radius:8px; margin-top:6px;">
+              <span style="color:#6ee7b7; font-family:monospace;">⚡ Found HTTP Node: ${ip}</span>
+              <button class="sm-btn" onclick="prefillDiscoveredIp('${ip}')">+ Prefill Form</button>
+            </div>
+          `).join('');
+        }
+      });
+
+      function prefillDiscoveredIp(ip) {
+        resetForm();
+        document.getElementById('devIp').value = ip;
+        document.getElementById('devName').value = `ESP Node (${ip.split('.').pop()})`;
+        document.getElementById('devName').focus();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      // Export JSON Backup
+      document.getElementById('exportJsonBtn').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `access-point-nvs-backup-${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+      });
+
+      // Import JSON Backup
+      document.getElementById('importJsonInput').addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          try {
+            const parsed = JSON.parse(ev.target.result);
+            if (parsed && Array.isArray(parsed.devices)) {
+              state = parsed;
+              persistState(true);
+              renderAllConfig();
+              showToast('Imported NVS configuration backup!');
+            } else {
+              showToast('Invalid JSON format');
+            }
+          } catch (_) {
+            showToast('Failed to parse JSON file');
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // Factory Reset
+      document.getElementById('factoryResetBtn').addEventListener('click', () => {
+        if (confirm('Reset all devices and groups back to factory defaults?')) {
+          localStorage.removeItem(STORAGE_KEY);
+          fetch('/api/nvs/reset', { method: 'POST' }).catch(() => {});
+          window.location.href = 'index.html';
+        }
+      });
+
+      (async function init() {
+        await loadConfigState();
+        renderAllConfig();
+      })();
+    </script>
+  </body>
+</html>
