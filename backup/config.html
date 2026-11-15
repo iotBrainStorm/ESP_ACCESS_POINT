@@ -2244,7 +2244,7 @@
 
         const btn = document.getElementById("testScConnBtn");
         btn.className = "btn btn-sm";
-        btn.textContent = "Sending POST...";
+        btn.textContent = "Checking...";
 
         const portPart = port !== 80 ? `:${port}` : "";
         const url = `http://${host}${portPart}/api/switch/toggle`;
@@ -2257,15 +2257,19 @@
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
             },
-            body: `index=${encodeURIComponent(index)}&state=toggle&key=${encodeURIComponent(revealApiKey(apiKey))}`,
+            body: `index=${encodeURIComponent(index)}&state=status&key=${encodeURIComponent(revealApiKey(apiKey))}`,
+            cache: "no-store",
             signal: ctrl.signal,
           });
           const data = await res.json();
+          if (!res.ok || data.ok === false) {
+            throw new Error(data.error || "Auth Failed");
+          }
           const stateStr = data.state ? "ON" : "OFF";
-          btn.textContent = `Reply: ${name} is ${stateStr}`;
+          btn.textContent = `OK: ${name} is ${stateStr}`;
           btn.className = "btn btn-sm conn-ok";
         } catch (err) {
-          btn.textContent = "Unreachable / Invalid Reply";
+          btn.textContent = err.message || "Unreachable / Invalid Key";
           btn.className = "btn btn-sm conn-err";
         } finally {
           clearTimeout(t);

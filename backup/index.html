@@ -1700,34 +1700,35 @@
         renderAll();
 
         try {
-          let newState;
-          if (isOfflinePreview) {
-            newState = !sc.state;
-          } else {
-            const res = await fetch(url, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              body: bodyStr,
-            });
-            const data = await res.json();
-            newState = !!data.state;
+          const res = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: bodyStr,
+            cache: "no-store",
+          });
+          const data = await res.json();
+
+          if (!res.ok || data.ok === false) {
+            throw new Error(data.error || `HTTP ${res.status}`);
           }
 
-          // 2. Sync ON/OFF state across ALL cloned/duplicate buttons for this switch
+          const newState = !!data.state;
+
+          // 2. Sync ON/OFF state & online status across all matching shortcuts
           matchingShortcuts.forEach((item) => {
             item.state = newState;
-          });
-
-          matchingShortcuts.forEach((item) => {
             shortcutStatus[item.id] = "online";
           });
 
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
           showToast(`${sc.name} is now: ${newState ? "ON" : "OFF"}`);
+
+          // 3. Immediately sync all shortcut hosts (syncs IP + .local duplicates too)
+          syncAllShortcuts(true);
         } catch (err) {
-          showToast(`Failed to toggle ${sc.name}`);
+          showToast(err.message || `Failed to toggle ${sc.name}`);
           matchingShortcuts.forEach((item) => {
             shortcutStatus[item.id] = "offline";
           });
@@ -1735,7 +1736,6 @@
           matchingShortcuts.forEach((item) => (shortcutBusy[item.id] = false));
           renderAll();
 
-          // 3. If Favorite Bundle Modal is open, refresh its buttons in real time too
           const favModal = document.getElementById("favCardModal");
           if (
             favModal.classList.contains("open") &&
@@ -1858,38 +1858,103 @@
         }
       }
 
-      async function pingSingleShortcut(sc) {
-        shortcutStatus[sc.id] = "checking";
-        updateStatusIndicators();
+      // Fetches all 4 relay states from a Smart Switch board in 1 request
+      async function syncShortcutsForHost(hostKey, silent = false) {
+        const group = (config.shortcuts || []).filter((s) => {
+          const h = cleanHostInput(s.host).toLowerCase();
+          const p = Number(s.port) || 80;
+          return `${h}:${p}` === hostKey;
+        });
+        if (!group.length) return;
 
-        const cleanH = cleanHostInput(sc.host);
+        const first = group[0];
+        const cleanH = cleanHostInput(first.host);
+        const portPart =
+          first.port && Number(first.port) !== 80 ? `:${first.port}` : "";
+
         if (!cleanH) {
-          shortcutStatus[sc.id] = "offline";
+          group.forEach((s) => (shortcutStatus[s.id] = "offline"));
           updateStatusIndicators();
           return;
+        }
+
+        if (!silent) {
+          group.forEach((s) => (shortcutStatus[s.id] = "checking"));
+          updateStatusIndicators();
         }
 
         const controller = new AbortController();
         const timeout = setTimeout(
           () => controller.abort(),
-          config.settings.pingTimeoutMs || 1500,
+          config.settings.pingTimeoutMs || 1800,
         );
-        const portPart = sc.port && Number(sc.port) !== 80 ? `:${sc.port}` : "";
-        const target = `http://${cleanH}${portPart}/`;
+
+        let stateChanged = false;
 
         try {
-          await fetch(target, {
-            mode: "no-cors",
+          // /api/switches returns {"states":[bool,bool,bool,bool]} for all 4 relays
+          const res = await fetch(`http://${cleanH}${portPart}/api/switches`, {
             cache: "no-store",
             signal: controller.signal,
           });
-          shortcutStatus[sc.id] = "online";
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const data = await res.json();
+
+          group.forEach((s) => {
+            const idx = Number(s.index) || 0;
+            if (Array.isArray(data.states) && data.states[idx] !== undefined) {
+              const liveState = !!data.states[idx];
+              if (s.state !== liveState) {
+                s.state = liveState;
+                stateChanged = true;
+              }
+            }
+            if (shortcutStatus[s.id] !== "online") {
+              shortcutStatus[s.id] = "online";
+              stateChanged = true;
+            }
+          });
         } catch (err) {
-          shortcutStatus[sc.id] = "offline";
+          group.forEach((s) => {
+            if (shortcutStatus[s.id] !== "offline") {
+              shortcutStatus[s.id] = "offline";
+              stateChanged = true;
+            }
+          });
         } finally {
           clearTimeout(timeout);
+          if (stateChanged || !silent) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+            renderFavorites();
+            renderShortcuts();
+            renderDevices();
+            const favModal = document.getElementById("favCardModal");
+            if (
+              favModal.classList.contains("open") &&
+              favModal.dataset.activeFavId
+            ) {
+              handleFavoriteClick(favModal.dataset.activeFavId);
+            }
+          }
           updateStatusIndicators();
         }
+      }
+
+      async function syncAllShortcuts(silent = false) {
+        const uniqueHosts = [
+          ...new Set(
+            (config.shortcuts || [])
+              .map((s) => {
+                const h = cleanHostInput(s.host).toLowerCase();
+                const p = Number(s.port) || 80;
+                return h ? `${h}:${p}` : null;
+              })
+              .filter(Boolean),
+          ),
+        ];
+        await Promise.all(
+          uniqueHosts.map((hostKey) => syncShortcutsForHost(hostKey, silent)),
+        );
       }
 
       async function pingAllDevices() {
@@ -1897,7 +1962,7 @@
         btn.classList.add("spinning");
         await Promise.all([
           ...config.devices.map((d) => pingSingleDevice(d)),
-          ...(config.shortcuts || []).map((s) => pingSingleShortcut(s)),
+          syncAllShortcuts(false),
         ]);
         btn.classList.remove("spinning");
       }
@@ -2374,6 +2439,13 @@
           }
         }
       });
+
+      // Real-time 2.5s sync for all Shortcut Toggle Buttons (physical, web, or API)
+      setInterval(() => {
+        if (config && config.shortcuts && config.shortcuts.length) {
+          syncAllShortcuts(true);
+        }
+      }, 2500);
 
       setInterval(() => {
         if (!isOfflinePreview) loadTelemetry();
