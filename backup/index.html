@@ -175,7 +175,6 @@
       }
       .dot.online {
         background: var(--ok);
-        box-shadow: 0 0 8px var(--ok);
       }
       .dot.offline {
         background: var(--err);
@@ -1923,18 +1922,8 @@
           });
         } finally {
           clearTimeout(timeout);
-          if (stateChanged || !silent) {
+          if (stateChanged) {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-            renderFavorites();
-            renderShortcuts();
-            renderDevices();
-            const favModal = document.getElementById("favCardModal");
-            if (
-              favModal.classList.contains("open") &&
-              favModal.dataset.activeFavId
-            ) {
-              handleFavoriteClick(favModal.dataset.activeFavId);
-            }
           }
           updateStatusIndicators();
         }
@@ -2007,15 +1996,57 @@
               }
             });
         });
+
         (config.shortcuts || []).forEach((sc) => {
           const st = shortcutStatus[sc.id] || "checking";
+          const isBusy = !!shortcutBusy[sc.id];
+          const isOn = !!sc.state;
           document
             .querySelectorAll(`[data-sc-status-id="${sc.id}"]`)
             .forEach((dot) => {
               dot.className = `dot ${st}`;
+              dot.title = `Status: ${st}`;
+            });
+          document
+            .querySelectorAll(`[data-sc-card-id="${sc.id}"]`)
+            .forEach((card) => {
+              card.classList.toggle("on", isOn);
+              card.classList.toggle("busy", isBusy);
+              const pill = card.querySelector(".sc-pill");
+              if (pill) pill.textContent = isBusy ? "..." : isOn ? "ON" : "OFF";
             });
         });
-        renderFavorites();
+
+        // Update multi-item bundle dots in-place without rebuilding favStrip
+        (config.favorites || []).forEach((fav) => {
+          const dIds = (fav.deviceIds || []).filter((id) =>
+            config.devices.some((d) => d.id === id),
+          );
+          const sIds = (fav.shortcutIds || []).filter((id) =>
+            config.shortcuts.some((s) => s.id === id),
+          );
+          const anyOnline =
+            dIds.some((id) => deviceStatus[id] === "online") ||
+            sIds.some((id) => shortcutStatus[id] === "online");
+          const anyChecking =
+            dIds.some(
+              (id) => !deviceStatus[id] || deviceStatus[id] === "checking",
+            ) ||
+            sIds.some(
+              (id) => !shortcutStatus[id] || shortcutStatus[id] === "checking",
+            );
+          const bundleSt = anyOnline
+            ? "online"
+            : anyChecking
+              ? "checking"
+              : "offline";
+
+          document
+            .querySelectorAll(`[data-fav-bundle-id="${fav.id}"]`)
+            .forEach((dot) => {
+              dot.className = `dot ${bundleSt}`;
+            });
+        });
       }
 
       /* Req #11: Render Favorites Section (Supports Devices, Shortcuts, Groups & Bundles) */
@@ -2050,16 +2081,17 @@
             // Case 1: Single Shortcut Favorite -> dot before switch name + ON/OFF pill
             if (sIds.length === 1 && !dIds.length && !gIds.length) {
               const sc = config.shortcuts.find((x) => x.id === sIds[0]);
+              const scIdSafe = escapeHtml(sc.id);
               const isBusy = !!shortcutBusy[sc.id];
               const isOn = !!sc.state;
               const st = shortcutStatus[sc.id] || "checking";
               return `
-                <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" style="--sc-color:${colorSafe}" onclick="handleFavoriteClick('${fIdSafe}')">
+                <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" data-sc-card-id="${scIdSafe}" style="--sc-color:${colorSafe}" onclick="handleFavoriteClick('${fIdSafe}')">
                   <div class="sc-left">
                     <div class="sc-icon">${svgIcon(fav.icon || sc.icon || "switch", 19)}</div>
                     <div style="min-width:0">
                       <div class="sc-title">
-                        <span class="dot ${st}" data-sc-status-id="${escapeHtml(sc.id)}" title="Status: ${st}"></span>
+                        <span class="dot ${st}" data-sc-status-id="${scIdSafe}" title="Status: ${st}"></span>
                         <span class="sc-title-text">${escapeHtml(fav.name || sc.name)}</span>
                       </div>
                     </div>
@@ -2069,7 +2101,7 @@
               `;
             }
 
-            // Case 2: Single Device Favorite -> simple green/red dot instead of OFFLINE or ms
+            // Case 2: Single Device Favorite -> right-side duplicate dot removed
             if (dIds.length === 1 && !sIds.length && !gIds.length) {
               const dev = config.devices.find((x) => x.id === dIds[0]);
               const st = deviceStatus[dev.id] || "checking";
@@ -2085,7 +2117,6 @@
                       <div class="sc-sub">${escapeHtml(getDisplayAddress(dev))}</div>
                     </div>
                   </div>
-                  <span class="dot ${st}" data-status-id="${escapeHtml(dev.id)}" title="Status: ${st}"></span>
                 </div>
               `;
             }
@@ -2115,7 +2146,7 @@
                   <div class="sc-icon">${svgIcon(fav.icon || "chip", 19)}</div>
                   <div style="min-width:0">
                     <div class="sc-title">
-                      <span class="dot ${bundleSt}"></span>
+                      <span class="dot ${bundleSt}" data-fav-bundle-id="${fIdSafe}"></span>
                       <span class="sc-title-text">${escapeHtml(fav.name)}</span>
                     </div>
                     <div class="sc-sub">${totalItems} linked item${totalItems > 1 ? "s" : ""}</div>
@@ -2206,7 +2237,7 @@
         const st = shortcutStatus[sc.id] || "checking";
 
         return `
-          <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" style="--sc-color:${colorSafe}" onclick="triggerShortcut('${idSafe}', event)">
+          <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" data-sc-card-id="${idSafe}" style="--sc-color:${colorSafe}" onclick="triggerShortcut('${idSafe}', event)">
             <div class="sc-left">
               <div class="sc-icon">${svgIcon(sc.icon || "switch", 19)}</div>
               <div style="min-width:0">
