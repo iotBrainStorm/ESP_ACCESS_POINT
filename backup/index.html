@@ -56,11 +56,22 @@
         --shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
       }
 
+      /* Req #5: Hide all vertical & horizontal scrollbars globally, keep touch/wheel scroll */
+      html,
+      body,
       * {
         box-sizing: border-box;
         margin: 0;
         padding: 0;
         -webkit-tap-highlight-color: transparent;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+      }
+
+      *::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
       }
 
       body {
@@ -75,6 +86,12 @@
         flex-direction: column;
         line-height: 1.45;
         overflow-x: hidden;
+      }
+
+      /* Req #2: Stop background scroll when modal is open */
+      body.modal-open {
+        overflow: hidden !important;
+        touch-action: none;
       }
 
       /* Header */
@@ -208,6 +225,13 @@
         border-radius: 7px;
         cursor: pointer;
         transition: 0.15s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .seg-btn.icon-only {
+        padding: 5px 8px;
       }
 
       .seg-btn.active {
@@ -296,9 +320,10 @@
         flex: 1;
       }
 
-      /* === MODIFIED #1: Pinned Favorites Dock (Fixed Upper Glow Clipping) === */
-      .fav-section {
-        margin-bottom: 18px;
+      /* Favorites Dock */
+      .fav-section,
+      .shortcut-section {
+        margin-bottom: 20px;
       }
 
       .section-label {
@@ -307,7 +332,7 @@
         text-transform: uppercase;
         letter-spacing: 0.06em;
         color: var(--text-muted);
-        margin-bottom: 6px;
+        margin-bottom: 8px;
         display: flex;
         align-items: center;
         gap: 6px;
@@ -317,14 +342,9 @@
         display: flex;
         gap: 10px;
         overflow-x: auto;
-        /* Extra top/side/bottom padding so hover lift + glow are never cropped */
         padding: 8px 6px 10px 6px;
         margin: -6px -6px 0 -6px;
-        scrollbar-width: none;
         -webkit-overflow-scrolling: touch;
-      }
-      .fav-strip::-webkit-scrollbar {
-        display: none;
       }
 
       .fav-chip {
@@ -355,7 +375,7 @@
       .fav-chip:active {
         border-color: var(--chip-color, var(--accent));
         background: var(--card-hover);
-        transform: translateY(-2px);
+        transform: translateY(-1px);
         box-shadow:
           0 4px 14px var(--accent-soft),
           0 0 10px
@@ -367,64 +387,128 @@
         outline: none;
       }
 
-      /* Group Filter Bar */
-      .toolbar {
+      /* Shortcut Toggle Grid */
+      .shortcut-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        gap: 12px;
+      }
+
+      .shortcut-card {
+        position: relative;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px 14px;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        margin-bottom: 16px;
-        flex-wrap: wrap;
-      }
-
-      .tabs {
-        display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        padding: 6px 4px;
-        margin: -6px -4px;
-        scrollbar-width: none;
-        flex: 1;
-        -webkit-overflow-scrolling: touch;
-      }
-      .tabs::-webkit-scrollbar {
-        display: none;
-      }
-
-      .tab {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 7px 13px;
-        border-radius: 10px;
-        border: 1px solid var(--border);
-        background: var(--card);
-        color: var(--text-muted);
-        font-size: 0.82rem;
-        font-weight: 600;
         cursor: pointer;
-        white-space: nowrap;
-        transition: 0.15s;
+        user-select: none;
+        transition: 0.18s ease;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .shortcut-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 4px;
+        background: var(--sc-color, var(--accent));
+        opacity: 0.55;
+        transition: 0.18s ease;
+      }
+
+      .shortcut-card.on {
+        border-color: var(--sc-color, var(--ok));
+        background: color-mix(
+          in srgb,
+          var(--sc-color, var(--ok)) 10%,
+          var(--card)
+        );
+      }
+
+      .shortcut-card.on::before {
+        opacity: 1;
+        background: var(--sc-color, var(--ok));
+      }
+
+      .shortcut-card:hover {
+        transform: translateY(-1px);
+        border-color: var(--sc-color, var(--accent));
+      }
+
+      .sc-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .sc-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
         flex-shrink: 0;
+        background: color-mix(
+          in srgb,
+          var(--sc-color, var(--accent)) 16%,
+          transparent
+        );
+        color: var(--sc-color, var(--accent));
       }
 
-      .tab:hover {
-        color: var(--text);
-        border-color: var(--text-muted);
+      .sc-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
-      .tab.active {
-        background: var(--accent-soft);
-        border-color: var(--accent);
-        color: var(--accent);
-        box-shadow: 0 2px 10px var(--accent-soft);
+      .sc-sub {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
-      .tab-count {
+      .sc-pill {
         font-size: 0.7rem;
-        padding: 1px 6px;
+        font-weight: 700;
+        padding: 4px 10px;
         border-radius: 999px;
-        background: rgba(148, 163, 184, 0.16);
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text-muted);
+        flex-shrink: 0;
+        transition: 0.18s;
+      }
+
+      .shortcut-card.on .sc-pill {
+        background: rgba(34, 197, 94, 0.16);
+        border-color: var(--ok);
+        color: var(--ok);
+      }
+
+      .shortcut-card.busy .sc-pill {
+        color: var(--warn);
+        border-color: var(--warn);
+      }
+
+      /* View Controls Bar (groupTabs removed per Req #3) */
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        margin-bottom: 12px;
       }
 
       /* Group Section */
@@ -450,6 +534,13 @@
       .group-title {
         font-size: 0.92rem;
         font-weight: 700;
+      }
+
+      .tab-count {
+        font-size: 0.7rem;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.16);
       }
 
       /* Device Grid & List */
@@ -495,7 +586,7 @@
       }
 
       .card:hover {
-        transform: translateY(-2px);
+        transform: translateY(-1px);
         background: var(--card-hover);
         border-color: var(--card-accent, var(--accent));
       }
@@ -698,7 +789,44 @@
         cursor: pointer;
       }
 
-      /* === MODIFIED #2: Two-Line Footer (Developer Credit + Core Telemetry) === */
+      /* Modal for Multi-Item Favorite Card */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.72);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 60;
+      }
+      .modal-backdrop.open {
+        display: flex;
+      }
+      .modal {
+        width: 100%;
+        max-width: 580px;
+        max-height: 88vh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 18px;
+      }
+      .modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      /* Two-Line Footer */
       footer {
         border-top: 1px solid var(--border);
         background: var(--bg-elev);
@@ -731,7 +859,6 @@
       }
 
       .footer-credit .brand-tag {
-        color: var(--accent);
         font-weight: 700;
       }
 
@@ -757,26 +884,41 @@
         cursor: pointer;
         font-size: 0.74rem;
         font-weight: 600;
-        text-decoration: underline;
+        text-decoration: none;
         padding: 2px 4px;
       }
       .footer-link:hover {
         opacity: 0.85;
       }
 
-      /* Toast */
+      /* Req #1: Full-screen background blur when Toast is shown */
+      .toast-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+        z-index: 98;
+      }
+      .toast-backdrop.show {
+        opacity: 1;
+      }
+
       .toast {
         position: fixed;
-        bottom: 20px;
+        bottom: 24px;
         left: 50%;
         transform: translateX(-50%) translateY(80px);
         background: var(--text);
         color: var(--bg);
-        padding: 9px 16px;
+        padding: 10px 18px;
         border-radius: 999px;
         font-size: 0.82rem;
         font-weight: 600;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
         opacity: 0;
         pointer-events: none;
         transition: 0.25s ease;
@@ -791,7 +933,6 @@
         transform: translateX(-50%) translateY(0);
       }
 
-      /* === MODIFIED #3: Enhanced Mobile Responsiveness === */
       @media (max-width: 640px) {
         .topbar-inner {
           padding: 10px 12px;
@@ -805,7 +946,6 @@
           max-width: 100%;
           flex: 1 1 100%;
         }
-        /* 16px prevents iOS/Android auto-zoom when tapping search input */
         .search-input {
           font-size: 16px;
           height: 38px;
@@ -813,12 +953,10 @@
         .container {
           padding: 12px;
         }
-        .device-grid {
+        .device-grid,
+        .shortcut-grid {
           grid-template-columns: 1fr;
           gap: 10px;
-        }
-        .toolbar {
-          gap: 8px;
         }
         .list-view .addr-pill {
           display: none;
@@ -889,7 +1027,7 @@
             type="text"
             id="searchInput"
             class="search-input"
-            placeholder="Search devices, IP, mDNS... (/)"
+            placeholder="Search"
           />
           <button id="clearSearch" class="search-clear" title="Clear">
             &times;
@@ -981,28 +1119,81 @@
               points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
             />
           </svg>
-          Pinned Favorites
+          Favorites
         </div>
         <div class="fav-strip" id="favStrip"></div>
       </section>
 
-      <!-- Group Tabs & View Controls -->
-      <div class="toolbar">
-        <div class="tabs" id="groupTabs"></div>
+      <!-- Req #9: Shortcut Toggle Buttons Section (just after Favorites) -->
+      <section
+        class="shortcut-section"
+        id="shortcutSection"
+        style="display: none"
+      >
+        <div class="section-label">
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--accent)"
+            stroke-width="2.2"
+          >
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+          </svg>
+          Shortcut Buttons
+        </div>
+        <div class="shortcut-grid" id="shortcutGrid"></div>
+      </section>
+
+      <!-- Req #3 & #4: groupTabs removed; Grid & Compact toggle with icons only -->
+      <div class="toolbar" id="viewToolbar">
         <div class="seg-toggle" title="Switch layout">
           <button
-            class="seg-btn active"
+            class="seg-btn icon-only active"
             id="gridViewBtn"
+            title="Grid View"
             onclick="setViewMode('grid')"
           >
-            Grid
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+            </svg>
           </button>
           <button
-            class="seg-btn"
+            class="seg-btn icon-only"
             id="listViewBtn"
+            title="Compact View"
             onclick="setViewMode('list')"
           >
-            Compact
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
           </button>
         </div>
       </div>
@@ -1011,7 +1202,24 @@
       <div id="devicesContainer"></div>
     </main>
 
-    <!-- === MODIFIED #2: Two-Line Footer === -->
+    <!-- Multi-Item Favorite Card Modal -->
+    <div
+      class="modal-backdrop"
+      id="favCardModal"
+      onclick="if (event.target === this) closeFavCardModal();"
+    >
+      <div class="modal">
+        <div class="modal-head">
+          <h3 id="favCardModalTitle">Favorite Bundle</h3>
+          <button class="mini-btn" onclick="closeFavCardModal()">
+            &times;
+          </button>
+        </div>
+        <div id="favCardModalBody"></div>
+      </div>
+    </div>
+
+    <!-- Two-Line Footer -->
     <footer>
       <div class="footer-inner">
         <div class="footer-credit">
@@ -1029,6 +1237,8 @@
       </div>
     </footer>
 
+    <!-- Req #1: Full-Background Blur Backdrop + Toast -->
+    <div class="toast-backdrop" id="toastBackdrop"></div>
     <div class="toast" id="toast"></div>
 
     <script>
@@ -1070,6 +1280,9 @@
           autoPing: true,
           pingTimeoutMs: 1500,
           pin: "",
+          enableShortcuts: true,
+          enableGroups: true,
+          enableFavorites: true,
         },
         groups: [
           { id: "g1", name: "LED & Displays", color: "#38bdf8" },
@@ -1138,27 +1351,97 @@
             fav: false,
           },
         ],
+        shortcuts: [
+          {
+            id: "s1",
+            name: "COMPUTER",
+            host: "smarthome.local",
+            port: 80,
+            index: 0,
+            apiKey: "sh_5003c0712e4ad3c9af2b1fd04efcf",
+            group: "none",
+            icon: "switch",
+            color: "#38bdf8",
+            fav: false,
+            state: false,
+          },
+        ],
+        favorites: [],
       };
 
       let config = null;
-      let activeGroup = "all";
       let viewMode = localStorage.getItem("hub_view_mode") || "grid";
-      let deviceStatus = {}; // { [id]: 'online' | 'offline' | 'checking' }
-      let deviceLatency = {}; // { [id]: number (ms) }
+      let deviceStatus = {};
+      let deviceLatency = {};
+      let shortcutBusy = {};
       let isOfflinePreview = false;
 
-      /* === SAFEGUARD: Deep Config Validator === */
       function sanitizeConfig(raw) {
         const base = structuredClone(DEFAULT_CONFIG);
-        if (!raw || typeof raw !== "object") return base;
-        return {
+        if (!raw || typeof raw !== "object") {
+          syncLegacyFavorites(base);
+          return base;
+        }
+        const merged = {
           settings: { ...base.settings, ...(raw.settings || {}) },
-          groups:
-            Array.isArray(raw.groups) && raw.groups.length
-              ? raw.groups
-              : base.groups,
+          groups: Array.isArray(raw.groups) ? raw.groups : base.groups,
           devices: Array.isArray(raw.devices) ? raw.devices : base.devices,
+          shortcuts: Array.isArray(raw.shortcuts)
+            ? raw.shortcuts
+            : base.shortcuts,
+          favorites: Array.isArray(raw.favorites) ? raw.favorites : [],
         };
+        syncLegacyFavorites(merged);
+        return merged;
+      }
+
+      function syncLegacyFavorites(cfg) {
+        cfg.devices.forEach((d) => {
+          if (
+            d.fav &&
+            !cfg.favorites.some(
+              (f) =>
+                Array.isArray(f.deviceIds) &&
+                f.deviceIds.length === 1 &&
+                f.deviceIds[0] === d.id &&
+                (!f.shortcutIds || !f.shortcutIds.length) &&
+                (!f.groupIds || !f.groupIds.length),
+            )
+          ) {
+            cfg.favorites.push({
+              id: "fav_d_" + d.id,
+              name: d.name,
+              icon: d.icon || "chip",
+              color: d.color || "#38bdf8",
+              deviceIds: [d.id],
+              shortcutIds: [],
+              groupIds: [],
+            });
+          }
+        });
+        cfg.shortcuts.forEach((s) => {
+          if (
+            s.fav &&
+            !cfg.favorites.some(
+              (f) =>
+                Array.isArray(f.shortcutIds) &&
+                f.shortcutIds.length === 1 &&
+                f.shortcutIds[0] === s.id &&
+                (!f.deviceIds || !f.deviceIds.length) &&
+                (!f.groupIds || !f.groupIds.length),
+            )
+          ) {
+            cfg.favorites.push({
+              id: "fav_s_" + s.id,
+              name: s.name,
+              icon: s.icon || "switch",
+              color: s.color || "#38bdf8",
+              deviceIds: [],
+              shortcutIds: [s.id],
+              groupIds: [],
+            });
+          }
+        });
       }
 
       function svgIcon(name, size = 20) {
@@ -1166,12 +1449,36 @@
         return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
       }
 
+      /* Req #1: Show Toast with Full-Background Blur */
       function showToast(msg) {
         const t = document.getElementById("toast");
+        const bg = document.getElementById("toastBackdrop");
         t.textContent = msg;
         t.classList.add("show");
+        bg.classList.add("show");
         clearTimeout(t._timer);
-        t._timer = setTimeout(() => t.classList.remove("show"), 2200);
+        t._timer = setTimeout(() => {
+          t.classList.remove("show");
+          bg.classList.remove("show");
+        }, 2200);
+      }
+
+      /* Req #2: Lock background scroll when modal opens */
+      function syncModalScrollLock() {
+        const hasOpenModal = !!document.querySelector(".modal-backdrop.open");
+        document.body.classList.toggle("modal-open", hasOpenModal);
+      }
+
+      /* Req #6: Format RSSI with percentage like "WiFi: -54 dBm (76%)" */
+      function rssiToPercent(dbm) {
+        const val = Number(dbm);
+        if (isNaN(val)) return 0;
+        return Math.max(0, Math.min(100, Math.round(((val + 92) / 50) * 100)));
+      }
+
+      function formatRssiText(dbm) {
+        const pct = rssiToPercent(dbm);
+        return `WiFi: ${dbm} dBm (${pct}%)`;
       }
 
       function cleanHostInput(h) {
@@ -1223,9 +1530,9 @@
             const cached = localStorage.getItem(STORAGE_KEY);
             config = cached
               ? sanitizeConfig(JSON.parse(cached))
-              : structuredClone(DEFAULT_CONFIG);
+              : sanitizeConfig(null);
           } catch (_) {
-            config = structuredClone(DEFAULT_CONFIG);
+            config = sanitizeConfig(null);
           }
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
         }
@@ -1238,7 +1545,7 @@
 
       async function loadTelemetry() {
         if (isOfflinePreview) {
-          document.getElementById("hubRssi").textContent = "WiFi: -54 dBm";
+          document.getElementById("hubRssi").textContent = formatRssiText(-54);
           document.getElementById("hubUptime").textContent = "Uptime: 3d 14h";
           return;
         }
@@ -1247,8 +1554,9 @@
           if (!res.ok) return;
           const data = await res.json();
           if (data.rssi !== undefined)
-            document.getElementById("hubRssi").textContent =
-              `WiFi: ${data.rssi} dBm`;
+            document.getElementById("hubRssi").textContent = formatRssiText(
+              data.rssi,
+            );
           if (data.uptime !== undefined)
             document.getElementById("hubUptime").textContent =
               `Uptime: ${data.uptime}`;
@@ -1294,7 +1602,6 @@
         renderDevices();
       }
 
-      /* === SAFEGUARD: Open by ID instead of inline JSON === */
       function openDeviceById(id, customPath = null, event = null) {
         if (event) event.stopPropagation();
         const dev = config.devices.find((d) => d.id === id);
@@ -1308,7 +1615,43 @@
         }
       }
 
-      /* === SAFEGUARD: HTTP LAN Clipboard Fallback === */
+      /* Req #9: Trigger Shortcut Toggle Button via POST API Key */
+      async function triggerShortcut(id, event = null) {
+        if (event) event.stopPropagation();
+        const sc = config.shortcuts.find((s) => s.id === id);
+        if (!sc || shortcutBusy[id]) return;
+
+        const cleanH = cleanHostInput(sc.host);
+        if (!cleanH) return showToast("Invalid shortcut host");
+        const portPart = sc.port && Number(sc.port) !== 80 ? `:${sc.port}` : "";
+        const url = `http://${cleanH}${portPart}/api/switch/toggle`;
+        const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=toggle&key=${encodeURIComponent(sc.apiKey || "")}`;
+
+        shortcutBusy[id] = true;
+        renderShortcuts();
+        renderDevices();
+
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: bodyStr,
+          });
+          const data = await res.json();
+          sc.state = !!data.state;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+          showToast(`${sc.name} is now: ${sc.state ? "ON" : "OFF"}`);
+        } catch (err) {
+          showToast(`Failed to toggle ${sc.name}`);
+        } finally {
+          shortcutBusy[id] = false;
+          renderShortcuts();
+          renderDevices();
+        }
+      }
+
       function copyAddress(e, text) {
         e.stopPropagation();
         if (navigator.clipboard && window.isSecureContext) {
@@ -1343,6 +1686,39 @@
         const dev = config.devices.find((d) => d.id === id);
         if (!dev) return;
         dev.fav = !dev.fav;
+
+        if (dev.fav) {
+          if (
+            !config.favorites.some(
+              (f) =>
+                f.deviceIds?.length === 1 &&
+                f.deviceIds[0] === id &&
+                !f.shortcutIds?.length &&
+                !f.groupIds?.length,
+            )
+          ) {
+            config.favorites.push({
+              id: "fav_d_" + id,
+              name: dev.name,
+              icon: dev.icon || "chip",
+              color: dev.color || "#38bdf8",
+              deviceIds: [id],
+              shortcutIds: [],
+              groupIds: [],
+            });
+          }
+        } else {
+          config.favorites = config.favorites.filter(
+            (f) =>
+              !(
+                f.deviceIds?.length === 1 &&
+                f.deviceIds[0] === id &&
+                !f.shortcutIds?.length &&
+                !f.groupIds?.length
+              ),
+          );
+        }
+
         renderAll();
         showToast(dev.fav ? `Pinned ${dev.name}` : `Unpinned ${dev.name}`);
 
@@ -1393,7 +1769,6 @@
         btn.classList.add("spinning");
         await Promise.all(config.devices.map((d) => pingSingleDevice(d)));
         btn.classList.remove("spinning");
-        if (activeGroup === "online") renderDevices();
       }
 
       function updateStatusIndicators() {
@@ -1438,69 +1813,171 @@
         });
       }
 
+      /* Req #11: Render Favorites Section (Supports Devices, Shortcuts, Groups & Bundles) */
       function renderFavorites() {
-        const favs = config.devices.filter((d) => d.fav);
         const sec = document.getElementById("favSection");
         const strip = document.getElementById("favStrip");
 
-        if (!favs.length) {
+        if (
+          config.settings.enableFavorites === false ||
+          !Array.isArray(config.favorites) ||
+          !config.favorites.length
+        ) {
           sec.style.display = "none";
           return;
         }
 
         sec.style.display = "block";
-        strip.innerHTML = favs
-          .map((dev) => {
-            const st = deviceStatus[dev.id] || "checking";
-            const idSafe = escapeHtml(dev.id);
-            const colorSafe = escapeHtml(dev.color || "#38bdf8");
+        strip.innerHTML = config.favorites
+          .map((fav) => {
+            const fIdSafe = escapeHtml(fav.id);
+            const colorSafe = escapeHtml(fav.color || "#38bdf8");
+            const dIds = fav.deviceIds || [];
+            const sIds = fav.shortcutIds || [];
+            const gIds = fav.groupIds || [];
+
+            let dotHtml = "";
+            if (dIds.length === 1 && !sIds.length && !gIds.length) {
+              const st = deviceStatus[dIds[0]] || "checking";
+              dotHtml = `<span class="dot ${st}" data-status-id="${escapeHtml(dIds[0])}"></span>`;
+            } else if (sIds.length === 1 && !dIds.length && !gIds.length) {
+              const sc = config.shortcuts.find((x) => x.id === sIds[0]);
+              dotHtml = `<span class="dot ${sc?.state ? "online" : ""}"></span>`;
+            }
+
             return `
-          <div class="fav-chip" style="--chip-color:${colorSafe}" onclick="openDeviceById('${idSafe}')">
-            <span class="dot ${st}" data-status-id="${idSafe}"></span>
-            <span style="color:${colorSafe};display:grid">${svgIcon(dev.icon, 16)}</span>
-            <span>${escapeHtml(dev.name)}</span>
+          <div class="fav-chip" style="--chip-color:${colorSafe}" onclick="handleFavoriteClick('${fIdSafe}')">
+            ${dotHtml}
+            <span style="color:${colorSafe};display:grid">${svgIcon(fav.icon || "chip", 16)}</span>
+            <span>${escapeHtml(fav.name)}</span>
           </div>
         `;
           })
           .join("");
       }
 
-      function renderTabs() {
-        const tabsEl = document.getElementById("groupTabs");
-        const allCount = config.devices.length;
-        const onlineCount = config.devices.filter(
-          (d) => deviceStatus[d.id] === "online",
-        ).length;
+      function handleFavoriteClick(favId) {
+        const fav = config.favorites.find((f) => f.id === favId);
+        if (!fav) return;
+        const dIds = (fav.deviceIds || []).filter((id) =>
+          config.devices.some((d) => d.id === id),
+        );
+        const sIds = (fav.shortcutIds || []).filter((id) =>
+          config.shortcuts.some((s) => s.id === id),
+        );
+        const gIds = (fav.groupIds || []).filter((id) =>
+          config.groups.some((g) => g.id === id),
+        );
 
-        let html = `
-        <button class="tab ${activeGroup === "all" ? "active" : ""}" onclick="selectGroup('all')">
-          All Devices <span class="tab-count">${allCount}</span>
-        </button>
-        <button class="tab ${activeGroup === "online" ? "active" : ""}" onclick="selectGroup('online')">
-          <span class="dot online"></span>
-          Online <span class="tab-count">${onlineCount}</span>
-        </button>
-      `;
+        if (dIds.length === 1 && !sIds.length && !gIds.length) {
+          return openDeviceById(dIds[0]);
+        }
+        if (sIds.length === 1 && !dIds.length && !gIds.length) {
+          return triggerShortcut(sIds[0]);
+        }
+        if (gIds.length === 1 && !dIds.length && !sIds.length) {
+          const el = document.getElementById(`group-block-${gIds[0]}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+            return;
+          }
+        }
 
-        config.groups.forEach((g) => {
-          const count = config.devices.filter((d) => d.group === g.id).length;
-          const gIdSafe = escapeHtml(g.id);
-          html += `
-          <button class="tab ${activeGroup === g.id ? "active" : ""}" onclick="selectGroup('${gIdSafe}')">
-            <span class="dot" style="background:${escapeHtml(g.color)}"></span>
-            ${escapeHtml(g.name)}
-            <span class="tab-count">${count}</span>
-          </button>
-        `;
+        // Open Favorite Card Modal for multi-item favorite cards
+        const modal = document.getElementById("favCardModal");
+        document.getElementById("favCardModalTitle").textContent =
+          fav.name || "Favorite Card";
+
+        const allDevIds = new Set(dIds);
+        const allScIds = new Set(sIds);
+        gIds.forEach((gid) => {
+          config.devices
+            .filter((d) => d.group === gid)
+            .forEach((d) => allDevIds.add(d.id));
+          config.shortcuts
+            .filter((s) => s.group === gid)
+            .forEach((s) => allScIds.add(s.id));
         });
 
-        tabsEl.innerHTML = html;
+        const devs = config.devices.filter((d) => allDevIds.has(d.id));
+        const scs = config.shortcuts.filter((s) => allScIds.has(s.id));
+
+        let html = "";
+        if (scs.length) {
+          html += `<div class="section-label" style="margin-bottom:8px">Shortcut Switches</div>
+                   <div class="shortcut-grid" style="margin-bottom:16px">${scs.map(createShortcutHtml).join("")}</div>`;
+        }
+        if (devs.length) {
+          html += `<div class="section-label" style="margin-bottom:8px">Devices</div>
+                   <div class="device-grid list-view">${devs.map(createCardHtml).join("")}</div>`;
+        }
+        if (!html) {
+          html = `<p style="color:var(--text-muted);font-size:0.85rem">No linked items in this favorite card.</p>`;
+        }
+
+        document.getElementById("favCardModalBody").innerHTML = html;
+        modal.classList.add("open");
+        syncModalScrollLock();
       }
 
-      function selectGroup(groupId) {
-        activeGroup = groupId;
-        renderTabs();
-        renderDevices();
+      function closeFavCardModal() {
+        document.getElementById("favCardModal").classList.remove("open");
+        syncModalScrollLock();
+      }
+
+      function createShortcutHtml(sc) {
+        const idSafe = escapeHtml(sc.id);
+        const colorSafe = escapeHtml(sc.color || "#38bdf8");
+        const isBusy = !!shortcutBusy[sc.id];
+        const isOn = !!sc.state;
+        const addr = `${cleanHostInput(sc.host)}${sc.port && Number(sc.port) !== 80 ? ":" + sc.port : ""} • CH ${sc.index ?? 0}`;
+
+        return `
+          <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" style="--sc-color:${colorSafe}" onclick="triggerShortcut('${idSafe}', event)">
+            <div class="sc-left">
+              <div class="sc-icon">${svgIcon(sc.icon || "switch", 19)}</div>
+              <div style="min-width:0">
+                <div class="sc-title">${escapeHtml(sc.name)}</div>
+              </div>
+            </div>
+            <span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>
+          </div>
+        `;
+      }
+
+      /* Req #9: Render Shortcut Buttons Section */
+      function renderShortcuts() {
+        const sec = document.getElementById("shortcutSection");
+        const grid = document.getElementById("shortcutGrid");
+        const query = document
+          .getElementById("searchInput")
+          .value.trim()
+          .toLowerCase();
+
+        if (
+          config.settings.enableShortcuts === false ||
+          !Array.isArray(config.shortcuts) ||
+          !config.shortcuts.length
+        ) {
+          sec.style.display = "none";
+          return;
+        }
+
+        const filtered = config.shortcuts.filter((s) => {
+          if (!query) return true;
+          return (
+            (s.name && s.name.toLowerCase().includes(query)) ||
+            (s.host && s.host.toLowerCase().includes(query))
+          );
+        });
+
+        if (!filtered.length) {
+          sec.style.display = "none";
+          return;
+        }
+
+        sec.style.display = "block";
+        grid.innerHTML = filtered.map(createShortcutHtml).join("");
       }
 
       function createCardHtml(dev) {
@@ -1538,21 +2015,31 @@
       `;
       }
 
+      /* Req #8 & #10: Devices with group 'none' are invisible in Home UI; Group section respects enableGroups */
       function renderDevices() {
         const container = document.getElementById("devicesContainer");
+        const toolbar = document.getElementById("viewToolbar");
+
+        if (config.settings.enableGroups === false) {
+          container.innerHTML = "";
+          toolbar.style.display = "none";
+          return;
+        }
+
         const query = document
           .getElementById("searchInput")
           .value.trim()
           .toLowerCase();
 
-        const filtered = config.devices.filter((d) => {
-          const matchesGroup =
-            activeGroup === "all"
-              ? true
-              : activeGroup === "online"
-                ? deviceStatus[d.id] === "online"
-                : d.group === activeGroup;
-          if (!matchesGroup) return false;
+        // Req #8: Devices with group === 'none' (or unassigned) are invisible in Home UI until assigned to a group
+        const visibleDevices = config.devices.filter((d) => {
+          if (
+            !d.group ||
+            d.group === "none" ||
+            !config.groups.some((g) => g.id === d.group)
+          ) {
+            return false;
+          }
           if (!query) return true;
           const gName = getGroupName(d.group).toLowerCase();
           return (
@@ -1564,65 +2051,61 @@
           );
         });
 
-        if (!filtered.length) {
+        const gridClass = `device-grid ${viewMode === "list" ? "list-view" : ""}`;
+        let html = "";
+
+        config.groups.forEach((g) => {
+          const groupDevs = visibleDevices.filter((d) => d.group === g.id);
+          const groupShortcuts = (config.shortcuts || []).filter(
+            (s) =>
+              s.group === g.id &&
+              (!query ||
+                (s.name && s.name.toLowerCase().includes(query)) ||
+                (s.host && s.host.toLowerCase().includes(query))),
+          );
+
+          if (!groupDevs.length && !groupShortcuts.length) return;
+          const totalCount = groupDevs.length + groupShortcuts.length;
+
+          html += `
+            <section class="group-block" id="group-block-${escapeHtml(g.id)}">
+              <div class="group-header">
+                <span class="group-bar" style="background:${escapeHtml(g.color)}"></span>
+                <h3 class="group-title">${escapeHtml(g.name)}</h3>
+                <span class="tab-count">${totalCount}</span>
+              </div>
+              ${groupShortcuts.length ? `<div class="shortcut-grid" style="margin-bottom:${groupDevs.length ? "12px" : "0"}">${groupShortcuts.map(createShortcutHtml).join("")}</div>` : ""}
+              ${groupDevs.length ? `<div class="${gridClass}">${groupDevs.map(createCardHtml).join("")}</div>` : ""}
+            </section>
+          `;
+        });
+
+        if (!html) {
+          toolbar.style.display = "none";
           container.innerHTML = `
           <div class="empty">
-            <h3>No ESP devices found</h3>
-            <p>${config.devices.length ? "Try clearing your search or switching group tabs." : "Add your first ESP32/ESP8266 device in NVS Settings."}</p>
-            <a href="config.html" class="btn-primary">+ Manage Devices</a>
+            <h3>No grouped devices visible</h3>
+            <p>${config.devices.length ? "Assign a device to a Group in NVS Settings (devices set to 'None' stay hidden on Home UI)." : "Add your first ESP32/ESP8266 device in NVS Settings."}</p>
+            <a href="config.html" class="btn-primary">+ Manage Devices &amp; Groups</a>
           </div>
         `;
           return;
         }
 
-        const gridClass = `device-grid ${viewMode === "list" ? "list-view" : ""}`;
-
-        if (activeGroup === "all" && !query && config.groups.length > 1) {
-          let html = "";
-          config.groups.forEach((g) => {
-            const groupDevs = filtered.filter((d) => d.group === g.id);
-            if (!groupDevs.length) return;
-            html += `
-            <section class="group-block">
-              <div class="group-header">
-                <span class="group-bar" style="background:${escapeHtml(g.color)}"></span>
-                <h3 class="group-title">${escapeHtml(g.name)}</h3>
-                <span class="tab-count">${groupDevs.length}</span>
-              </div>
-              <div class="${gridClass}">${groupDevs.map(createCardHtml).join("")}</div>
-            </section>
-          `;
-          });
-          const ungrouped = filtered.filter(
-            (d) => !config.groups.some((g) => g.id === d.group),
-          );
-          if (ungrouped.length) {
-            html += `
-            <section class="group-block">
-              <div class="group-header">
-                <span class="group-bar" style="background:var(--text-muted)"></span>
-                <h3 class="group-title">Other Devices</h3>
-              </div>
-              <div class="${gridClass}">${ungrouped.map(createCardHtml).join("")}</div>
-            </section>
-          `;
-          }
-          container.innerHTML = html;
-        } else {
-          container.innerHTML = `<div class="${gridClass}">${filtered.map(createCardHtml).join("")}</div>`;
-        }
+        toolbar.style.display = "flex";
+        container.innerHTML = html;
       }
 
       function renderAll() {
         renderFavorites();
-        renderTabs();
+        renderShortcuts();
         renderDevices();
         updateStatusIndicators();
       }
 
       function getGroupName(id) {
         const g = config.groups.find((x) => x.id === id);
-        return g ? g.name : "General";
+        return g ? g.name : "None";
       }
 
       function escapeHtml(str) {
@@ -1648,18 +2131,19 @@
         setTimeout(() => location.reload(), 4000);
       }
 
-      // Search & Keyboard Shortcuts
       const searchInput = document.getElementById("searchInput");
       const clearSearch = document.getElementById("clearSearch");
 
       searchInput.addEventListener("input", () => {
         clearSearch.style.display = searchInput.value ? "block" : "none";
+        renderShortcuts();
         renderDevices();
       });
 
       clearSearch.addEventListener("click", () => {
         searchInput.value = "";
         clearSearch.style.display = "none";
+        renderShortcuts();
         renderDevices();
         searchInput.focus();
       });
@@ -1668,18 +2152,18 @@
         if (e.key === "/" && document.activeElement !== searchInput) {
           e.preventDefault();
           searchInput.focus();
-        } else if (
-          e.key === "Escape" &&
-          document.activeElement === searchInput
-        ) {
-          searchInput.value = "";
-          clearSearch.style.display = "none";
-          renderDevices();
-          searchInput.blur();
+        } else if (e.key === "Escape") {
+          closeFavCardModal();
+          if (document.activeElement === searchInput) {
+            searchInput.value = "";
+            clearSearch.style.display = "none";
+            renderShortcuts();
+            renderDevices();
+            searchInput.blur();
+          }
         }
       });
 
-      // Refresh telemetry every 15s when live
       setInterval(() => {
         if (!isOfflinePreview) loadTelemetry();
       }, 15000);

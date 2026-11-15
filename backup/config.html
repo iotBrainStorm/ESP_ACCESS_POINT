@@ -44,11 +44,22 @@
         --accent-soft: rgba(2, 132, 199, 0.1);
       }
 
+      /* Req #5: Hide all vertical & horizontal scrollbars globally */
+      html,
+      body,
       * {
         box-sizing: border-box;
         margin: 0;
         padding: 0;
         -webkit-tap-highlight-color: transparent;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+      }
+
+      *::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
       }
 
       body {
@@ -62,6 +73,12 @@
         padding-bottom: 100px;
         line-height: 1.45;
         overflow-x: hidden;
+      }
+
+      /* Req #2: Stop background scroll below modals when opened */
+      body.modal-open {
+        overflow: hidden !important;
+        touch-action: none;
       }
 
       /* Header */
@@ -86,19 +103,31 @@
         gap: 10px;
       }
 
+      /* Req #7: Back arrow centered in the middle of the button */
       .back-btn {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 6px;
-        padding: 7px 12px;
+        height: 36px;
+        padding: 0 13px;
         border-radius: 10px;
         border: 1px solid var(--border);
         background: var(--card);
         color: var(--text);
         text-decoration: none;
-        font-size: 0.84rem;
-        font-weight: 600;
+        font-size: 0.82rem;
+        font-weight: 700;
+        line-height: 1;
         flex-shrink: 0;
+      }
+      .back-btn .back-arrow {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        line-height: 1;
+        transform: translateY(-1px);
       }
       .back-btn:hover {
         border-color: var(--accent);
@@ -133,11 +162,7 @@
         display: flex;
         gap: 8px;
         overflow-x: auto;
-        scrollbar-width: none;
         -webkit-overflow-scrolling: touch;
-      }
-      .nav-tabs::-webkit-scrollbar {
-        display: none;
       }
 
       .nav-tab {
@@ -232,7 +257,19 @@
         border-radius: 8px;
       }
 
-      /* Device List Rows */
+      /* Req #8 & #9: Test Connection Reachable (Green) / Unreachable (Red) */
+      .btn.conn-ok {
+        border-color: var(--ok) !important;
+        background: rgba(34, 197, 94, 0.16) !important;
+        color: var(--ok) !important;
+      }
+      .btn.conn-err {
+        border-color: var(--err) !important;
+        background: rgba(239, 68, 68, 0.16) !important;
+        color: var(--err) !important;
+      }
+
+      /* List Rows */
       .item-list {
         display: flex;
         flex-direction: column;
@@ -400,6 +437,37 @@
         transform: translateX(18px);
       }
 
+      /* Multi-Select Checklist Box for Groups & Favorites Modals */
+      .check-list-box {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+        gap: 6px;
+        max-height: 145px;
+        overflow-y: auto;
+        padding: 8px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+      }
+      .check-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 7px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        font-size: 0.78rem;
+        cursor: pointer;
+        user-select: none;
+      }
+      .check-item:hover {
+        border-color: var(--accent);
+      }
+      .check-item input {
+        accent-color: var(--accent);
+      }
+
       /* Icon & Color Pickers */
       .picker-grid {
         display: grid;
@@ -447,6 +515,7 @@
         inset: 0;
         background: rgba(0, 0, 0, 0.72);
         backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
         display: none;
         align-items: center;
         justify-content: center;
@@ -462,6 +531,8 @@
         max-width: 560px;
         max-height: 90vh;
         overflow-y: auto;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
         background: var(--bg-elev);
         border: 1px solid var(--border);
         border-radius: 16px;
@@ -567,6 +638,22 @@
         text-align: center;
       }
 
+      /* Req #1: Toast with Full-Background Blur */
+      .toast-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.28);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.22s ease;
+        z-index: 98;
+      }
+      .toast-backdrop.show {
+        opacity: 1;
+      }
+
       .toast {
         position: fixed;
         top: 70px;
@@ -574,10 +661,11 @@
         transform: translateX(-50%) translateY(-20px);
         background: var(--text);
         color: var(--bg);
-        padding: 8px 16px;
+        padding: 9px 18px;
         border-radius: 999px;
         font-size: 0.82rem;
         font-weight: 600;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
         opacity: 0;
         pointer-events: none;
         transition: 0.22s;
@@ -592,7 +680,6 @@
         transform: translateX(-50%) translateY(0);
       }
 
-      /* === MODIFIED #3: Mobile Responsiveness for Config Page === */
       @media (max-width: 640px) {
         .topbar-inner {
           padding: 10px 12px;
@@ -605,7 +692,7 @@
         }
         .input,
         .select {
-          font-size: 16px; /* Prevents mobile zoom on focus */
+          font-size: 16px;
           height: 40px;
         }
         .dev-row {
@@ -676,18 +763,27 @@
 
     <header class="topbar">
       <div class="topbar-inner">
-        <a href="index.html" class="back-btn">&larr; ACCESS POINT</a>
+        <!-- Req #7: Back arrow centered in the middle of the button -->
+        <a href="index.html" class="back-btn">
+          <span class="back-arrow">&larr;</span>
+          <span>BACK</span>
+        </a>
         <div class="header-title">Hub NVS Settings</div>
         <span class="nvs-badge" id="headerNvsSize">0 B / 16 KB</span>
       </div>
     </header>
 
+    <!-- Req #8, #9, #10, #11: Ordered Menu Tabs -->
     <nav class="nav-tabs">
       <button class="nav-tab active" onclick="switchTab('devices', this)">
         Devices
       </button>
-      <button class="nav-tab" onclick="switchTab('groups', this)">
-        Groups
+      <button class="nav-tab" onclick="switchTab('shortcuts', this)">
+        Shortcut Button
+      </button>
+      <button class="nav-tab" onclick="switchTab('groups', this)">Group</button>
+      <button class="nav-tab" onclick="switchTab('favorites', this)">
+        Favorites
       </button>
       <button class="nav-tab" onclick="switchTab('scanner', this)">
         mDNS Scanner
@@ -701,7 +797,7 @@
     </nav>
 
     <main class="container">
-      <!-- TAB 1: DEVICES -->
+      <!-- MENU 1: DEVICES -->
       <section class="panel active" id="tab-devices">
         <div class="panel-header">
           <h2>Saved ESP Devices (<span id="devCountLabel">0</span>)</h2>
@@ -722,37 +818,78 @@
         <div class="item-list" id="deviceList"></div>
       </section>
 
-      <!-- TAB 2: GROUPS -->
-      <section class="panel" id="tab-groups">
-        <div class="panel-header">
-          <h2>Rooms &amp; Categories</h2>
-        </div>
+      <!-- MENU 2: SHORTCUT BUTTON -->
+      <section class="panel" id="tab-shortcuts">
         <div class="card-box">
-          <div class="form-grid" style="align-items: end">
-            <div class="field">
-              <label>New Group Name</label>
-              <input
-                type="text"
-                id="newGroupName"
-                class="input"
-                placeholder="e.g., Workshop, Bedroom, Solar"
-              />
+          <div class="toggle-row" style="padding: 0">
+            <div>
+              <div class="toggle-title">
+                Enable Shortcut Button Section on Home UI
+              </div>
+              <div class="toggle-desc">
+                Shows quick API toggle switches right below Favorites on the
+                dashboard
+              </div>
             </div>
-            <div class="field">
-              <label>Group Accent Color</label>
-              <input
-                type="color"
-                id="newGroupColor"
-                class="input"
-                value="#38bdf8"
-                style="padding: 3px"
-              />
+            <input
+              type="checkbox"
+              class="switch"
+              id="enableShortcutsToggle"
+              onchange="updatePref('enableShortcuts', this.checked)"
+            />
+          </div>
+        </div>
+
+        <div class="panel-header">
+          <h2>Saved Shortcut Buttons (<span id="scCountLabel">0</span>)</h2>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <input
+              type="text"
+              id="scFilterInput"
+              class="input"
+              placeholder="Filter shortcuts..."
+              style="width: 180px; height: 36px"
+              oninput="renderShortcutList()"
+            />
+            <button class="btn btn-primary" onclick="openShortcutModal()">
+              + Add Shortcut
+            </button>
+          </div>
+        </div>
+        <div class="item-list" id="shortcutList"></div>
+      </section>
+
+      <!-- MENU 3: GROUP -->
+      <section class="panel" id="tab-groups">
+        <div class="card-box">
+          <div class="toggle-row" style="padding: 0">
+            <div>
+              <div class="toggle-title">Enable Group Section on Home UI</div>
+              <div class="toggle-desc">
+                Shows categorized room &amp; device groups on the main dashboard
+              </div>
             </div>
-            <button
-              class="btn btn-primary"
-              style="height: 38px"
-              onclick="addGroup()"
-            >
+            <input
+              type="checkbox"
+              class="switch"
+              id="enableGroupsToggle"
+              onchange="updatePref('enableGroups', this.checked)"
+            />
+          </div>
+        </div>
+
+        <div class="panel-header">
+          <h2>Rooms &amp; Categories (<span id="grpCountLabel">0</span>)</h2>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <input
+              type="text"
+              id="grpFilterInput"
+              class="input"
+              placeholder="Filter groups..."
+              style="width: 180px; height: 36px"
+              oninput="renderGroupList()"
+            />
+            <button class="btn btn-primary" onclick="openGroupModal()">
               + Create Group
             </button>
           </div>
@@ -760,7 +897,47 @@
         <div class="item-list" id="groupList"></div>
       </section>
 
-      <!-- TAB 3: mDNS SCANNER -->
+      <!-- MENU 4: FAVORITES -->
+      <section class="panel" id="tab-favorites">
+        <div class="card-box">
+          <div class="toggle-row" style="padding: 0">
+            <div>
+              <div class="toggle-title">
+                Enable Favorites Section on Home UI
+              </div>
+              <div class="toggle-desc">
+                Shows the pinned Favorites Dock at the top of the home page
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="switch"
+              id="enableFavoritesToggle"
+              onchange="updatePref('enableFavorites', this.checked)"
+            />
+          </div>
+        </div>
+
+        <div class="panel-header">
+          <h2>Pinned Favorites (<span id="favCountLabel">0</span>)</h2>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <input
+              type="text"
+              id="favFilterInput"
+              class="input"
+              placeholder="Filter favorites..."
+              style="width: 180px; height: 36px"
+              oninput="renderFavoriteList()"
+            />
+            <button class="btn btn-primary" onclick="openFavoriteModal()">
+              + Add Favorite
+            </button>
+          </div>
+        </div>
+        <div class="item-list" id="favoriteList"></div>
+      </section>
+
+      <!-- MENU 5: mDNS SCANNER -->
       <section class="panel" id="tab-scanner">
         <div class="panel-header">
           <h2>Auto-Discover Local ESP Webservers</h2>
@@ -779,7 +956,7 @@
         <div class="item-list" id="scanResults"></div>
       </section>
 
-      <!-- TAB 4: PREFERENCES -->
+      <!-- MENU 6: PREFERENCES -->
       <section class="panel" id="tab-prefs">
         <div class="panel-header">
           <h2>Dashboard Behavior &amp; Appearance</h2>
@@ -901,7 +1078,7 @@
         </div>
       </section>
 
-      <!-- TAB 5: NVS & BACKUP -->
+      <!-- MENU 7: NVS & BACKUP -->
       <section class="panel" id="tab-backup">
         <div class="panel-header">
           <h2>NVS Storage, Backup &amp; Security</h2>
@@ -947,8 +1124,8 @@
               margin-bottom: 12px;
             "
           >
-            Download a JSON backup of all your devices, groups, and preferences
-            before flashing firmware or migrating to a new ESP32.
+            Download a JSON backup of all your devices, shortcuts, groups,
+            favorites, and preferences before flashing firmware.
           </p>
           <div style="display: flex; gap: 10px; flex-wrap: wrap">
             <button class="btn btn-primary" onclick="exportBackup()">
@@ -1010,11 +1187,11 @@
       </div>
     </div>
 
-    <!-- Add / Edit Device Modal -->
+    <!-- MODAL 1: Add / Edit Device (Req #8) -->
     <div class="modal-backdrop" id="deviceModal">
       <div class="modal">
         <div class="modal-head">
-          <h3 id="modalTitle">Add ESP Device</h3>
+          <h3 id="modalTitle">Add Device</h3>
           <button class="btn btn-sm" onclick="closeDeviceModal()">
             &times;
           </button>
@@ -1027,15 +1204,15 @@
               type="text"
               id="devName"
               class="input"
-              placeholder="e.g., Living Room LED"
+              placeholder="e.g. Living Room"
             />
           </div>
           <div class="field">
-            <label>Group / Room</label>
+            <label>Group (Default: None)</label>
             <select id="devGroup" class="select"></select>
           </div>
           <div class="field">
-            <label>IPv4 Address *</label>
+            <label>IPv4 Address</label>
             <input
               type="text"
               id="devIp"
@@ -1067,12 +1244,12 @@
             />
           </div>
           <div class="field">
-            <label>Secondary Button Label (Optional)</label>
+            <label>Secondary Button Name (Optional)</label>
             <input
               type="text"
               id="devAltLabel"
               class="input"
-              placeholder="e.g., OTA, API, Reboot"
+              placeholder="e.g. OTA, API, Reboot"
             />
           </div>
           <div class="field">
@@ -1081,18 +1258,18 @@
               type="text"
               id="devAltPath"
               class="input"
-              placeholder="e.g., /update"
+              placeholder="e.g. /update.html"
             />
           </div>
         </div>
 
         <div class="field" style="margin-top: 12px">
-          <label>Short Note / Location</label>
+          <label>Short Note</label>
           <input
             type="text"
             id="devNote"
             class="input"
-            placeholder="e.g., WS2812B 300 LEDs behind TV"
+            placeholder="e.g. TV - FAN - LED"
           />
         </div>
 
@@ -1110,7 +1287,7 @@
           <div>
             <div class="toggle-title">Pin to Favorites Dock</div>
             <div class="toggle-desc">
-              Show in quick-launch bar at the top of index.html
+              Show in quick-launch bar at the top of Home Page
             </div>
           </div>
           <input type="checkbox" class="switch" id="devFav" />
@@ -1134,6 +1311,207 @@
       </div>
     </div>
 
+    <!-- MODAL 2: Add / Edit Shortcut Button (Req #9) -->
+    <div class="modal-backdrop" id="shortcutModal">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 id="scModalTitle">Add Shortcut Button</h3>
+          <button class="btn btn-sm" onclick="closeShortcutModal()">
+            &times;
+          </button>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Switch Name *</label>
+            <input
+              type="text"
+              id="scName"
+              class="input"
+              placeholder="e.g. COMPUTER"
+            />
+          </div>
+          <div class="field">
+            <label>Group (Optional)</label>
+            <select id="scGroup" class="select"></select>
+          </div>
+          <div class="field">
+            <label>IP / Hostname *</label>
+            <input
+              type="text"
+              id="scHost"
+              class="input"
+              placeholder="smarthome.local or 192.168.1.51"
+            />
+          </div>
+          <div class="field">
+            <label>Port (Default 80)</label>
+            <input type="number" id="scPort" class="input" value="80" />
+          </div>
+          <div class="field">
+            <label>Switch Index *</label>
+            <input
+              type="number"
+              id="scIndex"
+              class="input"
+              value="0"
+              min="0"
+              placeholder="0"
+            />
+          </div>
+          <div class="field">
+            <label>API Key *</label>
+            <input
+              type="text"
+              id="scApiKey"
+              class="input"
+              placeholder="sh_5003c0712e4ad3c9af2b1fd04efcf"
+            />
+          </div>
+        </div>
+
+        <div class="field" style="margin-top: 12px">
+          <label>Device Icon</label>
+          <div class="picker-grid" id="scIconPicker"></div>
+        </div>
+
+        <div class="field" style="margin-top: 12px">
+          <label>Accent Color</label>
+          <div class="color-row" id="scColorPicker"></div>
+        </div>
+
+        <div class="toggle-row" style="margin-top: 10px">
+          <div>
+            <div class="toggle-title">Pin to Favorites Dock</div>
+            <div class="toggle-desc">
+              Add this toggle switch directly to the Favorites bar
+            </div>
+          </div>
+          <input type="checkbox" class="switch" id="scFav" />
+        </div>
+
+        <div class="modal-foot">
+          <button
+            class="btn btn-sm"
+            id="testScConnBtn"
+            onclick="testShortcutConnection()"
+          >
+            Test Connection
+          </button>
+          <div style="display: flex; gap: 8px">
+            <button class="btn" onclick="closeShortcutModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveShortcutForm()">
+              Apply Shortcut
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 3: Add / Edit Group (Req #10) -->
+    <div class="modal-backdrop" id="groupModal">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 id="grpModalTitle">Create Group</h3>
+          <button class="btn btn-sm" onclick="closeGroupModal()">
+            &times;
+          </button>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Group Name *</label>
+            <input
+              type="text"
+              id="grpName"
+              class="input"
+              placeholder="e.g. Workshop, Bedroom, Solar"
+            />
+          </div>
+        </div>
+
+        <div class="field" style="margin-top: 12px">
+          <label>Group Accent Color</label>
+          <div class="color-row" id="grpColorPicker"></div>
+        </div>
+
+        <div class="field" style="margin-top: 14px">
+          <label>Assign Saved Devices (Optional)</label>
+          <div class="check-list-box" id="grpDevicesCheckList"></div>
+        </div>
+
+        <div class="field" style="margin-top: 12px">
+          <label>Assign Saved Shortcut Buttons (Optional)</label>
+          <div class="check-list-box" id="grpShortcutsCheckList"></div>
+        </div>
+
+        <div class="modal-foot" style="justify-content: flex-end">
+          <button class="btn" onclick="closeGroupModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveGroupForm()">
+            Apply Group
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 4: Add / Edit Favorite or Favorite Card (Req #11) -->
+    <div class="modal-backdrop" id="favoriteModal">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 id="favModalTitle">Add Favorite</h3>
+          <button class="btn btn-sm" onclick="closeFavoriteModal()">
+            &times;
+          </button>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Favorite / Card Name *</label>
+            <input
+              type="text"
+              id="favName"
+              class="input"
+              placeholder="e.g. Desk Control or Master Card"
+            />
+          </div>
+        </div>
+
+        <div class="field" style="margin-top: 12px">
+          <label>Favorite Icon</label>
+          <div class="picker-grid" id="favIconPicker"></div>
+        </div>
+
+        <div class="field" style="margin-top: 12px">
+          <label>Accent Color</label>
+          <div class="color-row" id="favColorPicker"></div>
+        </div>
+
+        <div class="field" style="margin-top: 14px">
+          <label>Include Saved Devices (Optional)</label>
+          <div class="check-list-box" id="favDevicesCheckList"></div>
+        </div>
+
+        <div class="field" style="margin-top: 12px">
+          <label>Include Saved Shortcut Buttons (Optional)</label>
+          <div class="check-list-box" id="favShortcutsCheckList"></div>
+        </div>
+
+        <div class="field" style="margin-top: 12px">
+          <label>Include Saved Groups (Optional)</label>
+          <div class="check-list-box" id="favGroupsCheckList"></div>
+        </div>
+
+        <div class="modal-foot" style="justify-content: flex-end">
+          <button class="btn" onclick="closeFavoriteModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveFavoriteForm()">
+            Apply Favorite
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Req #1: Full-Background Blur Backdrop + Toast -->
+    <div class="toast-backdrop" id="toastBackdrop"></div>
     <div class="toast" id="toast"></div>
 
     <script>
@@ -1179,9 +1557,20 @@
       let config = null;
       let isDirty = false;
       let isOfflinePreview = false;
+
       let editingDeviceId = null;
+      let editingShortcutId = null;
+      let editingGroupId = null;
+      let editingFavoriteId = null;
+
       let selectedIcon = "chip";
       let selectedColor = "#38bdf8";
+      let scSelectedIcon = "switch";
+      let scSelectedColor = "#38bdf8";
+      let grpSelectedColor = "#38bdf8";
+      let favSelectedIcon = "chip";
+      let favSelectedColor = "#38bdf8";
+
       let lastScannedList = [];
 
       function sanitizeConfig(raw) {
@@ -1196,31 +1585,98 @@
             autoPing: true,
             pingTimeoutMs: 1500,
             pin: "",
+            enableShortcuts: true,
+            enableGroups: true,
+            enableFavorites: true,
           },
           groups: [{ id: "g1", name: "General", color: "#38bdf8" }],
           devices: [],
+          shortcuts: [],
+          favorites: [],
         };
         if (!raw || typeof raw !== "object") return fallback;
-        return {
+        const merged = {
           settings: { ...fallback.settings, ...(raw.settings || {}) },
-          groups:
-            Array.isArray(raw.groups) && raw.groups.length
-              ? raw.groups
-              : fallback.groups,
+          groups: Array.isArray(raw.groups) ? raw.groups : fallback.groups,
           devices: Array.isArray(raw.devices) ? raw.devices : [],
+          shortcuts: Array.isArray(raw.shortcuts) ? raw.shortcuts : [],
+          favorites: Array.isArray(raw.favorites) ? raw.favorites : [],
         };
+        syncPinsToFavorites(merged);
+        return merged;
+      }
+
+      function syncPinsToFavorites(cfg) {
+        cfg.devices.forEach((d) => {
+          if (
+            d.fav &&
+            !cfg.favorites.some(
+              (f) =>
+                f.deviceIds?.length === 1 &&
+                f.deviceIds[0] === d.id &&
+                !f.shortcutIds?.length &&
+                !f.groupIds?.length,
+            )
+          ) {
+            cfg.favorites.push({
+              id: "fav_d_" + d.id,
+              name: d.name,
+              icon: d.icon || "chip",
+              color: d.color || "#38bdf8",
+              deviceIds: [d.id],
+              shortcutIds: [],
+              groupIds: [],
+            });
+          }
+        });
+        cfg.shortcuts.forEach((s) => {
+          if (
+            s.fav &&
+            !cfg.favorites.some(
+              (f) =>
+                f.shortcutIds?.length === 1 &&
+                f.shortcutIds[0] === s.id &&
+                !f.deviceIds?.length &&
+                !f.groupIds?.length,
+            )
+          ) {
+            cfg.favorites.push({
+              id: "fav_s_" + s.id,
+              name: s.name,
+              icon: s.icon || "switch",
+              color: s.color || "#38bdf8",
+              deviceIds: [],
+              shortcutIds: [s.id],
+              groupIds: [],
+            });
+          }
+        });
       }
 
       function svgIcon(name, size = 19) {
         return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ICONS.chip}</svg>`;
       }
 
+      /* Req #1: Toast with Full-Background Blur */
       function showToast(msg) {
         const t = document.getElementById("toast");
+        const bg = document.getElementById("toastBackdrop");
         t.textContent = msg;
         t.classList.add("show");
+        bg.classList.add("show");
         clearTimeout(t._timer);
-        t._timer = setTimeout(() => t.classList.remove("show"), 2300);
+        t._timer = setTimeout(() => {
+          t.classList.remove("show");
+          bg.classList.remove("show");
+        }, 2300);
+      }
+
+      /* Req #2: Stop background scroll when any modal or PIN lock is open */
+      function syncModalScrollLock() {
+        const anyModalOpen = !!document.querySelector(".modal-backdrop.open");
+        const pinOpen =
+          document.getElementById("pinOverlay").style.display === "flex";
+        document.body.classList.toggle("modal-open", anyModalOpen || pinOpen);
       }
 
       function markDirty() {
@@ -1256,6 +1712,7 @@
         if (pin && sessionStorage.getItem("hub_unlocked") !== pin) {
           document.getElementById("pinOverlay").style.display = "flex";
         }
+        syncModalScrollLock();
       }
 
       function unlockPin() {
@@ -1263,6 +1720,7 @@
         if (val === config.settings.pin) {
           sessionStorage.setItem("hub_unlocked", val);
           document.getElementById("pinOverlay").style.display = "none";
+          syncModalScrollLock();
         } else {
           showToast("Incorrect PIN");
         }
@@ -1289,12 +1747,34 @@
 
       function renderAll() {
         renderDeviceList();
+        renderShortcutList();
         renderGroupList();
+        renderFavoriteList();
         populatePreferences();
         updateNvsMeter();
       }
 
-      /* Devices Management */
+      function populateGroupSelect(selectId, selectedVal = "none") {
+        const sel = document.getElementById(selectId);
+        let html = `<option value="none">None</option>`;
+        html += config.groups
+          .map(
+            (g) =>
+              `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`,
+          )
+          .join("");
+        sel.innerHTML = html;
+        sel.value =
+          selectedVal &&
+          (selectedVal === "none" ||
+            config.groups.some((g) => g.id === selectedVal))
+            ? selectedVal
+            : "none";
+      }
+
+      /* ==========================================
+         SECTION 1: DEVICES (Req #8)
+         ========================================== */
       function renderDeviceList() {
         const list = document.getElementById("deviceList");
         const q = (document.getElementById("devFilterInput")?.value || "")
@@ -1320,6 +1800,7 @@
           .map((dev) => {
             const idx = config.devices.indexOf(dev);
             const g = config.groups.find((x) => x.id === dev.group);
+            const groupLabel = g ? g.name : "None (Hidden on Home)";
             const idSafe = escapeHtml(dev.id);
             const colorSafe = escapeHtml(dev.color || "#38bdf8");
             return `
@@ -1330,7 +1811,7 @@
                 <div class="dev-row-title">
                   ${escapeHtml(dev.name)}
                   ${dev.fav ? '<span style="color:#fbbf24">&#9733;</span>' : ""}
-                  <span class="badge">${escapeHtml(g ? g.name : "General")}</span>
+                  <span class="badge">${escapeHtml(groupLabel)}</span>
                 </div>
                 <div class="dev-row-sub">${escapeHtml(dev.ip || "No IP")} ${dev.mdns ? "• " + escapeHtml(dev.mdns) : ""}</div>
               </div>
@@ -1366,26 +1847,37 @@
         copy.id = "d" + Date.now().toString(36);
         copy.name = orig.name + " (Copy)";
         config.devices.push(copy);
+        if (copy.fav) syncPinsToFavorites(config);
         markDirty();
-        renderDeviceList();
+        renderAll();
         showToast("Device cloned");
       }
 
       function deleteDevice(id) {
         if (!confirm("Delete this device from the hub?")) return;
         config.devices = config.devices.filter((d) => d.id !== id);
+        config.favorites.forEach((f) => {
+          if (Array.isArray(f.deviceIds)) {
+            f.deviceIds = f.deviceIds.filter((did) => did !== id);
+          }
+        });
+        config.favorites = config.favorites.filter(
+          (f) =>
+            (f.deviceIds && f.deviceIds.length) ||
+            (f.shortcutIds && f.shortcutIds.length) ||
+            (f.groupIds && f.groupIds.length),
+        );
         markDirty();
-        renderDeviceList();
+        renderAll();
       }
 
-      /* Device Modal */
       function openDeviceModal(id = null, prefill = null) {
         editingDeviceId = id;
         const dev = id ? config.devices.find((d) => d.id === id) : prefill;
 
         document.getElementById("modalTitle").textContent = id
-          ? "Edit ESP Device"
-          : "Add ESP Device";
+          ? "Edit Device"
+          : "Add Device";
         document.getElementById("devName").value = dev?.name || "";
         document.getElementById("devIp").value = dev?.ip || "";
         document.getElementById("devMdns").value = dev?.mdns || "";
@@ -1396,32 +1888,31 @@
         document.getElementById("devNote").value = dev?.note || "";
         document.getElementById("devFav").checked = !!dev?.fav;
 
-        const groupSel = document.getElementById("devGroup");
-        groupSel.innerHTML = config.groups
-          .map(
-            (g) =>
-              `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`,
-          )
-          .join("");
-        groupSel.value = dev?.group || config.groups[0]?.id || "";
+        // Req #8: Default group is 'none'
+        populateGroupSelect("devGroup", dev?.group || "none");
 
         selectedIcon = dev?.icon || "chip";
         selectedColor = dev?.color || "#38bdf8";
-        renderPickers();
+        renderDevicePickers();
 
-        document.getElementById("testConnBtn").textContent = "Test Connection";
+        const testBtn = document.getElementById("testConnBtn");
+        testBtn.textContent = "Test Connection";
+        testBtn.className = "btn btn-sm";
+
         document.getElementById("deviceModal").classList.add("open");
+        syncModalScrollLock();
       }
 
       function closeDeviceModal() {
         document.getElementById("deviceModal").classList.remove("open");
+        syncModalScrollLock();
       }
 
-      function renderPickers() {
+      function renderDevicePickers() {
         document.getElementById("iconPicker").innerHTML = Object.keys(ICONS)
           .map(
             (k) => `
-        <div class="pick-item ${selectedIcon === k ? "selected" : ""}" onclick="selectedIcon='${k}'; renderPickers()">
+        <div class="pick-item ${selectedIcon === k ? "selected" : ""}" onclick="selectedIcon='${k}'; renderDevicePickers()">
           ${svgIcon(k, 18)}
         </div>
       `,
@@ -1431,10 +1922,10 @@
         document.getElementById("colorPicker").innerHTML =
           SWATCHES.map(
             (c) => `
-        <div class="swatch ${selectedColor === c ? "selected" : ""}" style="background:${c}" onclick="selectedColor='${c}'; renderPickers()"></div>
+        <div class="swatch ${selectedColor === c ? "selected" : ""}" style="background:${c}" onclick="selectedColor='${c}'; renderDevicePickers()"></div>
       `,
           ).join("") +
-          `<input type="color" value="${selectedColor}" style="width:32px;height:28px;border:none;background:none" onchange="selectedColor=this.value; renderPickers()" />`;
+          `<input type="color" value="${selectedColor}" style="width:32px;height:28px;border:none;background:none" onchange="selectedColor=this.value; renderDevicePickers()" />`;
       }
 
       function cleanHost(str) {
@@ -1444,6 +1935,7 @@
           .replace(/\/+$/, "");
       }
 
+      /* Req #8: Set Reachable Green / Unreachable Red after pinging */
       async function testModalConnection() {
         const ip = cleanHost(document.getElementById("devIp").value);
         const mdns = cleanHost(document.getElementById("devMdns").value);
@@ -1452,6 +1944,7 @@
         if (!host) return showToast("Enter an IP or mDNS first");
 
         const btn = document.getElementById("testConnBtn");
+        btn.className = "btn btn-sm";
         btn.textContent = "Pinging...";
         const start = performance.now();
         const ctrl = new AbortController();
@@ -1465,8 +1958,10 @@
           });
           const ms = Math.round(performance.now() - start);
           btn.textContent = `Reachable (${ms}ms)`;
+          btn.className = "btn btn-sm conn-ok";
         } catch {
           btn.textContent = "Unreachable / Timeout";
+          btn.className = "btn btn-sm conn-err";
         } finally {
           clearTimeout(t);
         }
@@ -1484,8 +1979,11 @@
         let path = document.getElementById("devPath").value.trim() || "/";
         if (!path.startsWith("/") && !path.startsWith(":")) path = "/" + path;
 
+        const id = editingDeviceId || "d" + Date.now().toString(36);
+        const fav = document.getElementById("devFav").checked;
+
         const payload = {
-          id: editingDeviceId || "d" + Date.now().toString(36),
+          id,
           name,
           ip,
           mdns,
@@ -1494,10 +1992,10 @@
           altLabel: document.getElementById("devAltLabel").value.trim(),
           altPath: document.getElementById("devAltPath").value.trim(),
           note: document.getElementById("devNote").value.trim(),
-          group: document.getElementById("devGroup").value,
+          group: document.getElementById("devGroup").value || "none",
           icon: selectedIcon,
           color: selectedColor,
-          fav: document.getElementById("devFav").checked,
+          fav,
         };
 
         if (editingDeviceId) {
@@ -1507,29 +2005,329 @@
           config.devices.push(payload);
         }
 
+        // Sync pin status with Favorites list
+        if (fav) {
+          syncPinsToFavorites(config);
+        } else {
+          config.favorites = config.favorites.filter(
+            (f) =>
+              !(
+                f.deviceIds?.length === 1 &&
+                f.deviceIds[0] === id &&
+                !f.shortcutIds?.length &&
+                !f.groupIds?.length
+              ),
+          );
+        }
+
         markDirty();
-        renderDeviceList();
+        renderAll();
         closeDeviceModal();
         showToast(editingDeviceId ? "Device updated" : "Device added");
       }
 
-      /* Groups Management */
-      function renderGroupList() {
-        const list = document.getElementById("groupList");
-        list.innerHTML = config.groups
-          .map((g, idx) => {
-            const count = config.devices.filter((d) => d.group === g.id).length;
-            const gIdSafe = escapeHtml(g.id);
+      /* ==========================================
+         SECTION 2: SHORTCUT BUTTON (Req #9)
+         ========================================== */
+      function renderShortcutList() {
+        const list = document.getElementById("shortcutList");
+        const q = (document.getElementById("scFilterInput")?.value || "")
+          .trim()
+          .toLowerCase();
+        document.getElementById("scCountLabel").textContent =
+          config.shortcuts.length;
+
+        if (!config.shortcuts.length) {
+          list.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">No shortcut buttons saved yet. Click <strong>+ Add Shortcut</strong> to create an API toggle button.</div>`;
+          return;
+        }
+
+        const filtered = config.shortcuts.filter(
+          (s) =>
+            !q ||
+            (s.name && s.name.toLowerCase().includes(q)) ||
+            (s.host && s.host.toLowerCase().includes(q)),
+        );
+
+        list.innerHTML = filtered
+          .map((sc) => {
+            const idx = config.shortcuts.indexOf(sc);
+            const g = config.groups.find((x) => x.id === sc.group);
+            const idSafe = escapeHtml(sc.id);
+            const colorSafe = escapeHtml(sc.color || "#38bdf8");
             return `
           <div class="dev-row">
             <div class="dev-row-left">
-              <input type="color" value="${escapeHtml(g.color)}" style="width:32px;height:32px;border:none;background:none;cursor:pointer" onchange="updateGroup('${gIdSafe}', 'color', this.value)" />
-              <input type="text" class="input" style="max-width:240px" value="${escapeHtml(g.name)}" onchange="updateGroup('${gIdSafe}', 'name', this.value)" />
-              <span class="badge">${count} devices</span>
+              <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">${svgIcon(sc.icon || "switch", 20)}</div>
+              <div>
+                <div class="dev-row-title">
+                  ${escapeHtml(sc.name)}
+                  ${sc.fav ? '<span style="color:#fbbf24">&#9733;</span>' : ""}
+                  <span class="badge">${escapeHtml(g ? g.name : "None")}</span>
+                  <span class="badge">Index: ${sc.index ?? 0}</span>
+                </div>
+                <div class="dev-row-sub">${escapeHtml(sc.host)}:${sc.port || 80} • Key: ${sc.apiKey ? escapeHtml(sc.apiKey.slice(0, 10)) + "…" : "None"}</div>
+              </div>
             </div>
             <div class="row-actions">
-              <button class="btn btn-sm" ${idx === 0 ? "disabled" : ""} onclick="moveGroup(${idx}, -1)">&uarr;</button>
-              <button class="btn btn-sm" ${idx === config.groups.length - 1 ? "disabled" : ""} onclick="moveGroup(${idx}, 1)">&darr;</button>
+              <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveShortcut(${idx}, -1)">&uarr;</button>
+              <button class="btn btn-sm" title="Move Down" ${idx === config.shortcuts.length - 1 ? "disabled" : ""} onclick="moveShortcut(${idx}, 1)">&darr;</button>
+              <button class="btn btn-sm" onclick="cloneShortcut('${idSafe}')">Clone</button>
+              <button class="btn btn-sm" onclick="openShortcutModal('${idSafe}')">Edit</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteShortcut('${idSafe}')">Delete</button>
+            </div>
+          </div>
+        `;
+          })
+          .join("");
+      }
+
+      function moveShortcut(index, dir) {
+        const target = index + dir;
+        if (target < 0 || target >= config.shortcuts.length) return;
+        [config.shortcuts[index], config.shortcuts[target]] = [
+          config.shortcuts[target],
+          config.shortcuts[index],
+        ];
+        markDirty();
+        renderShortcutList();
+      }
+
+      function cloneShortcut(id) {
+        const orig = config.shortcuts.find((s) => s.id === id);
+        if (!orig) return;
+        const copy = structuredClone(orig);
+        copy.id = "s" + Date.now().toString(36);
+        copy.name = orig.name + " (Copy)";
+        config.shortcuts.push(copy);
+        if (copy.fav) syncPinsToFavorites(config);
+        markDirty();
+        renderAll();
+        showToast("Shortcut cloned");
+      }
+
+      function deleteShortcut(id) {
+        if (!confirm("Delete this shortcut button?")) return;
+        config.shortcuts = config.shortcuts.filter((s) => s.id !== id);
+        config.favorites.forEach((f) => {
+          if (Array.isArray(f.shortcutIds)) {
+            f.shortcutIds = f.shortcutIds.filter((sid) => sid !== id);
+          }
+        });
+        config.favorites = config.favorites.filter(
+          (f) =>
+            (f.deviceIds && f.deviceIds.length) ||
+            (f.shortcutIds && f.shortcutIds.length) ||
+            (f.groupIds && f.groupIds.length),
+        );
+        markDirty();
+        renderAll();
+      }
+
+      function openShortcutModal(id = null) {
+        editingShortcutId = id;
+        const sc = id ? config.shortcuts.find((s) => s.id === id) : null;
+
+        document.getElementById("scModalTitle").textContent = id
+          ? "Edit Shortcut Button"
+          : "Add Shortcut Button";
+        document.getElementById("scName").value = sc?.name || "";
+        document.getElementById("scHost").value = sc?.host || "";
+        document.getElementById("scPort").value = sc?.port || 80;
+        document.getElementById("scIndex").value = sc?.index ?? 0;
+        document.getElementById("scApiKey").value = sc?.apiKey || "";
+        document.getElementById("scFav").checked = !!sc?.fav;
+
+        populateGroupSelect("scGroup", sc?.group || "none");
+
+        scSelectedIcon = sc?.icon || "switch";
+        scSelectedColor = sc?.color || "#38bdf8";
+        renderShortcutPickers();
+
+        const testBtn = document.getElementById("testScConnBtn");
+        testBtn.textContent = "Test Connection";
+        testBtn.className = "btn btn-sm";
+
+        document.getElementById("shortcutModal").classList.add("open");
+        syncModalScrollLock();
+      }
+
+      function closeShortcutModal() {
+        document.getElementById("shortcutModal").classList.remove("open");
+        syncModalScrollLock();
+      }
+
+      function renderShortcutPickers() {
+        document.getElementById("scIconPicker").innerHTML = Object.keys(ICONS)
+          .map(
+            (k) => `
+        <div class="pick-item ${scSelectedIcon === k ? "selected" : ""}" onclick="scSelectedIcon='${k}'; renderShortcutPickers()">
+          ${svgIcon(k, 18)}
+        </div>
+      `,
+          )
+          .join("");
+
+        document.getElementById("scColorPicker").innerHTML =
+          SWATCHES.map(
+            (c) => `
+        <div class="swatch ${scSelectedColor === c ? "selected" : ""}" style="background:${c}" onclick="scSelectedColor='${c}'; renderShortcutPickers()"></div>
+      `,
+          ).join("") +
+          `<input type="color" value="${scSelectedColor}" style="width:32px;height:28px;border:none;background:none" onchange="scSelectedColor=this.value; renderShortcutPickers()" />`;
+      }
+
+      /* Req #9: Test Shortcut Connection with Reply */
+      async function testShortcutConnection() {
+        const name = document.getElementById("scName").value.trim() || "Switch";
+        const host = cleanHost(document.getElementById("scHost").value);
+        const port = Number(document.getElementById("scPort").value) || 80;
+        const index = Number(document.getElementById("scIndex").value) || 0;
+        const apiKey = document.getElementById("scApiKey").value.trim();
+
+        if (!host) return showToast("Enter IP / Hostname first");
+        if (!apiKey) return showToast("Enter API Key first");
+
+        const btn = document.getElementById("testScConnBtn");
+        btn.className = "btn btn-sm";
+        btn.textContent = "Sending POST...";
+
+        const portPart = port !== 80 ? `:${port}` : "";
+        const url = `http://${host}${portPart}/api/switch/toggle`;
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 2500);
+
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: `index=${encodeURIComponent(index)}&state=toggle&key=${encodeURIComponent(apiKey)}`,
+            signal: ctrl.signal,
+          });
+          const data = await res.json();
+          const stateStr = data.state ? "ON" : "OFF";
+          btn.textContent = `Reply: ${name} is ${stateStr}`;
+          btn.className = "btn btn-sm conn-ok";
+        } catch (err) {
+          btn.textContent = "Unreachable / Invalid Reply";
+          btn.className = "btn btn-sm conn-err";
+        } finally {
+          clearTimeout(t);
+        }
+      }
+
+      function saveShortcutForm() {
+        const name = document.getElementById("scName").value.trim();
+        const host = cleanHost(document.getElementById("scHost").value);
+        const port = Number(document.getElementById("scPort").value) || 80;
+        const index = Number(document.getElementById("scIndex").value) || 0;
+        const apiKey = document.getElementById("scApiKey").value.trim();
+        const fav = document.getElementById("scFav").checked;
+
+        if (!name) return showToast("Switch name is required");
+        if (!host) return showToast("IP / Hostname is required");
+        if (!apiKey) return showToast("API Key is required");
+
+        const id = editingShortcutId || "s" + Date.now().toString(36);
+        const existing = config.shortcuts.find((s) => s.id === id);
+
+        const payload = {
+          id,
+          name,
+          host,
+          port,
+          index,
+          apiKey,
+          group: document.getElementById("scGroup").value || "none",
+          icon: scSelectedIcon,
+          color: scSelectedColor,
+          fav,
+          state: existing ? !!existing.state : false,
+        };
+
+        if (editingShortcutId) {
+          const idx = config.shortcuts.findIndex(
+            (s) => s.id === editingShortcutId,
+          );
+          if (idx !== -1) config.shortcuts[idx] = payload;
+        } else {
+          config.shortcuts.push(payload);
+        }
+
+        if (fav) {
+          syncPinsToFavorites(config);
+        } else {
+          config.favorites = config.favorites.filter(
+            (f) =>
+              !(
+                f.shortcutIds?.length === 1 &&
+                f.shortcutIds[0] === id &&
+                !f.deviceIds?.length &&
+                !f.groupIds?.length
+              ),
+          );
+        }
+
+        markDirty();
+        renderAll();
+        closeShortcutModal();
+        showToast(editingShortcutId ? "Shortcut updated" : "Shortcut added");
+      }
+
+      /* ==========================================
+         SECTION 3: GROUP (Req #10)
+         ========================================== */
+      function renderGroupList() {
+        const list = document.getElementById("groupList");
+        const q = (document.getElementById("grpFilterInput")?.value || "")
+          .trim()
+          .toLowerCase();
+        document.getElementById("grpCountLabel").textContent =
+          config.groups.length;
+
+        if (!config.groups.length) {
+          list.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">No groups created yet. Click <strong>+ Create Group</strong>.</div>`;
+          return;
+        }
+
+        const filtered = config.groups.filter(
+          (g) => !q || (g.name && g.name.toLowerCase().includes(q)),
+        );
+
+        list.innerHTML = filtered
+          .map((g) => {
+            const idx = config.groups.indexOf(g);
+            const devCount = config.devices.filter(
+              (d) => d.group === g.id,
+            ).length;
+            const scCount = config.shortcuts.filter(
+              (s) => s.group === g.id,
+            ).length;
+            const gIdSafe = escapeHtml(g.id);
+            const colorSafe = escapeHtml(g.color || "#38bdf8");
+
+            return `
+          <div class="dev-row">
+            <div class="dev-row-left">
+              <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">
+                <span style="width:14px;height:14px;border-radius:50%;background:${colorSafe};display:inline-block"></span>
+              </div>
+              <div>
+                <div class="dev-row-title">
+                  ${escapeHtml(g.name)}
+                  <span class="badge">${devCount} devices</span>
+                  <span class="badge">${scCount} shortcuts</span>
+                </div>
+                <div class="dev-row-sub">Accent: ${colorSafe}</div>
+              </div>
+            </div>
+            <div class="row-actions">
+              <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveGroup(${idx}, -1)">&uarr;</button>
+              <button class="btn btn-sm" title="Move Down" ${idx === config.groups.length - 1 ? "disabled" : ""} onclick="moveGroup(${idx}, 1)">&darr;</button>
+              <button class="btn btn-sm" onclick="cloneGroup('${gIdSafe}')">Clone</button>
+              <button class="btn btn-sm" onclick="openGroupModal('${gIdSafe}')">Edit</button>
               <button class="btn btn-sm btn-danger" onclick="deleteGroup('${gIdSafe}')">Delete</button>
             </div>
           </div>
@@ -1538,26 +2336,118 @@
           .join("");
       }
 
-      function addGroup() {
-        const nameEl = document.getElementById("newGroupName");
-        const name = nameEl.value.trim();
-        if (!name) return showToast("Enter a group name");
-        config.groups.push({
-          id: "g" + Date.now().toString(36),
-          name,
-          color: document.getElementById("newGroupColor").value,
-        });
-        nameEl.value = "";
-        markDirty();
-        renderGroupList();
+      function openGroupModal(id = null) {
+        editingGroupId = id;
+        const grp = id ? config.groups.find((g) => g.id === id) : null;
+
+        document.getElementById("grpModalTitle").textContent = id
+          ? "Edit Group"
+          : "Create Group";
+        document.getElementById("grpName").value = grp?.name || "";
+        grpSelectedColor = grp?.color || "#38bdf8";
+        renderGroupColorPicker();
+
+        // Populate Devices Checklist
+        const devBox = document.getElementById("grpDevicesCheckList");
+        if (!config.devices.length) {
+          devBox.innerHTML = `<span style="color:var(--text-muted);font-size:0.76rem">No saved devices available</span>`;
+        } else {
+          devBox.innerHTML = config.devices
+            .map((d) => {
+              const checked = id && d.group === id ? "checked" : "";
+              return `<label class="check-item"><input type="checkbox" name="grpDevCheck" value="${escapeHtml(d.id)}" ${checked}/> <span>${escapeHtml(d.name)}</span></label>`;
+            })
+            .join("");
+        }
+
+        // Populate Shortcuts Checklist
+        const scBox = document.getElementById("grpShortcutsCheckList");
+        if (!config.shortcuts.length) {
+          scBox.innerHTML = `<span style="color:var(--text-muted);font-size:0.76rem">No saved shortcuts available</span>`;
+        } else {
+          scBox.innerHTML = config.shortcuts
+            .map((s) => {
+              const checked = id && s.group === id ? "checked" : "";
+              return `<label class="check-item"><input type="checkbox" name="grpScCheck" value="${escapeHtml(s.id)}" ${checked}/> <span>${escapeHtml(s.name)}</span></label>`;
+            })
+            .join("");
+        }
+
+        document.getElementById("groupModal").classList.add("open");
+        syncModalScrollLock();
       }
 
-      function updateGroup(id, key, val) {
-        const g = config.groups.find((x) => x.id === id);
-        if (g && val.trim()) {
-          g[key] = val.trim();
-          markDirty();
+      function closeGroupModal() {
+        document.getElementById("groupModal").classList.remove("open");
+        syncModalScrollLock();
+      }
+
+      function renderGroupColorPicker() {
+        document.getElementById("grpColorPicker").innerHTML =
+          SWATCHES.map(
+            (c) => `
+        <div class="swatch ${grpSelectedColor === c ? "selected" : ""}" style="background:${c}" onclick="grpSelectedColor='${c}'; renderGroupColorPicker()"></div>
+      `,
+          ).join("") +
+          `<input type="color" value="${grpSelectedColor}" style="width:32px;height:28px;border:none;background:none" onchange="grpSelectedColor=this.value; renderGroupColorPicker()" />`;
+      }
+
+      function saveGroupForm() {
+        const name = document.getElementById("grpName").value.trim();
+        if (!name) return showToast("Group name is required");
+
+        const id = editingGroupId || "g" + Date.now().toString(36);
+        const payload = { id, name, color: grpSelectedColor };
+
+        if (editingGroupId) {
+          const idx = config.groups.findIndex((g) => g.id === editingGroupId);
+          if (idx !== -1) config.groups[idx] = payload;
+        } else {
+          config.groups.push(payload);
         }
+
+        const checkedDevs = new Set(
+          Array.from(
+            document.querySelectorAll('input[name="grpDevCheck"]:checked'),
+          ).map((el) => el.value),
+        );
+        config.devices.forEach((d) => {
+          if (checkedDevs.has(d.id)) {
+            d.group = id;
+          } else if (editingGroupId && d.group === id) {
+            d.group = "none";
+          }
+        });
+
+        const checkedScs = new Set(
+          Array.from(
+            document.querySelectorAll('input[name="grpScCheck"]:checked'),
+          ).map((el) => el.value),
+        );
+        config.shortcuts.forEach((s) => {
+          if (checkedScs.has(s.id)) {
+            s.group = id;
+          } else if (editingGroupId && s.group === id) {
+            s.group = "none";
+          }
+        });
+
+        markDirty();
+        renderAll();
+        closeGroupModal();
+        showToast(editingGroupId ? "Group updated" : "Group created");
+      }
+
+      function cloneGroup(id) {
+        const orig = config.groups.find((g) => g.id === id);
+        if (!orig) return;
+        const copy = structuredClone(orig);
+        copy.id = "g" + Date.now().toString(36);
+        copy.name = orig.name + " (Copy)";
+        config.groups.push(copy);
+        markDirty();
+        renderAll();
+        showToast("Group cloned");
       }
 
       function moveGroup(idx, dir) {
@@ -1572,21 +2462,269 @@
       }
 
       function deleteGroup(id) {
-        if (config.groups.length <= 1)
-          return showToast("At least one group is required");
         if (
           !confirm(
-            "Delete this group? Its devices will move to the first remaining group.",
+            "Delete this group? Assigned devices will be set to 'None' (hidden on Home UI until assigned to a group).",
           )
         )
           return;
         config.groups = config.groups.filter((g) => g.id !== id);
-        const fallbackId = config.groups[0].id;
         config.devices.forEach((d) => {
-          if (d.group === id) d.group = fallbackId;
+          if (d.group === id) d.group = "none";
+        });
+        config.shortcuts.forEach((s) => {
+          if (s.group === id) s.group = "none";
+        });
+        config.favorites.forEach((f) => {
+          if (Array.isArray(f.groupIds)) {
+            f.groupIds = f.groupIds.filter((gid) => gid !== id);
+          }
         });
         markDirty();
         renderAll();
+      }
+
+      /* ==========================================
+         SECTION 4: FAVORITES (Req #11)
+         ========================================== */
+      function renderFavoriteList() {
+        const list = document.getElementById("favoriteList");
+        const q = (document.getElementById("favFilterInput")?.value || "")
+          .trim()
+          .toLowerCase();
+        document.getElementById("favCountLabel").textContent =
+          config.favorites.length;
+
+        if (!config.favorites.length) {
+          list.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">No favorites pinned yet. Click <strong>+ Add Favorite</strong> or pin any Device / Shortcut.</div>`;
+          return;
+        }
+
+        const filtered = config.favorites.filter(
+          (f) => !q || (f.name && f.name.toLowerCase().includes(q)),
+        );
+
+        list.innerHTML = filtered
+          .map((fav) => {
+            const idx = config.favorites.indexOf(fav);
+            const idSafe = escapeHtml(fav.id);
+            const colorSafe = escapeHtml(fav.color || "#38bdf8");
+            const dCount = (fav.deviceIds || []).length;
+            const sCount = (fav.shortcutIds || []).length;
+            const gCount = (fav.groupIds || []).length;
+
+            return `
+          <div class="dev-row">
+            <div class="dev-row-left">
+              <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">${svgIcon(fav.icon || "chip", 20)}</div>
+              <div>
+                <div class="dev-row-title">
+                  ${escapeHtml(fav.name)}
+                  ${dCount ? `<span class="badge">${dCount} device${dCount > 1 ? "s" : ""}</span>` : ""}
+                  ${sCount ? `<span class="badge">${sCount} shortcut${sCount > 1 ? "s" : ""}</span>` : ""}
+                  ${gCount ? `<span class="badge">${gCount} group${gCount > 1 ? "s" : ""}</span>` : ""}
+                </div>
+                <div class="dev-row-sub">Pinned in Favorites Dock</div>
+              </div>
+            </div>
+            <div class="row-actions">
+              <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveFavorite(${idx}, -1)">&uarr;</button>
+              <button class="btn btn-sm" title="Move Down" ${idx === config.favorites.length - 1 ? "disabled" : ""} onclick="moveFavorite(${idx}, 1)">&darr;</button>
+              <button class="btn btn-sm" onclick="cloneFavorite('${idSafe}')">Clone</button>
+              <button class="btn btn-sm" onclick="openFavoriteModal('${idSafe}')">Edit</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteFavorite('${idSafe}')">Delete</button>
+            </div>
+          </div>
+        `;
+          })
+          .join("");
+      }
+
+      function moveFavorite(idx, dir) {
+        const target = idx + dir;
+        if (target < 0 || target >= config.favorites.length) return;
+        [config.favorites[idx], config.favorites[target]] = [
+          config.favorites[target],
+          config.favorites[idx],
+        ];
+        markDirty();
+        renderFavoriteList();
+      }
+
+      function cloneFavorite(id) {
+        const orig = config.favorites.find((f) => f.id === id);
+        if (!orig) return;
+        const copy = structuredClone(orig);
+        copy.id = "fav_" + Date.now().toString(36);
+        copy.name = orig.name + " (Copy)";
+        config.favorites.push(copy);
+        markDirty();
+        renderFavoriteList();
+        showToast("Favorite cloned");
+      }
+
+      function deleteFavorite(id) {
+        if (!confirm("Remove this item from Favorites?")) return;
+        const fav = config.favorites.find((f) => f.id === id);
+        if (fav) {
+          if (
+            fav.deviceIds?.length === 1 &&
+            !fav.shortcutIds?.length &&
+            !fav.groupIds?.length
+          ) {
+            const dev = config.devices.find((d) => d.id === fav.deviceIds[0]);
+            if (dev) dev.fav = false;
+          }
+          if (
+            fav.shortcutIds?.length === 1 &&
+            !fav.deviceIds?.length &&
+            !fav.groupIds?.length
+          ) {
+            const sc = config.shortcuts.find(
+              (s) => s.id === fav.shortcutIds[0],
+            );
+            if (sc) sc.fav = false;
+          }
+        }
+        config.favorites = config.favorites.filter((f) => f.id !== id);
+        markDirty();
+        renderAll();
+      }
+
+      function openFavoriteModal(id = null) {
+        editingFavoriteId = id;
+        const fav = id ? config.favorites.find((f) => f.id === id) : null;
+
+        document.getElementById("favModalTitle").textContent = id
+          ? "Edit Favorite"
+          : "Add Favorite";
+        document.getElementById("favName").value = fav?.name || "";
+        favSelectedIcon = fav?.icon || "chip";
+        favSelectedColor = fav?.color || "#38bdf8";
+        renderFavoritePickers();
+
+        const dSet = new Set(fav?.deviceIds || []);
+        const sSet = new Set(fav?.shortcutIds || []);
+        const gSet = new Set(fav?.groupIds || []);
+
+        const devBox = document.getElementById("favDevicesCheckList");
+        devBox.innerHTML = config.devices.length
+          ? config.devices
+              .map(
+                (d) =>
+                  `<label class="check-item"><input type="checkbox" name="favDevCheck" value="${escapeHtml(d.id)}" ${dSet.has(d.id) ? "checked" : ""}/> <span>${escapeHtml(d.name)}</span></label>`,
+              )
+              .join("")
+          : `<span style="color:var(--text-muted);font-size:0.76rem">No saved devices</span>`;
+
+        const scBox = document.getElementById("favShortcutsCheckList");
+        scBox.innerHTML = config.shortcuts.length
+          ? config.shortcuts
+              .map(
+                (s) =>
+                  `<label class="check-item"><input type="checkbox" name="favScCheck" value="${escapeHtml(s.id)}" ${sSet.has(s.id) ? "checked" : ""}/> <span>${escapeHtml(s.name)}</span></label>`,
+              )
+              .join("")
+          : `<span style="color:var(--text-muted);font-size:0.76rem">No saved shortcuts</span>`;
+
+        const grpBox = document.getElementById("favGroupsCheckList");
+        grpBox.innerHTML = config.groups.length
+          ? config.groups
+              .map(
+                (g) =>
+                  `<label class="check-item"><input type="checkbox" name="favGrpCheck" value="${escapeHtml(g.id)}" ${gSet.has(g.id) ? "checked" : ""}/> <span>${escapeHtml(g.name)}</span></label>`,
+              )
+              .join("")
+          : `<span style="color:var(--text-muted);font-size:0.76rem">No saved groups</span>`;
+
+        document.getElementById("favoriteModal").classList.add("open");
+        syncModalScrollLock();
+      }
+
+      function closeFavoriteModal() {
+        document.getElementById("favoriteModal").classList.remove("open");
+        syncModalScrollLock();
+      }
+
+      function renderFavoritePickers() {
+        document.getElementById("favIconPicker").innerHTML = Object.keys(ICONS)
+          .map(
+            (k) => `
+        <div class="pick-item ${favSelectedIcon === k ? "selected" : ""}" onclick="favSelectedIcon='${k}'; renderFavoritePickers()">
+          ${svgIcon(k, 18)}
+        </div>
+      `,
+          )
+          .join("");
+
+        document.getElementById("favColorPicker").innerHTML =
+          SWATCHES.map(
+            (c) => `
+        <div class="swatch ${favSelectedColor === c ? "selected" : ""}" style="background:${c}" onclick="favSelectedColor='${c}'; renderFavoritePickers()"></div>
+      `,
+          ).join("") +
+          `<input type="color" value="${favSelectedColor}" style="width:32px;height:28px;border:none;background:none" onchange="favSelectedColor=this.value; renderFavoritePickers()" />`;
+      }
+
+      function saveFavoriteForm() {
+        let name = document.getElementById("favName").value.trim();
+        const deviceIds = Array.from(
+          document.querySelectorAll('input[name="favDevCheck"]:checked'),
+        ).map((el) => el.value);
+        const shortcutIds = Array.from(
+          document.querySelectorAll('input[name="favScCheck"]:checked'),
+        ).map((el) => el.value);
+        const groupIds = Array.from(
+          document.querySelectorAll('input[name="favGrpCheck"]:checked'),
+        ).map((el) => el.value);
+
+        if (!deviceIds.length && !shortcutIds.length && !groupIds.length) {
+          return showToast(
+            "Select at least one Device, Shortcut, or Group for this Favorite",
+          );
+        }
+
+        if (!name) {
+          if (deviceIds.length === 1) {
+            name =
+              config.devices.find((d) => d.id === deviceIds[0])?.name ||
+              "Favorite";
+          } else if (shortcutIds.length === 1) {
+            name =
+              config.shortcuts.find((s) => s.id === shortcutIds[0])?.name ||
+              "Favorite";
+          } else if (groupIds.length === 1) {
+            name =
+              config.groups.find((g) => g.id === groupIds[0])?.name ||
+              "Favorite";
+          } else {
+            name = "Favorite Card";
+          }
+        }
+
+        const payload = {
+          id: editingFavoriteId || "fav_" + Date.now().toString(36),
+          name,
+          icon: favSelectedIcon,
+          color: favSelectedColor,
+          deviceIds,
+          shortcutIds,
+          groupIds,
+        };
+
+        if (editingFavoriteId) {
+          const idx = config.favorites.findIndex(
+            (f) => f.id === editingFavoriteId,
+          );
+          if (idx !== -1) config.favorites[idx] = payload;
+        } else {
+          config.favorites.push(payload);
+        }
+
+        markDirty();
+        renderAll();
+        closeFavoriteModal();
+        showToast(editingFavoriteId ? "Favorite updated" : "Favorite added");
       }
 
       /* mDNS Scanner */
@@ -1661,6 +2799,7 @@
           ip: item.ip,
           mdns: item.mdns,
           port: item.port || 80,
+          group: "none",
         });
       }
 
@@ -1677,6 +2816,13 @@
           s.showIpOnCard !== false;
         document.getElementById("prefAutoPing").checked = s.autoPing !== false;
         document.getElementById("prefPin").value = s.pin || "";
+
+        document.getElementById("enableShortcutsToggle").checked =
+          s.enableShortcuts !== false;
+        document.getElementById("enableGroupsToggle").checked =
+          s.enableGroups !== false;
+        document.getElementById("enableFavoritesToggle").checked =
+          s.enableFavorites !== false;
       }
 
       function updatePref(key, val) {
@@ -1811,7 +2957,6 @@
         );
       }
 
-      /* === SAFEGUARD: Warn before closing tab with unsaved NVS changes === */
       window.addEventListener("beforeunload", (e) => {
         if (isDirty) {
           e.preventDefault();
