@@ -467,6 +467,13 @@
       .sc-title {
         font-size: 0.9rem;
         font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .sc-title-text {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1121,7 +1128,7 @@
           </svg>
           Favorites
         </div>
-        <div class="fav-strip" id="favStrip"></div>
+        <div class="shortcut-grid" id="favStrip"></div>
       </section>
 
       <!-- Req #9: Shortcut Toggle Buttons Section (just after Favorites) -->
@@ -1373,12 +1380,55 @@
       let viewMode = localStorage.getItem("hub_view_mode") || "grid";
       let deviceStatus = {};
       let deviceLatency = {};
+      let shortcutStatus = {};
       let shortcutBusy = {};
       let isOfflinePreview = false;
+
+      const KEY_SALT = "esp32_nvs_hub_v1_secret";
+
+      function encodeApiKey(rawKey) {
+        const str = String(rawKey || "").trim();
+        if (!str || str.startsWith("enc:")) return str;
+        const xor = Array.from(str)
+          .map((ch, i) =>
+            String.fromCharCode(
+              ch.charCodeAt(0) ^ KEY_SALT.charCodeAt(i % KEY_SALT.length),
+            ),
+          )
+          .join("");
+        return "enc:" + btoa(xor);
+      }
+
+      function revealApiKey(storedKey) {
+        const str = String(storedKey || "").trim();
+        if (!str.startsWith("enc:")) return str;
+        try {
+          const raw = atob(str.slice(4));
+          return Array.from(raw)
+            .map((ch, i) =>
+              String.fromCharCode(
+                ch.charCodeAt(0) ^ KEY_SALT.charCodeAt(i % KEY_SALT.length),
+              ),
+            )
+            .join("");
+        } catch {
+          return "";
+        }
+      }
+
+      function maskApiKey(storedKey) {
+        const plain = revealApiKey(storedKey);
+        if (!plain) return "None";
+        const last4 = plain.slice(-4);
+        return `••••••••••••${last4}`;
+      }
 
       function sanitizeConfig(raw) {
         const base = structuredClone(DEFAULT_CONFIG);
         if (!raw || typeof raw !== "object") {
+          base.shortcuts.forEach((s) => {
+            if (s.apiKey) s.apiKey = encodeApiKey(s.apiKey);
+          });
           syncLegacyFavorites(base);
           return base;
         }
@@ -1391,6 +1441,9 @@
             : base.shortcuts,
           favorites: Array.isArray(raw.favorites) ? raw.favorites : [],
         };
+        merged.shortcuts.forEach((s) => {
+          if (s.apiKey) s.apiKey = encodeApiKey(s.apiKey);
+        });
         syncLegacyFavorites(merged);
         return merged;
       }
@@ -1615,7 +1668,18 @@
         }
       }
 
-      /* Req #9: Trigger Shortcut Toggle Button via POST API Key */
+      /* Helper: Check if two shortcuts control the exact same physical switch */
+      function isSamePhysicalSwitch(a, b) {
+        if (!a || !b) return false;
+        const hostA = cleanHostInput(a.host).toLowerCase();
+        const hostB = cleanHostInput(b.host).toLowerCase();
+        const portA = Number(a.port) || 80;
+        const portB = Number(b.port) || 80;
+        const idxA = Number(a.index) || 0;
+        const idxB = Number(b.index) || 0;
+        return hostA === hostB && portA === portB && idxA === idxB;
+      }
+
       async function triggerShortcut(id, event = null) {
         if (event) event.stopPropagation();
         const sc = config.shortcuts.find((s) => s.id === id);
@@ -1625,30 +1689,60 @@
         if (!cleanH) return showToast("Invalid shortcut host");
         const portPart = sc.port && Number(sc.port) !== 80 ? `:${sc.port}` : "";
         const url = `http://${cleanH}${portPart}/api/switch/toggle`;
-        const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=toggle&key=${encodeURIComponent(sc.apiKey || "")}`;
+        const rawKey = revealApiKey(sc.apiKey);
+        const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=toggle&key=${encodeURIComponent(rawKey)}`;
 
-        shortcutBusy[id] = true;
-        renderShortcuts();
-        renderDevices();
+        // 1. Mark this shortcut AND all its clones as busy
+        const matchingShortcuts = config.shortcuts.filter((item) =>
+          isSamePhysicalSwitch(item, sc),
+        );
+        matchingShortcuts.forEach((item) => (shortcutBusy[item.id] = true));
+        renderAll();
 
         try {
-          const res = await fetch(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: bodyStr,
+          let newState;
+          if (isOfflinePreview) {
+            newState = !sc.state;
+          } else {
+            const res = await fetch(url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+              body: bodyStr,
+            });
+            const data = await res.json();
+            newState = !!data.state;
+          }
+
+          // 2. Sync ON/OFF state across ALL cloned/duplicate buttons for this switch
+          matchingShortcuts.forEach((item) => {
+            item.state = newState;
           });
-          const data = await res.json();
-          sc.state = !!data.state;
+
+          matchingShortcuts.forEach((item) => {
+            shortcutStatus[item.id] = "online";
+          });
+
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-          showToast(`${sc.name} is now: ${sc.state ? "ON" : "OFF"}`);
+          showToast(`${sc.name} is now: ${newState ? "ON" : "OFF"}`);
         } catch (err) {
           showToast(`Failed to toggle ${sc.name}`);
+          matchingShortcuts.forEach((item) => {
+            shortcutStatus[item.id] = "offline";
+          });
         } finally {
-          shortcutBusy[id] = false;
-          renderShortcuts();
-          renderDevices();
+          matchingShortcuts.forEach((item) => (shortcutBusy[item.id] = false));
+          renderAll();
+
+          // 3. If Favorite Bundle Modal is open, refresh its buttons in real time too
+          const favModal = document.getElementById("favCardModal");
+          if (
+            favModal.classList.contains("open") &&
+            favModal.dataset.activeFavId
+          ) {
+            handleFavoriteClick(favModal.dataset.activeFavId);
+          }
         }
       }
 
@@ -1764,10 +1858,47 @@
         }
       }
 
+      async function pingSingleShortcut(sc) {
+        shortcutStatus[sc.id] = "checking";
+        updateStatusIndicators();
+
+        const cleanH = cleanHostInput(sc.host);
+        if (!cleanH) {
+          shortcutStatus[sc.id] = "offline";
+          updateStatusIndicators();
+          return;
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(
+          () => controller.abort(),
+          config.settings.pingTimeoutMs || 1500,
+        );
+        const portPart = sc.port && Number(sc.port) !== 80 ? `:${sc.port}` : "";
+        const target = `http://${cleanH}${portPart}/`;
+
+        try {
+          await fetch(target, {
+            mode: "no-cors",
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          shortcutStatus[sc.id] = "online";
+        } catch (err) {
+          shortcutStatus[sc.id] = "offline";
+        } finally {
+          clearTimeout(timeout);
+          updateStatusIndicators();
+        }
+      }
+
       async function pingAllDevices() {
         const btn = document.getElementById("refreshBtn");
         btn.classList.add("spinning");
-        await Promise.all(config.devices.map((d) => pingSingleDevice(d)));
+        await Promise.all([
+          ...config.devices.map((d) => pingSingleDevice(d)),
+          ...(config.shortcuts || []).map((s) => pingSingleShortcut(s)),
+        ]);
         btn.classList.remove("spinning");
       }
 
@@ -1811,6 +1942,15 @@
               }
             });
         });
+        (config.shortcuts || []).forEach((sc) => {
+          const st = shortcutStatus[sc.id] || "checking";
+          document
+            .querySelectorAll(`[data-sc-status-id="${sc.id}"]`)
+            .forEach((dot) => {
+              dot.className = `dot ${st}`;
+            });
+        });
+        renderFavorites();
       }
 
       /* Req #11: Render Favorites Section (Supports Devices, Shortcuts, Groups & Bundles) */
@@ -1832,26 +1972,93 @@
           .map((fav) => {
             const fIdSafe = escapeHtml(fav.id);
             const colorSafe = escapeHtml(fav.color || "#38bdf8");
-            const dIds = fav.deviceIds || [];
-            const sIds = fav.shortcutIds || [];
-            const gIds = fav.groupIds || [];
+            const dIds = (fav.deviceIds || []).filter((id) =>
+              config.devices.some((d) => d.id === id),
+            );
+            const sIds = (fav.shortcutIds || []).filter((id) =>
+              config.shortcuts.some((s) => s.id === id),
+            );
+            const gIds = (fav.groupIds || []).filter((id) =>
+              config.groups.some((g) => g.id === id),
+            );
 
-            let dotHtml = "";
-            if (dIds.length === 1 && !sIds.length && !gIds.length) {
-              const st = deviceStatus[dIds[0]] || "checking";
-              dotHtml = `<span class="dot ${st}" data-status-id="${escapeHtml(dIds[0])}"></span>`;
-            } else if (sIds.length === 1 && !dIds.length && !gIds.length) {
+            // Case 1: Single Shortcut Favorite -> dot before switch name + ON/OFF pill
+            if (sIds.length === 1 && !dIds.length && !gIds.length) {
               const sc = config.shortcuts.find((x) => x.id === sIds[0]);
-              dotHtml = `<span class="dot ${sc?.state ? "online" : ""}"></span>`;
+              const isBusy = !!shortcutBusy[sc.id];
+              const isOn = !!sc.state;
+              const st = shortcutStatus[sc.id] || "checking";
+              return `
+                <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" style="--sc-color:${colorSafe}" onclick="handleFavoriteClick('${fIdSafe}')">
+                  <div class="sc-left">
+                    <div class="sc-icon">${svgIcon(fav.icon || sc.icon || "switch", 19)}</div>
+                    <div style="min-width:0">
+                      <div class="sc-title">
+                        <span class="dot ${st}" data-sc-status-id="${escapeHtml(sc.id)}" title="Status: ${st}"></span>
+                        <span class="sc-title-text">${escapeHtml(fav.name || sc.name)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>
+                </div>
+              `;
             }
 
+            // Case 2: Single Device Favorite -> simple green/red dot instead of OFFLINE or ms
+            if (dIds.length === 1 && !sIds.length && !gIds.length) {
+              const dev = config.devices.find((x) => x.id === dIds[0]);
+              const st = deviceStatus[dev.id] || "checking";
+              return `
+                <div class="shortcut-card" style="--sc-color:${colorSafe}" onclick="handleFavoriteClick('${fIdSafe}')">
+                  <div class="sc-left">
+                    <div class="sc-icon">${svgIcon(fav.icon || dev.icon || "chip", 19)}</div>
+                    <div style="min-width:0">
+                      <div class="sc-title">
+                        <span class="dot ${st}" data-status-id="${escapeHtml(dev.id)}" title="Status: ${st}"></span>
+                        <span class="sc-title-text">${escapeHtml(fav.name || dev.name)}</span>
+                      </div>
+                      <div class="sc-sub">${escapeHtml(getDisplayAddress(dev))}</div>
+                    </div>
+                  </div>
+                  <span class="dot ${st}" data-status-id="${escapeHtml(dev.id)}" title="Status: ${st}"></span>
+                </div>
+              `;
+            }
+
+            // Case 3: Group or Multi-Item Favorite Card -> combined green/red dot
+            const totalItems = dIds.length + sIds.length + gIds.length;
+            const anyOnline =
+              dIds.some((id) => deviceStatus[id] === "online") ||
+              sIds.some((id) => shortcutStatus[id] === "online");
+            const anyChecking =
+              dIds.some(
+                (id) => !deviceStatus[id] || deviceStatus[id] === "checking",
+              ) ||
+              sIds.some(
+                (id) =>
+                  !shortcutStatus[id] || shortcutStatus[id] === "checking",
+              );
+            const bundleSt = anyOnline
+              ? "online"
+              : anyChecking
+                ? "checking"
+                : "offline";
+
             return `
-          <div class="fav-chip" style="--chip-color:${colorSafe}" onclick="handleFavoriteClick('${fIdSafe}')">
-            ${dotHtml}
-            <span style="color:${colorSafe};display:grid">${svgIcon(fav.icon || "chip", 16)}</span>
-            <span>${escapeHtml(fav.name)}</span>
-          </div>
-        `;
+              <div class="shortcut-card" style="--sc-color:${colorSafe}" onclick="handleFavoriteClick('${fIdSafe}')">
+                <div class="sc-left">
+                  <div class="sc-icon">${svgIcon(fav.icon || "chip", 19)}</div>
+                  <div style="min-width:0">
+                    <div class="sc-title">
+                      <span class="dot ${bundleSt}"></span>
+                      <span class="sc-title-text">${escapeHtml(fav.name)}</span>
+                    </div>
+                    <div class="sc-sub">${totalItems} linked item${totalItems > 1 ? "s" : ""}</div>
+                  </div>
+                </div>
+                <span class="sc-pill">OPEN</span>
+              </div>
+            `;
           })
           .join("");
       }
@@ -1916,6 +2123,7 @@
         }
 
         document.getElementById("favCardModalBody").innerHTML = html;
+        modal.dataset.activeFavId = favId;
         modal.classList.add("open");
         syncModalScrollLock();
       }
@@ -1930,14 +2138,17 @@
         const colorSafe = escapeHtml(sc.color || "#38bdf8");
         const isBusy = !!shortcutBusy[sc.id];
         const isOn = !!sc.state;
-        const addr = `${cleanHostInput(sc.host)}${sc.port && Number(sc.port) !== 80 ? ":" + sc.port : ""} • CH ${sc.index ?? 0}`;
+        const st = shortcutStatus[sc.id] || "checking";
 
         return `
           <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" style="--sc-color:${colorSafe}" onclick="triggerShortcut('${idSafe}', event)">
             <div class="sc-left">
               <div class="sc-icon">${svgIcon(sc.icon || "switch", 19)}</div>
               <div style="min-width:0">
-                <div class="sc-title">${escapeHtml(sc.name)}</div>
+                <div class="sc-title">
+                  <span class="dot ${st}" data-sc-status-id="${idSafe}" title="Status: ${st}"></span>
+                  <span class="sc-title-text">${escapeHtml(sc.name)}</span>
+                </div>
               </div>
             </div>
             <span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>

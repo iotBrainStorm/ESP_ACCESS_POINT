@@ -1362,10 +1362,12 @@
           <div class="field">
             <label>API Key *</label>
             <input
-              type="text"
+              type="password"
               id="scApiKey"
               class="input"
-              placeholder="sh_5003c0712e4ad3c9af2b1fd04efcf"
+              autocomplete="new-password"
+              spellcheck="false"
+              placeholder="Enter API Key"
             />
           </div>
         </div>
@@ -1573,6 +1575,45 @@
 
       let lastScannedList = [];
 
+      const KEY_SALT = "esp32_nvs_hub_v1_secret";
+
+      function encodeApiKey(rawKey) {
+        const str = String(rawKey || "").trim();
+        if (!str || str.startsWith("enc:")) return str;
+        const xor = Array.from(str)
+          .map((ch, i) =>
+            String.fromCharCode(
+              ch.charCodeAt(0) ^ KEY_SALT.charCodeAt(i % KEY_SALT.length),
+            ),
+          )
+          .join("");
+        return "enc:" + btoa(xor);
+      }
+
+      function revealApiKey(storedKey) {
+        const str = String(storedKey || "").trim();
+        if (!str.startsWith("enc:")) return str;
+        try {
+          const raw = atob(str.slice(4));
+          return Array.from(raw)
+            .map((ch, i) =>
+              String.fromCharCode(
+                ch.charCodeAt(0) ^ KEY_SALT.charCodeAt(i % KEY_SALT.length),
+              ),
+            )
+            .join("");
+        } catch {
+          return "";
+        }
+      }
+
+      function maskApiKey(storedKey) {
+        const plain = revealApiKey(storedKey);
+        if (!plain) return "None";
+        const last4 = plain.slice(-4);
+        return `••••••••••••${last4}`;
+      }
+
       function sanitizeConfig(raw) {
         const fallback = {
           settings: {
@@ -1602,6 +1643,9 @@
           shortcuts: Array.isArray(raw.shortcuts) ? raw.shortcuts : [],
           favorites: Array.isArray(raw.favorites) ? raw.favorites : [],
         };
+        merged.shortcuts.forEach((s) => {
+          if (s.apiKey) s.apiKey = encodeApiKey(s.apiKey);
+        });
         syncPinsToFavorites(merged);
         return merged;
       }
@@ -2066,7 +2110,7 @@
                   <span class="badge">${escapeHtml(g ? g.name : "None")}</span>
                   <span class="badge">Index: ${sc.index ?? 0}</span>
                 </div>
-                <div class="dev-row-sub">${escapeHtml(sc.host)}:${sc.port || 80} • Key: ${sc.apiKey ? escapeHtml(sc.apiKey.slice(0, 10)) + "…" : "None"}</div>
+                <div class="dev-row-sub">${escapeHtml(sc.host)}:${sc.port || 80} • Key: ${escapeHtml(maskApiKey(sc.apiKey))}</div>
               </div>
             </div>
             <div class="row-actions">
@@ -2135,7 +2179,11 @@
         document.getElementById("scHost").value = sc?.host || "";
         document.getElementById("scPort").value = sc?.port || 80;
         document.getElementById("scIndex").value = sc?.index ?? 0;
-        document.getElementById("scApiKey").value = sc?.apiKey || "";
+        const apiKeyInput = document.getElementById("scApiKey");
+        apiKeyInput.value = ""; // Never populate raw key into DOM value!
+        apiKeyInput.placeholder = sc?.apiKey
+          ? `${maskApiKey(sc.apiKey)} (Leave blank to keep)`
+          : "Enter API Key";
         document.getElementById("scFav").checked = !!sc?.fav;
 
         populateGroupSelect("scGroup", sc?.group || "none");
@@ -2183,7 +2231,13 @@
         const host = cleanHost(document.getElementById("scHost").value);
         const port = Number(document.getElementById("scPort").value) || 80;
         const index = Number(document.getElementById("scIndex").value) || 0;
-        const apiKey = document.getElementById("scApiKey").value.trim();
+        const typedKey = document.getElementById("scApiKey").value.trim();
+        const existingSc = editingShortcutId
+          ? config.shortcuts.find((s) => s.id === editingShortcutId)
+          : null;
+        const apiKey = typedKey
+          ? encodeApiKey(typedKey)
+          : existingSc?.apiKey || "";
 
         if (!host) return showToast("Enter IP / Hostname first");
         if (!apiKey) return showToast("Enter API Key first");
@@ -2203,7 +2257,7 @@
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
             },
-            body: `index=${encodeURIComponent(index)}&state=toggle&key=${encodeURIComponent(apiKey)}`,
+            body: `index=${encodeURIComponent(index)}&state=toggle&key=${encodeURIComponent(revealApiKey(apiKey))}`,
             signal: ctrl.signal,
           });
           const data = await res.json();
@@ -2223,7 +2277,13 @@
         const host = cleanHost(document.getElementById("scHost").value);
         const port = Number(document.getElementById("scPort").value) || 80;
         const index = Number(document.getElementById("scIndex").value) || 0;
-        const apiKey = document.getElementById("scApiKey").value.trim();
+        const typedKey = document.getElementById("scApiKey").value.trim();
+        const existingSc = editingShortcutId
+          ? config.shortcuts.find((s) => s.id === editingShortcutId)
+          : null;
+        const apiKey = typedKey
+          ? encodeApiKey(typedKey)
+          : existingSc?.apiKey || "";
         const fav = document.getElementById("scFav").checked;
 
         if (!name) return showToast("Switch name is required");
@@ -2845,8 +2905,12 @@
         const fill = document.getElementById("nvsMeterFill");
         fill.style.width = `${pct}%`;
         fill.style.background = pct > 85 ? "var(--err)" : "var(--accent)";
+        const safePreview = structuredClone(config);
+        (safePreview.shortcuts || []).forEach((s) => {
+          if (s.apiKey) s.apiKey = maskApiKey(s.apiKey);
+        });
         document.getElementById("rawJsonPreview").textContent = JSON.stringify(
-          config,
+          safePreview,
           null,
           2,
         );
