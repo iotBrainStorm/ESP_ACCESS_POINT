@@ -1057,7 +1057,7 @@
               id="modeMdnsBtn"
               onclick="setAddressMode(true)"
             >
-              mDNS
+              DNS
             </button>
           </div>
 
@@ -2314,7 +2314,7 @@
             ${showAddr ? `<span class="addr-pill" title="Tap to copy address" onclick="copyAddress(event, '${escapeHtml(addr)}')">${escapeHtml(addr)}</span>` : "<span></span>"}
             <div class="card-links">
               ${dev.altLabel && dev.altPath ? `<button class="mini-btn" onclick="openDeviceById('${idSafe}', '${altPathSafe}', event)">${escapeHtml(dev.altLabel)}</button>` : ""}
-              <button class="mini-btn" onclick="openDeviceById('${idSafe}', null, event)">Open &rarr;</button>
+              
             </div>
           </div>
         </article>
