@@ -638,7 +638,7 @@
         text-overflow: ellipsis;
       }
 
-      .ping-ms {
+      /* .ping-ms {
         font-size: 0.68rem;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         color: var(--ok);
@@ -646,7 +646,7 @@
         padding: 1px 6px;
         border-radius: 999px;
         flex-shrink: 0;
-      }
+      } */
 
       .dev-meta {
         font-size: 0.75rem;
@@ -2303,7 +2303,6 @@
               <div class="dev-title-row">
                 <span class="dot ${st}" data-status-id="${idSafe}" title="Status: ${st}"></span>
                 <h2 class="dev-name">${escapeHtml(dev.name)}</h2>
-                <span class="ping-ms" data-ping-id="${idSafe}" style="display:${st === "online" && ms ? "inline-block" : "none"}">${ms ? ms + "ms" : ""}</span>
               </div>
               <div class="dev-meta">${escapeHtml(dev.note || getGroupName(dev.group))}</div>
             </div>
