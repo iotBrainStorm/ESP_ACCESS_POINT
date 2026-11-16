@@ -1290,6 +1290,18 @@
           enableGroups: true,
           enableFavorites: true,
         },
+        network: {
+          mode: "dhcp",
+          staticIp: "",
+          gateway: "192.168.0.1",
+          subnet: "255.255.255.0",
+          dns: "8.8.8.8",
+          apName: "HOME ACCESS",
+          apPass: "",
+          apTimeout: 180,
+          mdnsEnabled: true,
+          mdns: "homeaccess.local",
+        },
         groups: [
           { id: "g1", name: "LED & Displays", color: "#38bdf8" },
           { id: "g2", name: "Living Room", color: "#34d399" },
@@ -1431,8 +1443,41 @@
           syncLegacyFavorites(base);
           return base;
         }
+        const fallback = {
+          settings: {
+            title: "ACCESS POINT",
+            subtitle: "ESP32 Central Gateway",
+            theme: "dark",
+            preferMdns: false,
+            openNewTab: false,
+            showIpOnCard: true,
+            autoPing: true,
+            pingTimeoutMs: 1500,
+            pin: "",
+            enableShortcuts: true,
+            enableGroups: true,
+            enableFavorites: true,
+          },
+          network: {
+            mode: "dhcp",
+            staticIp: "",
+            gateway: "192.168.0.1",
+            subnet: "255.255.255.0",
+            dns: "8.8.8.8",
+            apName: "HOME ACCESS",
+            apPass: "",
+            apTimeout: 180,
+            mdnsEnabled: true,
+            mdns: "homeaccess.local",
+          },
+          groups: [{ id: "g1", name: "General", color: "#38bdf8" }],
+          devices: [],
+          shortcuts: [],
+          favorites: [],
+        };
         const merged = {
           settings: { ...base.settings, ...(raw.settings || {}) },
+          network: { ...fallback.network, ...(raw.network || {}) },
           groups: Array.isArray(raw.groups) ? raw.groups : base.groups,
           devices: Array.isArray(raw.devices) ? raw.devices : base.devices,
           shortcuts: Array.isArray(raw.shortcuts)

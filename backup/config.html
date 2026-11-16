@@ -785,6 +785,9 @@
       <button class="nav-tab" onclick="switchTab('favorites', this)">
         Favorites
       </button>
+      <button class="nav-tab" onclick="switchTab('network', this)">
+        Network
+      </button>
       <button class="nav-tab" onclick="switchTab('scanner', this)">
         mDNS Scanner
       </button>
@@ -932,6 +935,304 @@
           </div>
         </div>
         <div class="item-list" id="favoriteList"></div>
+      </section>
+
+      <!-- MENU 5: NETWORK -->
+      <section class="panel" id="tab-network">
+        <div class="panel-header">
+          <h2>Network &amp; WiFi Configuration</h2>
+        </div>
+
+        <!-- 1. IP SETTINGS -->
+        <div class="card-box">
+          <h3>1. IP Settings</h3>
+          <div class="form-grid" style="margin-bottom: 12px">
+            <div class="field">
+              <label>IP Assignment Mode</label>
+              <select
+                id="netIpMode"
+                class="select"
+                onchange="
+                  updateNetConfig('mode', this.value);
+                  toggleStaticIpFields();
+                "
+              >
+                <option value="dhcp">DHCP (Automatic IP)</option>
+                <option value="static">Static IP (Manual)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Appears when Static IP is selected (Order: Static IP, Subnet, Gateway, DNS) -->
+          <div class="form-grid" id="staticIpFields" style="display: none">
+            <div class="field">
+              <label>Static IP *</label>
+              <input
+                type="text"
+                id="netStaticIp"
+                class="input"
+                placeholder="192.168.0.100"
+                oninput="updateNetConfig('staticIp', this.value.trim())"
+              />
+            </div>
+            <div class="field">
+              <label>Subnet Mask</label>
+              <input
+                type="text"
+                id="netSubnet"
+                class="input"
+                value="255.255.255.0"
+                placeholder="255.255.255.0"
+                oninput="updateNetConfig('subnet', this.value.trim())"
+              />
+            </div>
+            <div class="field">
+              <label>Default Gateway</label>
+              <input
+                type="text"
+                id="netGateway"
+                class="input"
+                value="192.168.0.1"
+                placeholder="192.168.0.1"
+                oninput="updateNetConfig('gateway', this.value.trim())"
+              />
+            </div>
+            <div class="field">
+              <label>DNS Server</label>
+              <input
+                type="text"
+                id="netDns"
+                class="input"
+                value="8.8.8.8"
+                placeholder="8.8.8.8"
+                oninput="updateNetConfig('dns', this.value.trim())"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. ACCESS POINT (WiFiManager) -->
+        <div class="card-box">
+          <h3>2. Access Point Setup</h3>
+          <div class="form-grid">
+            <div class="field">
+              <label>AP Name</label>
+              <input
+                type="text"
+                id="netApName"
+                class="input"
+                value="HOME ACCESS"
+                placeholder="HOME ACCESS"
+                oninput="updateNetConfig('apName', this.value)"
+              />
+            </div>
+            <div class="field">
+              <label>AP Password</label>
+              <div
+                style="position: relative; display: flex; align-items: center"
+              >
+                <input
+                  type="password"
+                  id="netApPass"
+                  class="input"
+                  style="padding-right: 38px"
+                  autocomplete="new-password"
+                  placeholder="Keep blank for no password"
+                  oninput="updateNetConfig('apPass', this.value)"
+                />
+                <button
+                  type="button"
+                  id="toggleApPassBtn"
+                  onclick="toggleApPassVisibility()"
+                  title="Show / Hide Password"
+                  style="
+                    position: absolute;
+                    right: 8px;
+                    background: none;
+                    border: none;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    display: grid;
+                    place-items: center;
+                    padding: 4px;
+                  "
+                >
+                  <svg
+                    id="apPassEyeIcon"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Portal Timeout (Seconds)</label>
+              <input
+                type="number"
+                id="netApTimeout"
+                class="input"
+                value="180"
+                min="30"
+                max="600"
+                placeholder="180"
+                oninput="updateNetConfig('apTimeout', Number(this.value))"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. WIFI SETUP & LIVE TELEMETRY -->
+        <div class="card-box">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              flex-wrap: wrap;
+              gap: 8px;
+              margin-bottom: 12px;
+            "
+          >
+            <h3 style="margin-bottom: 0">3. WiFi Setup &amp; Status</h3>
+            <span class="badge" id="wifiLiveRssi" style="color: var(--accent)">
+              Signal: -- dBm (--%)
+            </span>
+          </div>
+
+          <div class="form-grid" style="margin-bottom: 14px">
+            <div class="field">
+              <label>Connected Network (SSID)</label>
+              <div
+                class="input"
+                style="
+                  display: flex;
+                  align-items: center;
+                  font-family: monospace;
+                "
+                id="wifiLiveSsid"
+              >
+                Not Connected
+              </div>
+            </div>
+            <div class="field">
+              <label>Connected IP Address</label>
+              <div
+                class="input"
+                style="
+                  display: flex;
+                  align-items: center;
+                  font-family: monospace;
+                "
+                id="wifiLiveIp"
+              >
+                0.0.0.0
+              </div>
+            </div>
+            <div class="field">
+              <label>Gateway IP</label>
+              <div
+                class="input"
+                style="
+                  display: flex;
+                  align-items: center;
+                  font-family: monospace;
+                "
+                id="wifiLiveGw"
+              >
+                192.168.0.1
+              </div>
+            </div>
+            <div class="field">
+              <label>Device MAC Address</label>
+              <div
+                class="input"
+                style="
+                  display: flex;
+                  align-items: center;
+                  font-family: monospace;
+                "
+                id="wifiLiveMac"
+              >
+                00:00:00:00:00:00
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap">
+            <button class="btn btn-primary" onclick="triggerWifiPortal(false)">
+              Connect WiFi
+            </button>
+            <button class="btn btn-danger" onclick="triggerWifiPortal(true)">
+              Forget WiFi
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. mDNS SETUP -->
+        <div class="card-box">
+          <h3>4. mDNS Setup</h3>
+          <div class="toggle-row" style="padding-top: 0; margin-bottom: 12px">
+            <div>
+              <div class="toggle-title">Enable mDNS Responder</div>
+              <div class="toggle-desc">
+                Current link:
+                <a
+                  id="mdnsLiveLink"
+                  href="http://homeaccess.local"
+                  target="_blank"
+                  rel="noopener"
+                  style="
+                    color: var(--accent);
+                    font-weight: 700;
+                    font-family: monospace;
+                  "
+                >
+                  http://homeaccess.local
+                </a>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="switch"
+              id="netMdnsEnabled"
+              checked
+              onchange="updateNetConfig('mdnsEnabled', this.checked)"
+            />
+          </div>
+
+          <div class="form-grid" id="mdnsInputRow">
+            <div class="field">
+              <label>Custom mDNS Hostname</label>
+              <input
+                type="text"
+                id="netMdnsHost"
+                class="input"
+                value="http://homeaccess.local"
+                placeholder="http://homeaccess.local"
+                oninput="updateMdnsHost(this.value)"
+              />
+            </div>
+            <div class="field" style="justify-content: flex-end">
+              <label>&nbsp;</label>
+              <button
+                class="btn"
+                style="height: 38px; width: fit-content"
+                onclick="resetDefaultMdns()"
+              >
+                Reset Default
+              </button>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- MENU 5: mDNS SCANNER -->
@@ -1627,6 +1928,18 @@
             enableGroups: true,
             enableFavorites: true,
           },
+          network: {
+            mode: "dhcp",
+            staticIp: "",
+            gateway: "192.168.0.1",
+            subnet: "255.255.255.0",
+            dns: "8.8.8.8",
+            apName: "HOME ACCESS",
+            apPass: "",
+            apTimeout: 180,
+            mdnsEnabled: true,
+            mdns: "homeaccess.local",
+          },
           groups: [{ id: "g1", name: "General", color: "#38bdf8" }],
           devices: [],
           shortcuts: [],
@@ -1635,6 +1948,7 @@
         if (!raw || typeof raw !== "object") return fallback;
         const merged = {
           settings: { ...fallback.settings, ...(raw.settings || {}) },
+          network: { ...fallback.network, ...(raw.network || {}) },
           groups: Array.isArray(raw.groups) ? raw.groups : fallback.groups,
           devices: Array.isArray(raw.devices) ? raw.devices : [],
           shortcuts: Array.isArray(raw.shortcuts) ? raw.shortcuts : [],
@@ -1774,6 +2088,8 @@
         );
       }
 
+      let netPollTimer = null;
+
       function switchTab(tabName, btn) {
         document
           .querySelectorAll(".nav-tab")
@@ -1783,7 +2099,15 @@
           .forEach((p) => p.classList.remove("active"));
         btn.classList.add("active");
         document.getElementById(`tab-${tabName}`).classList.add("active");
+
         if (tabName === "backup") updateNvsMeter();
+
+        // Poll real-time WiFi signal & IP every 3s while Network tab is active
+        clearInterval(netPollTimer);
+        if (tabName === "network") {
+          fetchLiveNetworkInfo();
+          netPollTimer = setInterval(fetchLiveNetworkInfo, 3000);
+        }
       }
 
       function renderAll() {
@@ -1791,6 +2115,7 @@
         renderShortcutList();
         renderGroupList();
         renderFavoriteList();
+        populateNetwork();
         populatePreferences();
         updateNvsMeter();
       }
@@ -2864,6 +3189,243 @@
         });
       }
 
+      /* ==========================================
+         SECTION 5: NETWORK (IP, AP, WiFi, mDNS)
+         ========================================== */
+      function ensureNetObject() {
+        if (!config.network || typeof config.network !== "object") {
+          config.network = {
+            mode: "dhcp",
+            staticIp: "",
+            gateway: "192.168.0.1",
+            subnet: "255.255.255.0",
+            dns: "8.8.8.8",
+            apName: "HOME ACCESS",
+            apPass: "",
+            apTimeout: 180,
+            mdnsEnabled: true,
+            mdns: "homeaccess.local",
+          };
+        }
+        return config.network;
+      }
+
+      function populateNetwork() {
+        const net = ensureNetObject();
+        document.getElementById("netIpMode").value = net.mode || "dhcp";
+        document.getElementById("netStaticIp").value = net.staticIp || "";
+        document.getElementById("netSubnet").value =
+          net.subnet || "255.255.255.0";
+        document.getElementById("netGateway").value =
+          net.gateway || "192.168.0.1";
+        document.getElementById("netDns").value = net.dns || "8.8.8.8";
+        toggleStaticIpFields();
+
+        document.getElementById("netApName").value =
+          net.apName || "HOME ACCESS";
+        document.getElementById("netApPass").value = net.apPass || "";
+        document.getElementById("netApTimeout").value = net.apTimeout || 180;
+
+        const host = formatMdnsDomain(net.mdns || "homeaccess.local");
+        document.getElementById("netMdnsEnabled").checked =
+          net.mdnsEnabled !== false;
+        document.getElementById("netMdnsHost").value = `http://${host}`;
+        refreshMdnsLinkUI();
+        fetchLiveNetworkInfo();
+      }
+
+      function toggleStaticIpFields() {
+        const modeEl = document.getElementById("netIpMode");
+        const fieldsEl = document.getElementById("staticIpFields");
+        if (!modeEl || !fieldsEl) return;
+
+        const isStatic = modeEl.value === "static";
+        fieldsEl.style.display = isStatic ? "grid" : "none";
+
+        // Ensure default static values are filled in when switching to Static mode
+        if (isStatic) {
+          const net = ensureNetObject();
+          if (!document.getElementById("netSubnet").value) {
+            document.getElementById("netSubnet").value =
+              net.subnet || "255.255.255.0";
+          }
+          if (!document.getElementById("netGateway").value) {
+            document.getElementById("netGateway").value =
+              net.gateway || "192.168.0.1";
+          }
+          if (!document.getElementById("netDns").value) {
+            document.getElementById("netDns").value = net.dns || "8.8.8.8";
+          }
+        }
+      }
+
+      function toggleApPassVisibility() {
+        const input = document.getElementById("netApPass");
+        const icon = document.getElementById("apPassEyeIcon");
+        const isHidden = input.type === "password";
+        input.type = isHidden ? "text" : "password";
+        icon.innerHTML = isHidden
+          ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+          : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+      }
+
+      function updateNetConfig(key, val) {
+        const net = ensureNetObject();
+        net[key] = val;
+        if (key === "mdnsEnabled") refreshMdnsLinkUI();
+        markDirty();
+      }
+
+      function formatMdnsDomain(raw) {
+        let clean = String(raw || "")
+          .trim()
+          .toLowerCase()
+          .replace(/^https?:\/\//, "")
+          .replace(/\/+$/, "");
+        if (!clean) return "homeaccess.local";
+        if (!clean.endsWith(".local")) clean += ".local";
+        return clean;
+      }
+
+      function updateMdnsHost(val) {
+        const net = ensureNetObject();
+        net.mdns = formatMdnsDomain(val);
+        refreshMdnsLinkUI();
+        markDirty();
+      }
+
+      function resetDefaultMdns() {
+        if (
+          !confirm(
+            "Reset mDNS address back to default (http://homeaccess.local)?",
+          )
+        ) {
+          return;
+        }
+        const net = ensureNetObject();
+        net.mdns = "homeaccess.local";
+        net.mdnsEnabled = true;
+        document.getElementById("netMdnsEnabled").checked = true;
+        document.getElementById("netMdnsHost").value =
+          "http://homeaccess.local";
+        refreshMdnsLinkUI();
+        markDirty();
+        showToast("mDNS reset to http://homeaccess.local");
+      }
+
+      function refreshMdnsLinkUI() {
+        const net = ensureNetObject();
+        const enabled = net.mdnsEnabled !== false;
+        const host = formatMdnsDomain(net.mdns);
+        const link = document.getElementById("mdnsLiveLink");
+        const row = document.getElementById("mdnsInputRow");
+
+        if (enabled) {
+          link.href = `http://${host}`;
+          link.textContent = `http://${host}`;
+          link.style.pointerEvents = "auto";
+          link.style.opacity = "1";
+          row.style.opacity = "1";
+          row.style.pointerEvents = "auto";
+        } else {
+          link.href = "#";
+          link.textContent = `http://${host} (Disabled)`;
+          link.style.pointerEvents = "none";
+          link.style.opacity = "0.5";
+          row.style.opacity = "0.45";
+          row.style.pointerEvents = "none";
+        }
+      }
+
+      function rssiToPct(dbm) {
+        const v = Number(dbm);
+        if (isNaN(v)) return 0;
+        return Math.max(0, Math.min(100, Math.round(((v + 92) / 50) * 100)));
+      }
+
+      async function fetchLiveNetworkInfo() {
+        const net = ensureNetObject();
+        // Always ensure fallback Gateway & MAC are displayed first
+        const gwEl = document.getElementById("wifiLiveGw");
+        const macEl = document.getElementById("wifiLiveMac");
+        if (!gwEl.textContent || gwEl.textContent.trim() === "--") {
+          gwEl.textContent = net.gateway || "192.168.0.1";
+        }
+        if (!macEl.textContent || macEl.textContent.trim() === "--") {
+          macEl.textContent = "A0:B7:65:FE:12:9C";
+        }
+
+        if (isOfflinePreview) {
+          const rssi = -52;
+          document.getElementById("wifiLiveRssi").textContent =
+            `Signal: ${rssi} dBm (${rssiToPct(rssi)}%)`;
+          document.getElementById("wifiLiveSsid").textContent =
+            "Home_Fiber_2.4G";
+          document.getElementById("wifiLiveIp").textContent =
+            net.mode === "static" && net.staticIp
+              ? net.staticIp
+              : "192.168.0.105";
+          gwEl.textContent = net.gateway || "192.168.0.1";
+          macEl.textContent = "A0:B7:65:FE:12:9C";
+          return;
+        }
+        try {
+          const res = await fetch("/api/status", { cache: "no-store" });
+          if (!res.ok) return;
+          const d = await res.json();
+          if (d.rssi !== undefined) {
+            document.getElementById("wifiLiveRssi").textContent =
+              `Signal: ${d.rssi} dBm (${rssiToPct(d.rssi)}%)`;
+          }
+          document.getElementById("wifiLiveSsid").textContent =
+            d.ssid || "Connected";
+          document.getElementById("wifiLiveIp").textContent =
+            d.ip || location.hostname || "192.168.0.105";
+          gwEl.textContent = d.gateway || net.gateway || "192.168.0.1";
+          macEl.textContent = d.mac || "A0:B7:65:FE:12:9C";
+        } catch (_) {}
+      }
+
+      async function triggerWifiPortal(forgetCredentials) {
+        const net = ensureNetObject();
+        const apName =
+          document.getElementById("netApName").value.trim() ||
+          net.apName ||
+          "HOME ACCESS";
+        const apPass = document.getElementById("netApPass").value || "";
+        const apTimeout =
+          Number(document.getElementById("netApTimeout").value) ||
+          net.apTimeout ||
+          180;
+
+        if (apPass.length > 0 && apPass.length < 8) {
+          return showToast(
+            "AP Password must be at least 8 characters (or leave blank)",
+          );
+        }
+
+        const passDisplay = apPass ? apPass : "None (Open AP)";
+        const confirmMsg = forgetCredentials
+          ? `Forget current WiFi and start Access Point?\n\n• AP Name: ${apName}\n• Password: ${passDisplay}\n• Timeout: ${apTimeout}s`
+          : `Start Access Point to connect a new WiFi?\n\n• AP Name: ${apName}\n• Password: ${passDisplay}\n• Timeout: ${apTimeout}s`;
+
+        if (!confirm(confirmMsg)) return;
+
+        showToast(`Starting AP "${apName}" (${apTimeout}s)...`);
+        if (!isOfflinePreview) {
+          await fetch("/api/wifi/portal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              forget: forgetCredentials,
+              apName,
+              apPass,
+              apTimeout,
+            }),
+          }).catch(() => {});
+        }
+      }
+
       /* Preferences & NVS Storage */
       function populatePreferences() {
         const s = config.settings;
@@ -2917,7 +3479,65 @@
         );
       }
 
+      function isValidIpv4(ip) {
+        const parts = String(ip || "")
+          .trim()
+          .split(".");
+        if (parts.length !== 4) return false;
+        return parts.every((part) => {
+          if (!/^\d{1,3}$/.test(part)) return false;
+          if (part.length > 1 && part.startsWith("0")) return false;
+          const n = Number(part);
+          return n >= 0 && n <= 255;
+        });
+      }
+
+      function validateNetworkConfig() {
+        const net = ensureNetObject();
+        const netTabBtn = document.querySelector(
+          '.nav-tab[onclick*="network"]',
+        );
+
+        // 1. Check Static IP, Subnet, Gateway & DNS when Static mode is selected
+        if (net.mode === "static") {
+          const fields = [
+            { val: net.staticIp, label: "Static IP", id: "netStaticIp" },
+            { val: net.subnet, label: "Subnet Mask", id: "netSubnet" },
+            { val: net.gateway, label: "Default Gateway", id: "netGateway" },
+            { val: net.dns, label: "DNS Server", id: "netDns" },
+          ];
+
+          for (const f of fields) {
+            if (!isValidIpv4(f.val)) {
+              if (netTabBtn) switchTab("network", netTabBtn);
+              document.getElementById(f.id)?.focus();
+              showToast(`Invalid ${f.label}: ${f.val || "Required"}`);
+              return false;
+            }
+          }
+
+          if (net.staticIp === net.gateway) {
+            if (netTabBtn) switchTab("network", netTabBtn);
+            document.getElementById("netStaticIp")?.focus();
+            showToast("Static IP cannot be the same as Default Gateway");
+            return false;
+          }
+        }
+
+        // 2. Check WiFiManager AP Password (must be blank or 8 to 63 characters)
+        if (net.apPass && (net.apPass.length < 8 || net.apPass.length > 63)) {
+          if (netTabBtn) switchTab("network", netTabBtn);
+          document.getElementById("netApPass")?.focus();
+          showToast("AP Password must be 8–63 characters (or leave blank)");
+          return false;
+        }
+
+        return true;
+      }
+
       async function saveToNvs() {
+        // 1. Validate Static IP & AP settings before saving
+        if (!validateNetworkConfig()) return;
         const bytes = getPayloadByteSize();
         if (bytes > NVS_MAX_BYTES) {
           return showToast("Error: Config exceeds 16KB NVS limit!");
