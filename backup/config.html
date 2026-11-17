@@ -839,7 +839,7 @@
             class="btn btn-sm btn-danger"
             onclick="triggerForgetUsers()"
           >
-            Forget?
+            Forget
           </button>
           <div style="display: flex; gap: 8px">
             <button
@@ -1838,12 +1838,9 @@
 
           <div class="toggle-row">
             <div>
-              <div class="toggle-title">
-                Prefer mDNS (.local) over IPv4 by Default
-              </div>
+              <div class="toggle-title">Prefer mDNS by Default</div>
               <div class="toggle-desc">
-                Uses hostname.local when clicking cards (recommended if router
-                DHCP changes IPs)
+                Uses hostname.local when clicking cards
               </div>
             </div>
             <input
@@ -1856,7 +1853,7 @@
 
           <div class="toggle-row">
             <div>
-              <div class="toggle-title">Open Devices in New Browser Tab</div>
+              <div class="toggle-title">Open in new Tab</div>
               <div class="toggle-desc">
                 Keep off for seamless single-window PWA navigation on mobile
               </div>
@@ -1871,7 +1868,7 @@
 
           <div class="toggle-row">
             <div>
-              <div class="toggle-title">Show IP / mDNS Pill on Home Cards</div>
+              <div class="toggle-title">IP mDNS Pill on Home</div>
               <div class="toggle-desc">
                 Displays copyable address badge on each device card
               </div>
@@ -1886,12 +1883,9 @@
 
           <div class="toggle-row">
             <div>
-              <div class="toggle-title">
-                Auto-Check Device Online Status on Load
-              </div>
+              <div class="toggle-title">Check Device Online on Load</div>
               <div class="toggle-desc">
-                Pings devices asynchronously in the background when opening home
-                page
+                Pings devices asynchronously in the background
               </div>
             </div>
             <input
@@ -1955,10 +1949,10 @@
           </p>
           <div style="display: flex; gap: 10px; flex-wrap: wrap">
             <button class="btn btn-primary" onclick="exportBackup()">
-              Export JSON Backup
+              Export JSON
             </button>
             <label class="btn" style="cursor: pointer">
-              Import JSON Backup
+              Import JSON
               <input
                 type="file"
                 accept=".json"
@@ -1972,9 +1966,9 @@
         <div class="card-box" style="border-color: rgba(239, 68, 68, 0.35)">
           <h3 style="color: var(--err)">Danger Zone</h3>
           <div style="display: flex; gap: 10px; flex-wrap: wrap">
-            <button class="btn" onclick="rebootHub()">Restart ESP32 Hub</button>
+            <button class="btn" onclick="rebootHub()">Restart</button>
             <button class="btn btn-danger" onclick="factoryReset()">
-              Factory Reset NVS
+              Factory Reset
             </button>
           </div>
         </div>
@@ -3022,7 +3016,7 @@
 
         const user = await promptVerification(
           policy.role,
-          `Login Required (${pageKey === "homePage" ? "Home UI" : "Configuration"})`,
+          `Login Required ${pageKey === "homePage" ? "- Home" : "- Settings"}`,
           false,
         );
         if (user && policy.mode === "session") {
