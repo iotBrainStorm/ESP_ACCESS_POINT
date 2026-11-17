@@ -1660,7 +1660,7 @@
             "
           >
             <div class="field">
-              <label>Max Login Attempts (Default 3, Max 5)</label>
+              <label>Max Login Attempts</label>
               <select
                 id="verMaxAttempts"
                 class="select"
@@ -3331,10 +3331,26 @@
         }
 
         applyTheme();
-        renderAll();
         const loggedIn = await enforcePageLogin("configPage");
         if (!loggedIn) {
           window.location.href = "index.html";
+          return;
+        }
+        renderAll();
+        if (!isOfflinePreview) {
+          try {
+            const stRes = await fetch("/api/status", { cache: "no-store" });
+            if (stRes.ok) {
+              const stData = await stRes.json();
+              if (
+                stData.bootId &&
+                getLockoutData().bootSession !== String(stData.bootId)
+              ) {
+                clearLockoutData();
+                sessionStorage.setItem("esp_boot_id", String(stData.bootId));
+              }
+            }
+          } catch (_) {}
         }
       }
 
@@ -5408,7 +5424,7 @@
         setBackupLoadingModal(
           true,
           "Exporting JSON Backup...",
-          "Preparing NVS configuration file for download",
+          "Preparing configuration...",
         );
         await new Promise((r) => setTimeout(r, 600));
         try {
@@ -5432,7 +5448,7 @@
         setBackupLoadingModal(
           true,
           "Importing JSON Backup...",
-          "Validating and restoring configuration",
+          "Validating configuration...",
         );
         const reader = new FileReader();
         reader.onload = async (e) => {
@@ -5465,7 +5481,6 @@
         if (!confirm("Restart the central ESP32 hub?")) return;
         showToast("Restarting ESP32...");
         if (!isOfflinePreview) clearLockoutData();
-        clearLockoutData();
         await fetch("/api/reboot", { method: "POST" }).catch(() => {});
         setTimeout(() => (location.href = "index.html"), 4000);
       }
@@ -5475,6 +5490,8 @@
         if (!confirm("Erase all saved devices and reset NVS to defaults?"))
           return;
         localStorage.removeItem(STORAGE_KEY);
+        clearLockoutData();
+        sessionStorage.clear();
         isDirty = false;
         if (!isOfflinePreview)
           await fetch("/api/reset", { method: "POST" }).catch(() => {});

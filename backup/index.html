@@ -3028,10 +3028,24 @@
 
         applySettingsUI();
         updateHomeClock();
+        await loadTelemetry(); // Also fixes Critical Issue 2 below
+
+        const loggedIn = await enforcePageLogin("homePage");
+        if (!loggedIn) {
+          document.getElementById("favSection").style.display = "none";
+          document.getElementById("shortcutSection").style.display = "none";
+          document.getElementById("viewToolbar").style.display = "none";
+          document.getElementById("devicesContainer").innerHTML = `
+    <div class="empty">
+      <h3>Authentication Required</h3>
+      <p>Please sign in to view and control your devices.</p>
+      <button class="btn-primary" onclick="location.reload()">Sign In</button>
+    </div>`;
+          return;
+        }
+
         renderAll();
-        await enforcePageLogin("homePage");
         if (config.settings.autoPing) pingAllDevices();
-        loadTelemetry();
       }
 
       /* Event Listeners & Background Intervals */
