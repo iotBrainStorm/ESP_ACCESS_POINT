@@ -722,41 +722,109 @@
     </style>
   </head>
   <body>
-    <!-- PIN Lock Screen -->
-    <div class="pin-overlay" id="pinOverlay">
-      <div class="pin-card">
-        <h3 style="margin-bottom: 6px">Configuration Locked</h3>
+    <!-- Universal Auth & Verification Modal -->
+    <div
+      class="pin-overlay"
+      id="authModal"
+      style="
+        display: none;
+        background: rgba(0, 0, 0, 0.78);
+        backdrop-filter: blur(8px);
+      "
+    >
+      <div class="pin-card" style="max-width: 370px; text-align: left">
+        <h3 id="authModalTitle" style="margin-bottom: 4px">
+          Verification Required
+        </h3>
         <p
+          id="authModalSub"
           style="
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             color: var(--text-muted);
             margin-bottom: 14px;
           "
         >
-          Enter your Hub PIN to edit NVS settings
+          Sign in to continue
         </p>
-        <input
-          type="password"
-          id="pinInput"
-          class="input"
+
+        <div class="field" style="margin-bottom: 10px">
+          <label>Username</label>
+          <input
+            type="text"
+            id="authUser"
+            class="input"
+            placeholder="esp"
+            autocomplete="username"
+          />
+        </div>
+        <div class="field" style="margin-bottom: 14px">
+          <label>Password</label>
+          <input
+            type="password"
+            id="authPass"
+            class="input"
+            placeholder="••••••"
+            autocomplete="current-password"
+          />
+        </div>
+
+        <!-- 5-Second BOOT Button Reset Box (Hidden until Forget clicked) -->
+        <div
+          id="forgetBootBox"
           style="
-            text-align: center;
-            font-size: 1.1rem;
-            letter-spacing: 4px;
+            display: none;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid var(--warn);
+            background: rgba(245, 158, 11, 0.1);
             margin-bottom: 12px;
+            font-size: 0.76rem;
           "
-          placeholder="••••"
-        />
-        <div style="display: flex; gap: 8px">
-          <a
-            href="index.html"
-            class="btn"
-            style="flex: 1; text-decoration: none"
-            >Back</a
+        >
+          <div id="forgetBootText" style="font-weight: 700; color: var(--warn)">
+            Hold ESP32 BOOT button now (5.0s)...
+          </div>
+          <div class="meter-bar" style="margin-top: 6px">
+            <div
+              class="meter-fill"
+              id="forgetBootBar"
+              style="width: 100%; background: var(--warn)"
+            ></div>
+          </div>
+        </div>
+
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+          "
+        >
+          <button
+            type="button"
+            class="btn btn-sm btn-danger"
+            onclick="triggerForgetUsers()"
           >
-          <button class="btn btn-primary" style="flex: 1" onclick="unlockPin()">
-            Unlock
+            Forget?
           </button>
+          <div style="display: flex; gap: 8px">
+            <button
+              type="button"
+              class="btn btn-sm"
+              id="authCancelBtn"
+              onclick="closeAuthModal()"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-primary"
+              onclick="submitAuthModal()"
+            >
+              Verify
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -790,6 +858,9 @@
       </button>
       <button class="nav-tab" onclick="switchTab('scanner', this)">
         Scan Devices
+      </button>
+      <button class="nav-tab" onclick="switchTab('admin', this)">
+        Administrator
       </button>
       <button class="nav-tab" onclick="switchTab('prefs', this)">
         Preferences
@@ -1364,6 +1435,324 @@
         <div class="item-list" id="scanResults"></div>
       </section>
 
+      <!-- MENU 7: ADMINISTRATOR -->
+      <section class="panel" id="tab-admin">
+        <div class="panel-header">
+          <h2>Administrator &amp; System Control</h2>
+        </div>
+
+        <!-- 1. TIME SETUP -->
+        <div class="card-box">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              flex-wrap: wrap;
+              gap: 8px;
+              margin-bottom: 12px;
+            "
+          >
+            <h3 style="margin-bottom: 0">1. Time Setup</h3>
+            <span
+              class="badge"
+              id="lastSyncBadge"
+              style="color: var(--accent); font-family: monospace"
+            >
+              Last sync: Never
+            </span>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label>NTP Server</label>
+              <input
+                type="text"
+                id="ntpServerInput"
+                class="input"
+                value="pool.ntp.org"
+                oninput="updateTimeCfg('ntpServer', this.value.trim())"
+              />
+            </div>
+            <div class="field">
+              <label>Home Screen Time Format</label>
+              <select
+                id="timeFormatSelect"
+                class="select"
+                onchange="updateTimeCfg('format', this.value)"
+              >
+                <option value="12h">12-Hour (AM / PM)</option>
+                <option value="24h">24-Hour</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Time Zone</label>
+              <select
+                id="timeZoneSelect"
+                class="select"
+                onchange="onTimeZoneChange(this)"
+              ></select>
+            </div>
+            <div class="field" style="justify-content: flex-end">
+              <label>&nbsp;</label>
+              <button
+                class="btn btn-primary"
+                id="syncTimeBtn"
+                onclick="syncTimeNow()"
+              >
+                Sync Now
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. USER SETUP -->
+        <div class="card-box">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              flex-wrap: wrap;
+              gap: 8px;
+              margin-bottom: 12px;
+            "
+          >
+            <h3 style="margin-bottom: 0">2. User Setup</h3>
+            <button
+              class="btn btn-sm"
+              onclick="toggleShowUsers()"
+              id="showUsersBtn"
+            >
+              Show Users
+            </button>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label>Username</label>
+              <input
+                type="text"
+                id="newUsername"
+                class="input"
+                placeholder="e.g. mrinal"
+              />
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <input
+                type="password"
+                id="newPassword"
+                class="input"
+                autocomplete="new-password"
+                placeholder="Enter password"
+              />
+            </div>
+            <div class="field">
+              <label>Role</label>
+              <select id="newUserRole" class="select">
+                <option value="user">Normal User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div class="field" style="justify-content: flex-end">
+              <label>&nbsp;</label>
+              <button class="btn btn-primary" onclick="addNewUser()">
+                + Add User
+              </button>
+            </div>
+          </div>
+
+          <!-- Collapsible User List -->
+          <div
+            id="userListWrap"
+            style="
+              display: none;
+              margin-top: 14px;
+              padding-top: 12px;
+              border-top: 1px solid var(--border);
+            "
+          >
+            <div class="item-list" id="userListContainer"></div>
+          </div>
+        </div>
+
+        <!-- 3. USER VERIFICATION -->
+        <div class="card-box">
+          <h3>3. User Verification &amp; Login Policy</h3>
+          <div class="form-grid" style="margin-bottom: 14px">
+            <div class="field">
+              <label>Home Page Login Modal</label>
+              <div style="display: flex; gap: 6px">
+                <select
+                  id="verHomeMode"
+                  class="select"
+                  onchange="updatePageVer('homePage', 'mode', this.value)"
+                >
+                  <option value="every">Every Time</option>
+                  <option value="session">Sessional (Default)</option>
+                  <option value="none">None</option>
+                </select>
+                <select
+                  id="verHomeRole"
+                  class="select"
+                  onchange="updatePageVer('homePage', 'role', this.value)"
+                >
+                  <option value="all">All Users</option>
+                  <option value="user">Normal User</option>
+                  <option value="admin">Admin Only</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Config Page Login Modal</label>
+              <div style="display: flex; gap: 6px">
+                <select
+                  id="verConfigMode"
+                  class="select"
+                  onchange="updatePageVer('configPage', 'mode', this.value)"
+                >
+                  <option value="every">Every Time</option>
+                  <option value="session">Sessional (Default)</option>
+                  <option value="none">None</option>
+                </select>
+                <select
+                  id="verConfigRole"
+                  class="select"
+                  onchange="updatePageVer('configPage', 'role', this.value)"
+                >
+                  <option value="admin">Admin Only</option>
+                  <option value="user">Normal User</option>
+                  <option value="all">All Users</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <label
+            style="
+              font-size: 0.76rem;
+              font-weight: 600;
+              color: var(--text-muted);
+              display: block;
+              margin-bottom: 8px;
+            "
+          >
+            Verification Requirement
+          </label>
+          <div class="form-grid" id="actionVerificationGrid"></div>
+        </div>
+
+        <!-- 4. REAL-TIME PERFORMANCE -->
+        <div class="card-box">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 12px;
+            "
+          >
+            <h3 style="margin-bottom: 0">4. Real-Time System Performance</h3>
+            <span class="badge" style="color: var(--ok)">Live (2s Poll)</span>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label>CPU Temperature</label>
+              <div
+                class="input"
+                id="perfTemp"
+                style="
+                  display: flex;
+                  align-items: center;
+                  font-family: monospace;
+                "
+              >
+                -- °C
+              </div>
+            </div>
+            <div class="field">
+              <label>System Uptime</label>
+              <div
+                class="input"
+                id="perfUptime"
+                style="
+                  display: flex;
+                  align-items: center;
+                  font-family: monospace;
+                "
+              >
+                --
+              </div>
+            </div>
+            <div class="field">
+              <label>Connected SSID &amp; IP</label>
+              <div
+                class="input"
+                id="perfNet"
+                style="
+                  display: flex;
+                  align-items: center;
+                  font-family: monospace;
+                "
+              >
+                --
+              </div>
+            </div>
+            <div class="field">
+              <label>Signal Strength</label>
+              <div
+                class="input"
+                id="perfRssi"
+                style="
+                  display: flex;
+                  align-items: center;
+                  font-family: monospace;
+                "
+              >
+                -- dBm (--%)
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 12px">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.78rem;
+                color: var(--text-muted);
+              "
+            >
+              <span>RAM Usage</span>
+              <span id="perfRamText">--% (-- KB / -- KB)</span>
+            </div>
+            <div class="meter-bar">
+              <div class="meter-fill" id="perfRamBar" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <div style="margin-top: 10px">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.78rem;
+                color: var(--text-muted);
+              "
+            >
+              <span>Storage Usage</span>
+              <span id="perfStorageText">--% (-- KB / -- KB)</span>
+            </div>
+            <div class="meter-bar">
+              <div
+                class="meter-fill"
+                id="perfStorageBar"
+                style="width: 0%"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- MENU 6: PREFERENCES -->
       <section class="panel" id="tab-prefs">
         <div class="panel-header">
@@ -1548,20 +1937,6 @@
                 onchange="importBackup(event)"
               />
             </label>
-          </div>
-        </div>
-
-        <div class="card-box">
-          <h3>Configuration Lock PIN (Optional)</h3>
-          <div style="display: flex; gap: 10px; max-width: 360px">
-            <input
-              type="text"
-              id="prefPin"
-              class="input"
-              maxlength="8"
-              placeholder="Leave empty for no PIN"
-              oninput="updatePref('pin', this.value.trim())"
-            />
           </div>
         </div>
 
@@ -1925,6 +2300,140 @@
     <div class="toast" id="toast"></div>
 
     <script>
+      let authResolveCallback = null;
+      let requiredAuthRole = "all"; // "admin" | "user" | "all"
+      let forgetBootTimer = null;
+
+      function verifyCredentials(username, password, roleRequirement) {
+        const uName = String(username || "")
+          .trim()
+          .toLowerCase();
+        const hash = hashCredential(uName, password);
+        const user = (config.admin?.users || []).find(
+          (u) => u.username.toLowerCase() === uName && u.passHash === hash,
+        );
+        if (!user) return { ok: false, msg: "Invalid username or password" };
+        if (roleRequirement === "admin" && user.role !== "admin") {
+          return { ok: false, msg: "Admin role required for this action" };
+        }
+        if (roleRequirement === "user" && user.role !== "user") {
+          return { ok: false, msg: "Normal User role required" };
+        }
+        return { ok: true, user };
+      }
+
+      function promptVerification(roleReq, titleText, allowCancel = true) {
+        if (!roleReq || roleReq === "none") return Promise.resolve(true);
+        return new Promise((resolve) => {
+          requiredAuthRole = roleReq;
+          authResolveCallback = resolve;
+          const roleLabel =
+            roleReq === "admin"
+              ? "Admin Only"
+              : roleReq === "user"
+                ? "Normal User"
+                : "Admin or Normal User";
+          document.getElementById("authModalTitle").textContent =
+            titleText || "Verification Required";
+          document.getElementById("authModalSub").textContent =
+            `Required permission: ${roleLabel}`;
+          document.getElementById("authUser").value = "";
+          document.getElementById("authPass").value = "";
+          document.getElementById("authCancelBtn").style.display = allowCancel
+            ? "inline-flex"
+            : "none";
+          document.getElementById("forgetBootBox").style.display = "none";
+          document.getElementById("authModal").style.display = "flex";
+          syncModalScrollLock();
+          document.getElementById("authUser").focus();
+        });
+      }
+
+      function submitAuthModal() {
+        const u = document.getElementById("authUser").value;
+        const p = document.getElementById("authPass").value;
+        const res = verifyCredentials(u, p, requiredAuthRole);
+        if (!res.ok) return showToast(res.msg);
+
+        document.getElementById("authModal").style.display = "none";
+        syncModalScrollLock();
+        if (authResolveCallback) authResolveCallback(res.user);
+        authResolveCallback = null;
+      }
+
+      function closeAuthModal() {
+        clearInterval(forgetBootTimer);
+        document.getElementById("authModal").style.display = "none";
+        syncModalScrollLock();
+        if (authResolveCallback) authResolveCallback(false);
+        authResolveCallback = null;
+      }
+
+      // 5-Second Physical BOOT Button Forget Flow
+      async function triggerForgetUsers() {
+        const box = document.getElementById("forgetBootBox");
+        const txt = document.getElementById("forgetBootText");
+        const bar = document.getElementById("forgetBootBar");
+        box.style.display = "block";
+
+        let remainingMs = 5000;
+        clearInterval(forgetBootTimer);
+
+        // Notify ESP32 to watch GPIO 0 (BOOT button) for 5 seconds
+        const bootPromise = !isOfflinePreview
+          ? fetch("/api/auth/forget-boot", { method: "POST" })
+              .then((r) => r.json())
+              .catch(() => ({ bootHeld: false }))
+          : new Promise((res) => {
+              // Offline preview helper: confirm dialog simulates holding BOOT button
+              setTimeout(
+                () =>
+                  res({
+                    bootHeld: confirm(
+                      "Preview Mode: Simulate holding ESP32 BOOT button?",
+                    ),
+                  }),
+                1500,
+              );
+            });
+
+        forgetBootTimer = setInterval(() => {
+          remainingMs -= 100;
+          const sec = Math.max(0, (remainingMs / 1000).toFixed(1));
+          txt.textContent = `Hold ESP32 BOOT button within ${sec}s...`;
+          bar.style.width = `${(remainingMs / 5000) * 100}%`;
+          if (remainingMs <= 0) clearInterval(forgetBootTimer);
+        }, 100);
+
+        const result = await bootPromise;
+        clearInterval(forgetBootTimer);
+
+        if (result && result.bootHeld) {
+          config.admin.users = [
+            {
+              username: "esp",
+              passHash: hashCredential("esp", "456456"),
+              role: "admin",
+            },
+          ];
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+          if (typeof renderAdminPanel === "function") renderAdminPanel();
+          box.style.display = "none";
+          showToast("Users reset! Default is now esp / 456456");
+        } else {
+          box.style.display = "none";
+          showToast("Forget aborted: BOOT button was not held within 5s");
+        }
+      }
+
+      async function verifyAction(actionKey, label) {
+        const roleReq =
+          config.admin?.verification?.actions?.[actionKey] || "none";
+        if (roleReq === "none") return true;
+        const ok = await promptVerification(roleReq, `Verify: ${label}`, true);
+        return !!ok;
+      }
+
       const STORAGE_KEY = "esp_iot_hub_config_v1";
       const NVS_MAX_BYTES = 16384;
 
@@ -1952,6 +2461,277 @@
         solar:
           '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
       };
+
+      const TIMEZONES = [
+        { offset: "-12", name: "Baker Island (UTC-12:00)" },
+        { offset: "-11", name: "American Samoa (UTC-11:00)" },
+        { offset: "-10", name: "Hawaii, USA (UTC-10:00)" },
+        { offset: "-9", name: "Alaska, USA (UTC-09:00)" },
+        { offset: "-8", name: "United States / Canada PST (UTC-08:00)" },
+        { offset: "-7", name: "United States / Mexico MST (UTC-07:00)" },
+        { offset: "-6", name: "United States / Mexico CST (UTC-06:00)" },
+        { offset: "-5", name: "United States / Colombia EST (UTC-05:00)" },
+        { offset: "-4", name: "Canada AST / Chile (UTC-04:00)" },
+        { offset: "-3", name: "Brazil / Argentina (UTC-03:00)" },
+        { offset: "-2", name: "South Georgia (UTC-02:00)" },
+        { offset: "-1", name: "Cape Verde / Azores (UTC-01:00)" },
+        { offset: "0", name: "United Kingdom / UTC (UTC+00:00)" },
+        { offset: "1", name: "Germany / France / Nigeria (UTC+01:00)" },
+        { offset: "2", name: "Egypt / South Africa (UTC+02:00)" },
+        { offset: "3", name: "Saudi Arabia / Russia MSK (UTC+03:00)" },
+        { offset: "3.5", name: "Iran (UTC+03:30)" },
+        { offset: "4", name: "United Arab Emirates (UTC+04:00)" },
+        { offset: "5", name: "Pakistan / Maldives (UTC+05:00)" },
+        { offset: "5.5", name: "India / Sri Lanka (UTC+05:30)" },
+        { offset: "5.75", name: "Nepal (UTC+05:45)" },
+        { offset: "6", name: "Bangladesh / Bhutan (UTC+06:00)" },
+        { offset: "7", name: "Thailand / Vietnam / Indonesia (UTC+07:00)" },
+        { offset: "8", name: "Singapore / China / Malaysia (UTC+08:00)" },
+        { offset: "9", name: "Japan / South Korea (UTC+09:00)" },
+        { offset: "9.5", name: "Australia Central (UTC+09:30)" },
+        { offset: "10", name: "Australia Eastern (UTC+10:00)" },
+        { offset: "11", name: "Solomon Islands (UTC+11:00)" },
+        { offset: "12", name: "New Zealand / Fiji (UTC+12:00)" },
+      ];
+
+      const ACTION_LABELS = {
+        devices: "Devices Management",
+        shortcuts: "Shortcut",
+        homeToggle: "Shortcut Toggling",
+        groups: "Group Management",
+        favorites: "Favorites Management",
+        network: "Network Configuration",
+        restart: "Restart Hub",
+        reset: "Factory Reset",
+      };
+
+      function populateAdministrator() {
+        const adm = config.admin;
+        // 1. Time
+        document.getElementById("ntpServerInput").value =
+          adm.time.ntpServer || "pool.ntp.org";
+        document.getElementById("timeFormatSelect").value =
+          adm.time.format || "24h";
+        document.getElementById("lastSyncBadge").textContent =
+          `Last sync: ${adm.time.lastSync || "Never"}`;
+
+        const tzSel = document.getElementById("timeZoneSelect");
+        tzSel.innerHTML = TIMEZONES.map(
+          (z) =>
+            `<option value="${z.offset}" data-country="${escapeHtml(z.name)}">${escapeHtml(z.name)}</option>`,
+        ).join("");
+        tzSel.value = String(adm.time.tzOffset ?? "5.5");
+
+        // 2. Users
+        renderUserList();
+
+        // 3. Verification
+        document.getElementById("verHomeMode").value =
+          adm.verification.homePage.mode;
+        document.getElementById("verHomeRole").value =
+          adm.verification.homePage.role;
+        document.getElementById("verConfigMode").value =
+          adm.verification.configPage.mode;
+        document.getElementById("verConfigRole").value =
+          adm.verification.configPage.role;
+
+        document.getElementById("actionVerificationGrid").innerHTML =
+          Object.entries(ACTION_LABELS)
+            .map(([key, label]) => {
+              const val = adm.verification.actions[key] || "none";
+              return `
+                    <div class="field">
+                      <label>${escapeHtml(label)}</label>
+                      <select class="select" onchange="updateActionVer('${key}', this.value)">
+                        <option value="none" ${val === "none" ? "selected" : ""}>None (No Prompt)</option>
+                        <option value="admin" ${val === "admin" ? "selected" : ""}>Admin Only</option>
+                        <option value="user" ${val === "user" ? "selected" : ""}>Normal User</option>
+                        <option value="all" ${val === "all" ? "selected" : ""}>All (Admin &amp; Normal)</option>
+                      </select>
+                    </div>`;
+            })
+            .join("");
+      }
+
+      function updateTimeCfg(key, val) {
+        config.admin.time[key] = val;
+        markDirty();
+      }
+
+      function onTimeZoneChange(sel) {
+        config.admin.time.tzOffset = sel.value;
+        config.admin.time.tzCountry =
+          sel.options[sel.selectedIndex]?.dataset?.country || "";
+        markDirty();
+      }
+
+      async function syncTimeNow() {
+        const btn = document.getElementById("syncTimeBtn");
+        btn.disabled = true;
+        btn.textContent = "Syncing...";
+
+        try {
+          let stamp = "";
+          if (!isOfflinePreview) {
+            const res = await fetch("/api/time/sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(config.admin.time),
+            });
+            const data = await res.json();
+            stamp = data.formattedTime; // e.g. "17 Nov 2026 15:34:56"
+          }
+          if (!stamp) {
+            // Format using selected timezone offset in browser
+            const now = new Date();
+            const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+            const targetDate = new Date(
+              utcMs + Number(config.admin.time.tzOffset || 0) * 3600000,
+            );
+            const months = [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec",
+            ];
+            const dd = String(targetDate.getDate()).padStart(2, "0");
+            const mon = months[targetDate.getMonth()];
+            const yyyy = targetDate.getFullYear();
+            const hh = String(targetDate.getHours()).padStart(2, "0");
+            const mm = String(targetDate.getMinutes()).padStart(2, "0");
+            const ss = String(targetDate.getSeconds()).padStart(2, "0");
+            stamp = `${dd} ${mon} ${yyyy} ${hh}:${mm}:${ss}`;
+          }
+
+          config.admin.time.lastSync = stamp;
+          document.getElementById("lastSyncBadge").textContent =
+            `Last sync: ${stamp}`;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+          showToast(`Last sync: ${stamp}`);
+        } catch {
+          showToast("NTP sync failed");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Sync Now";
+        }
+      }
+
+      function toggleShowUsers() {
+        const wrap = document.getElementById("userListWrap");
+        const isHidden = wrap.style.display === "none";
+        wrap.style.display = isHidden ? "block" : "none";
+        document.getElementById("showUsersBtn").textContent = isHidden
+          ? "Hide Users"
+          : "Show Users";
+        if (isHidden) renderUserList();
+      }
+
+      function renderUserList() {
+        const box = document.getElementById("userListContainer");
+        if (!box) return;
+        box.innerHTML = config.admin.users
+          .map(
+            (u, idx) => `
+                  <div class="dev-row">
+                    <div class="dev-row-left">
+                      <div>
+                        <div class="dev-row-title">
+                          ${escapeHtml(u.username)}
+                          <span class="badge" style="color:${u.role === "admin" ? "var(--accent)" : "var(--ok)"}">
+                            ${u.role === "admin" ? "Admin" : "Normal User"}
+                          </span>
+                        </div>
+                        <div class="dev-row-sub">Password Hash: •••••••••••• (Protected)</div>
+                      </div>
+                    </div>
+                    <div class="row-actions">
+                      <button class="btn btn-sm btn-danger" onclick="deleteUser(${idx})">Delete</button>
+                    </div>
+                  </div>
+                `,
+          )
+          .join("");
+      }
+
+      async function addNewUser() {
+        const uName = document.getElementById("newUsername").value.trim();
+        const uPass = document.getElementById("newPassword").value;
+        const uRole = document.getElementById("newUserRole").value;
+
+        if (!uName || !uPass)
+          return showToast("Enter both username and password");
+        if (
+          config.admin.users.some(
+            (u) => u.username.toLowerCase() === uName.toLowerCase(),
+          )
+        ) {
+          return showToast("Username already exists");
+        }
+
+        // Always require Admin verification to add a user
+        const verified = await promptVerification(
+          "admin",
+          `Admin Auth: Add user "${uName}"`,
+          true,
+        );
+        if (!verified) return;
+
+        config.admin.users.push({
+          username: uName,
+          passHash: hashCredential(uName, uPass),
+          role: uRole,
+        });
+        document.getElementById("newUsername").value = "";
+        document.getElementById("newPassword").value = "";
+        markDirty();
+        renderUserList();
+        showToast(`User "${uName}" added as ${uRole}`);
+      }
+
+      async function deleteUser(index) {
+        const target = config.admin.users[index];
+        if (!target) return;
+
+        const adminCount = config.admin.users.filter(
+          (u) => u.role === "admin",
+        ).length;
+        if (target.role === "admin" && adminCount <= 1) {
+          return showToast(
+            "Cannot delete: At least one Admin user must remain!",
+          );
+        }
+
+        // Always require Admin verification to delete a user
+        const verified = await promptVerification(
+          "admin",
+          `Admin Auth: Delete "${target.username}"`,
+          true,
+        );
+        if (!verified) return;
+
+        config.admin.users.splice(index, 1);
+        markDirty();
+        renderUserList();
+        showToast(`User "${target.username}" deleted`);
+      }
+
+      function updatePageVer(pageKey, field, val) {
+        config.admin.verification[pageKey][field] = val;
+        markDirty();
+      }
+
+      function updateActionVer(actionKey, val) {
+        config.admin.verification.actions[actionKey] = val;
+        markDirty();
+      }
 
       const SWATCHES = [
         "#38bdf8",
@@ -1984,6 +2764,65 @@
       let lastScannedList = [];
 
       const KEY_SALT = "esp32_nvs_hub_v1_secret";
+
+      function hashCredential(username, password) {
+        const cleanUser = String(username || "")
+          .trim()
+          .toLowerCase();
+        const raw = `${cleanUser}:${String(password || "")}:${KEY_SALT}`;
+        // Compact DJB2 + FNV-1a 64-bit hex digest (works over non-HTTPS http://192.168.x.x)
+        let h1 = 0xdeadbeef ^ raw.length,
+          h2 = 0x41c6ce57 ^ raw.length;
+        for (let i = 0, ch; i < raw.length; i++) {
+          ch = raw.charCodeAt(i);
+          h1 = Math.imul(h1 ^ ch, 2654435761);
+          h2 = Math.imul(h2 ^ ch, 1597334677);
+        }
+        h1 =
+          Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
+          Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 =
+          Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
+          Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        return (
+          "sha:" +
+          (h2 >>> 0).toString(16).padStart(8, "0") +
+          (h1 >>> 0).toString(16).padStart(8, "0")
+        );
+      }
+
+      function getDefaultAdminConfig() {
+        return {
+          time: {
+            ntpServer: "pool.ntp.org",
+            format: "24h", // "12h" | "24h"
+            tzOffset: "5.5", // -12 to +12
+            tzCountry: "India (UTC+05:30)",
+            lastSync: "Never",
+          },
+          users: [
+            {
+              username: "esp",
+              passHash: hashCredential("esp", "456456"),
+              role: "admin",
+            },
+          ],
+          verification: {
+            homePage: { mode: "session", role: "all" }, // mode: "every"|"session"|"none", role: "admin"|"user"|"all"
+            configPage: { mode: "session", role: "admin" },
+            actions: {
+              devices: "admin", // "none" | "admin" | "user" | "all"
+              shortcuts: "admin",
+              homeToggle: "none",
+              groups: "admin",
+              favorites: "all",
+              network: "admin",
+              restart: "admin",
+              reset: "admin",
+            },
+          },
+        };
+      }
 
       function encodeApiKey(rawKey) {
         const str = String(rawKey || "").trim();
@@ -2023,6 +2862,7 @@
       }
 
       function sanitizeConfig(raw) {
+        const defAdmin = getDefaultAdminConfig();
         const fallback = {
           settings: {
             title: "ACCESS POINT",
@@ -2054,8 +2894,20 @@
           devices: [],
           shortcuts: [],
           favorites: [],
+          admin: defAdmin,
         };
         if (!raw || typeof raw !== "object") return fallback;
+
+        const rawAdmin = raw?.admin || {};
+        const mergedUsers =
+          Array.isArray(rawAdmin.users) && rawAdmin.users.length
+            ? rawAdmin.users
+            : defAdmin.users;
+
+        if (!mergedUsers.some((u) => u.role === "admin")) {
+          mergedUsers.unshift(defAdmin.users[0]);
+        }
+
         const merged = {
           settings: { ...fallback.settings, ...(raw.settings || {}) },
           network: { ...fallback.network, ...(raw.network || {}) },
@@ -2063,6 +2915,24 @@
           devices: Array.isArray(raw.devices) ? raw.devices : [],
           shortcuts: Array.isArray(raw.shortcuts) ? raw.shortcuts : [],
           favorites: Array.isArray(raw.favorites) ? raw.favorites : [],
+          admin: {
+            time: { ...defAdmin.time, ...(rawAdmin.time || {}) },
+            users: mergedUsers,
+            verification: {
+              homePage: {
+                ...defAdmin.verification.homePage,
+                ...(rawAdmin.verification?.homePage || {}),
+              },
+              configPage: {
+                ...defAdmin.verification.configPage,
+                ...(rawAdmin.verification?.configPage || {}),
+              },
+              actions: {
+                ...defAdmin.verification.actions,
+                ...(rawAdmin.verification?.actions || {}),
+              },
+            },
+          },
         };
         merged.shortcuts.forEach((s) => {
           if (s.apiKey) s.apiKey = encodeApiKey(s.apiKey);
@@ -2136,19 +3006,18 @@
         }, 2300);
       }
 
-      /* Req #2: Stop background scroll when any modal or PIN lock is open */
-      function syncModalScrollLock() {
-        const anyModalOpen = !!document.querySelector(".modal-backdrop.open");
-        const pinOpen =
-          document.getElementById("pinOverlay").style.display === "flex";
-        document.body.classList.toggle("modal-open", anyModalOpen || pinOpen);
-      }
-
       function markDirty() {
         isDirty = true;
         document.getElementById("saveStatus").innerHTML =
           `<span class="unsaved-dot"></span>Unsaved changes`;
         updateNvsMeter();
+      }
+
+      function syncModalScrollLock() {
+        const anyModalOpen = !!document.querySelector(".modal-backdrop.open");
+        const authOpen =
+          document.getElementById("authModal")?.style.display === "flex";
+        document.body.classList.toggle("modal-open", anyModalOpen || authOpen);
       }
 
       async function init() {
@@ -2168,16 +3037,127 @@
         }
 
         applyTheme();
-        checkPinGate();
         renderAll();
+        await enforcePageLogin("configPage");
       }
 
-      function checkPinGate() {
-        const pin = config.settings.pin;
-        if (pin && sessionStorage.getItem("hub_unlocked") !== pin) {
-          document.getElementById("pinOverlay").style.display = "flex";
+      let perfPollTimer = null;
+
+      function switchTab(tabName, btn) {
+        document
+          .querySelectorAll(".nav-tab")
+          .forEach((b) => b.classList.remove("active"));
+        document
+          .querySelectorAll(".panel")
+          .forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`tab-${tabName}`).classList.add("active");
+
+        if (tabName === "backup") updateNvsMeter();
+        if (tabName === "scanner") syncScannerWithGateway();
+
+        clearInterval(netPollTimer);
+        if (tabName === "network") {
+          fetchLiveNetworkInfo();
+          netPollTimer = setInterval(fetchLiveNetworkInfo, 3000);
         }
-        syncModalScrollLock();
+
+        clearInterval(perfPollTimer);
+        if (tabName === "admin") {
+          populateAdministrator();
+          fetchLivePerformance();
+          perfPollTimer = setInterval(fetchLivePerformance, 2000);
+        }
+      }
+
+      function renderAll() {
+        renderDeviceList();
+        renderShortcutList();
+        renderGroupList();
+        renderFavoriteList();
+        populateNetwork();
+        syncScannerWithGateway();
+        populateAdministrator();
+        populatePreferences();
+        updateNvsMeter();
+      }
+
+      async function fetchLivePerformance() {
+        const nvsUsed = getPayloadByteSize();
+        let d = {
+          cpuTemp: 46.8,
+          uptime: "3d 14h 22m",
+          ramUsedKb: 138,
+          ramTotalKb: 320,
+          storageUsedKb: Number((nvsUsed / 1024).toFixed(1)),
+          storageTotalKb: 16,
+          ssid: "Home_Fiber_2.4G",
+          ip: "192.168.0.105",
+          rssi: -54,
+        };
+
+        if (!isOfflinePreview) {
+          try {
+            const res = await fetch("/api/status", { cache: "no-store" });
+            if (res.ok) d = { ...d, ...(await res.json()) };
+          } catch (_) {}
+        }
+
+        const ramPct = Math.min(
+          100,
+          Math.round((d.ramUsedKb / d.ramTotalKb) * 100),
+        );
+        const storPct = Math.min(
+          100,
+          Math.round((d.storageUsedKb / d.storageTotalKb) * 100),
+        );
+        const sigPct = rssiToPct(d.rssi);
+
+        document.getElementById("perfTemp").textContent =
+          `${Number(d.cpuTemp).toFixed(1)} °C`;
+        document.getElementById("perfUptime").textContent = d.uptime;
+        document.getElementById("perfNet").textContent = `${d.ssid} (${d.ip})`;
+        document.getElementById("perfRssi").textContent =
+          `${d.rssi} dBm (${sigPct}%)`;
+
+        document.getElementById("perfRamText").textContent =
+          `${ramPct}% (${d.ramUsedKb} KB / ${d.ramTotalKb} KB)`;
+        document.getElementById("perfRamBar").style.width = `${ramPct}%`;
+
+        document.getElementById("perfStorageText").textContent =
+          `${storPct}% (${d.storageUsedKb} KB / ${d.storageTotalKb} KB)`;
+        document.getElementById("perfStorageBar").style.width = `${storPct}%`;
+      }
+
+      async function enforcePageLogin(pageKey) {
+        // pageKey is "homePage" in index.html, "configPage" in config.html
+        const policy = config.admin?.verification?.[pageKey] || {
+          mode: "session",
+          role: "all",
+        };
+        if (policy.mode === "none") return;
+
+        const sessionKey = `hub_auth_${pageKey}`;
+        if (policy.mode === "session") {
+          const savedRole = sessionStorage.getItem(sessionKey);
+          if (
+            savedRole &&
+            (policy.role === "all" ||
+              savedRole === policy.role ||
+              savedRole === "admin")
+          ) {
+            return;
+          }
+        }
+
+        const user = await promptVerification(
+          policy.role,
+          `Login Required (${pageKey === "homePage" ? "Home UI" : "Configuration"})`,
+          false,
+        );
+        if (user && policy.mode === "session") {
+          sessionStorage.setItem(sessionKey, user.role);
+        }
       }
 
       function unlockPin() {
@@ -2200,38 +3180,6 @@
 
       let netPollTimer = null;
 
-      function switchTab(tabName, btn) {
-        document
-          .querySelectorAll(".nav-tab")
-          .forEach((b) => b.classList.remove("active"));
-        document
-          .querySelectorAll(".panel")
-          .forEach((p) => p.classList.remove("active"));
-        btn.classList.add("active");
-        document.getElementById(`tab-${tabName}`).classList.add("active");
-
-        if (tabName === "backup") updateNvsMeter();
-        if (tabName === "scanner") syncScannerWithGateway();
-
-        // Poll real-time WiFi signal & IP every 3s while Network tab is active
-        clearInterval(netPollTimer);
-        if (tabName === "network") {
-          fetchLiveNetworkInfo();
-          netPollTimer = setInterval(fetchLiveNetworkInfo, 3000);
-        }
-      }
-
-      function renderAll() {
-        renderDeviceList();
-        renderShortcutList();
-        renderGroupList();
-        renderFavoriteList();
-        populateNetwork();
-        syncScannerWithGateway();
-        populatePreferences();
-        updateNvsMeter();
-      }
-
       function populateGroupSelect(selectId, selectedVal = "none") {
         const sel = document.getElementById(selectId);
         let html = `<option value="none">None</option>`;
@@ -2251,8 +3199,8 @@
       }
 
       /* ==========================================
-         SECTION 1: DEVICES (Req #8)
-         ========================================== */
+                     SECTION 1: DEVICES (Req #8)
+                     ========================================== */
       function renderDeviceList() {
         const list = document.getElementById("deviceList");
         const q = (document.getElementById("devFilterInput")?.value || "")
@@ -2282,32 +3230,33 @@
             const idSafe = escapeHtml(dev.id);
             const colorSafe = escapeHtml(dev.color || "#38bdf8");
             return `
-          <div class="dev-row">
-            <div class="dev-row-left">
-              <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">${svgIcon(dev.icon, 20)}</div>
-              <div>
-                <div class="dev-row-title">
-                  ${escapeHtml(dev.name)}
-                  ${dev.fav ? '<span style="color:#fbbf24">&#9733;</span>' : ""}
-                  <span class="badge">${escapeHtml(groupLabel)}</span>
-                </div>
-                <div class="dev-row-sub">${escapeHtml(dev.ip || "No IP")} ${dev.mdns ? "• " + escapeHtml(dev.mdns) : ""}</div>
-              </div>
-            </div>
-            <div class="row-actions">
-              <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveDevice(${idx}, -1)">&uarr;</button>
-              <button class="btn btn-sm" title="Move Down" ${idx === config.devices.length - 1 ? "disabled" : ""} onclick="moveDevice(${idx}, 1)">&darr;</button>
-              <button class="btn btn-sm" onclick="cloneDevice('${idSafe}')">Clone</button>
-              <button class="btn btn-sm" onclick="openDeviceModal('${idSafe}')">Edit</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteDevice('${idSafe}')">Delete</button>
-            </div>
-          </div>
-        `;
+                      <div class="dev-row">
+                        <div class="dev-row-left">
+                          <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">${svgIcon(dev.icon, 20)}</div>
+                          <div>
+                            <div class="dev-row-title">
+                              ${escapeHtml(dev.name)}
+                              ${dev.fav ? '<span style="color:#fbbf24">&#9733;</span>' : ""}
+                              <span class="badge">${escapeHtml(groupLabel)}</span>
+                            </div>
+                            <div class="dev-row-sub">${escapeHtml(dev.ip || "No IP")} ${dev.mdns ? "• " + escapeHtml(dev.mdns) : ""}</div>
+                          </div>
+                        </div>
+                        <div class="row-actions">
+                          <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveDevice(${idx}, -1)">&uarr;</button>
+                          <button class="btn btn-sm" title="Move Down" ${idx === config.devices.length - 1 ? "disabled" : ""} onclick="moveDevice(${idx}, 1)">&darr;</button>
+                          <button class="btn btn-sm" onclick="cloneDevice('${idSafe}')">Clone</button>
+                          <button class="btn btn-sm" onclick="openDeviceModal('${idSafe}')">Edit</button>
+                          <button class="btn btn-sm btn-danger" onclick="deleteDevice('${idSafe}')">Delete</button>
+                        </div>
+                      </div>
+                    `;
           })
           .join("");
       }
 
-      function moveDevice(index, dir) {
+      async function moveDevice(index, dir) {
+        if (!(await verifyAction("devices", "Modify Devices"))) return;
         const target = index + dir;
         if (target < 0 || target >= config.devices.length) return;
         [config.devices[index], config.devices[target]] = [
@@ -2318,7 +3267,8 @@
         renderDeviceList();
       }
 
-      function cloneDevice(id) {
+      async function cloneDevice(id) {
+        if (!(await verifyAction("devices", "Modify Devices"))) return;
         const orig = config.devices.find((d) => d.id === id);
         if (!orig) return;
         const copy = structuredClone(orig);
@@ -2331,7 +3281,8 @@
         showToast("Device cloned");
       }
 
-      function deleteDevice(id) {
+      async function deleteDevice(id) {
+        if (!(await verifyAction("devices", "Modify Devices"))) return;
         if (!confirm("Delete this device from the hub?")) return;
         config.devices = config.devices.filter((d) => d.id !== id);
         config.favorites.forEach((f) => {
@@ -2390,18 +3341,18 @@
         document.getElementById("iconPicker").innerHTML = Object.keys(ICONS)
           .map(
             (k) => `
-        <div class="pick-item ${selectedIcon === k ? "selected" : ""}" onclick="selectedIcon='${k}'; renderDevicePickers()">
-          ${svgIcon(k, 18)}
-        </div>
-      `,
+                    <div class="pick-item ${selectedIcon === k ? "selected" : ""}" onclick="selectedIcon='${k}'; renderDevicePickers()">
+                      ${svgIcon(k, 18)}
+                    </div>
+                  `,
           )
           .join("");
 
         document.getElementById("colorPicker").innerHTML =
           SWATCHES.map(
             (c) => `
-        <div class="swatch ${selectedColor === c ? "selected" : ""}" style="background:${c}" onclick="selectedColor='${c}'; renderDevicePickers()"></div>
-      `,
+                    <div class="swatch ${selectedColor === c ? "selected" : ""}" style="background:${c}" onclick="selectedColor='${c}'; renderDevicePickers()"></div>
+                  `,
           ).join("") +
           `<input type="color" value="${selectedColor}" style="width:32px;height:28px;border:none;background:none" onchange="selectedColor=this.value; renderDevicePickers()" />`;
       }
@@ -2445,7 +3396,8 @@
         }
       }
 
-      function saveDeviceForm() {
+      async function saveDeviceForm() {
+        if (!(await verifyAction("devices", "Modify Devices"))) return;
         const name = document.getElementById("devName").value.trim();
         const ip = cleanHost(document.getElementById("devIp").value);
         const mdns = cleanHost(document.getElementById("devMdns").value);
@@ -2505,8 +3457,8 @@
       }
 
       /* ==========================================
-         SECTION 2: SHORTCUT BUTTON (Req #9)
-         ========================================== */
+                     SECTION 2: SHORTCUT BUTTON (Req #9)
+                     ========================================== */
       function renderShortcutList() {
         const list = document.getElementById("shortcutList");
         const q = (document.getElementById("scFilterInput")?.value || "")
@@ -2534,33 +3486,34 @@
             const idSafe = escapeHtml(sc.id);
             const colorSafe = escapeHtml(sc.color || "#38bdf8");
             return `
-          <div class="dev-row">
-            <div class="dev-row-left">
-              <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">${svgIcon(sc.icon || "switch", 20)}</div>
-              <div>
-                <div class="dev-row-title">
-                  ${escapeHtml(sc.name)}
-                  ${sc.fav ? '<span style="color:#fbbf24">&#9733;</span>' : ""}
-                  <span class="badge">${escapeHtml(g ? g.name : "None")}</span>
-                  <span class="badge">Index: ${sc.index ?? 0}</span>
-                </div>
-                <div class="dev-row-sub">${escapeHtml(sc.host)}:${sc.port || 80} • Key: ${escapeHtml(maskApiKey(sc.apiKey))}</div>
-              </div>
-            </div>
-            <div class="row-actions">
-              <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveShortcut(${idx}, -1)">&uarr;</button>
-              <button class="btn btn-sm" title="Move Down" ${idx === config.shortcuts.length - 1 ? "disabled" : ""} onclick="moveShortcut(${idx}, 1)">&darr;</button>
-              <button class="btn btn-sm" onclick="cloneShortcut('${idSafe}')">Clone</button>
-              <button class="btn btn-sm" onclick="openShortcutModal('${idSafe}')">Edit</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteShortcut('${idSafe}')">Delete</button>
-            </div>
-          </div>
-        `;
+                      <div class="dev-row">
+                        <div class="dev-row-left">
+                          <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">${svgIcon(sc.icon || "switch", 20)}</div>
+                          <div>
+                            <div class="dev-row-title">
+                              ${escapeHtml(sc.name)}
+                              ${sc.fav ? '<span style="color:#fbbf24">&#9733;</span>' : ""}
+                              <span class="badge">${escapeHtml(g ? g.name : "None")}</span>
+                              <span class="badge">Index: ${sc.index ?? 0}</span>
+                            </div>
+                            <div class="dev-row-sub">${escapeHtml(sc.host)}:${sc.port || 80} • Key: ${escapeHtml(maskApiKey(sc.apiKey))}</div>
+                          </div>
+                        </div>
+                        <div class="row-actions">
+                          <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveShortcut(${idx}, -1)">&uarr;</button>
+                          <button class="btn btn-sm" title="Move Down" ${idx === config.shortcuts.length - 1 ? "disabled" : ""} onclick="moveShortcut(${idx}, 1)">&darr;</button>
+                          <button class="btn btn-sm" onclick="cloneShortcut('${idSafe}')">Clone</button>
+                          <button class="btn btn-sm" onclick="openShortcutModal('${idSafe}')">Edit</button>
+                          <button class="btn btn-sm btn-danger" onclick="deleteShortcut('${idSafe}')">Delete</button>
+                        </div>
+                      </div>
+                    `;
           })
           .join("");
       }
 
-      function moveShortcut(index, dir) {
+      async function moveShortcut(index, dir) {
+        if (!(await verifyAction("shortcuts", "Modify Shortcuts"))) return;
         const target = index + dir;
         if (target < 0 || target >= config.shortcuts.length) return;
         [config.shortcuts[index], config.shortcuts[target]] = [
@@ -2571,7 +3524,8 @@
         renderShortcutList();
       }
 
-      function cloneShortcut(id) {
+      async function cloneShortcut(id) {
+        if (!(await verifyAction("shortcuts", "Modify Shortcuts"))) return;
         const orig = config.shortcuts.find((s) => s.id === id);
         if (!orig) return;
         const copy = structuredClone(orig);
@@ -2584,7 +3538,8 @@
         showToast("Shortcut cloned");
       }
 
-      function deleteShortcut(id) {
+      async function deleteShortcut(id) {
+        if (!(await verifyAction("shortcuts", "Modify Shortcuts"))) return;
         if (!confirm("Delete this shortcut button?")) return;
         config.shortcuts = config.shortcuts.filter((s) => s.id !== id);
         config.favorites.forEach((f) => {
@@ -2643,18 +3598,18 @@
         document.getElementById("scIconPicker").innerHTML = Object.keys(ICONS)
           .map(
             (k) => `
-        <div class="pick-item ${scSelectedIcon === k ? "selected" : ""}" onclick="scSelectedIcon='${k}'; renderShortcutPickers()">
-          ${svgIcon(k, 18)}
-        </div>
-      `,
+                    <div class="pick-item ${scSelectedIcon === k ? "selected" : ""}" onclick="scSelectedIcon='${k}'; renderShortcutPickers()">
+                      ${svgIcon(k, 18)}
+                    </div>
+                  `,
           )
           .join("");
 
         document.getElementById("scColorPicker").innerHTML =
           SWATCHES.map(
             (c) => `
-        <div class="swatch ${scSelectedColor === c ? "selected" : ""}" style="background:${c}" onclick="scSelectedColor='${c}'; renderShortcutPickers()"></div>
-      `,
+                    <div class="swatch ${scSelectedColor === c ? "selected" : ""}" style="background:${c}" onclick="scSelectedColor='${c}'; renderShortcutPickers()"></div>
+                  `,
           ).join("") +
           `<input type="color" value="${scSelectedColor}" style="width:32px;height:28px;border:none;background:none" onchange="scSelectedColor=this.value; renderShortcutPickers()" />`;
       }
@@ -2710,7 +3665,8 @@
         }
       }
 
-      function saveShortcutForm() {
+      async function saveShortcutForm() {
+        if (!(await verifyAction("shortcuts", "Modify Shortcuts"))) return;
         const name = document.getElementById("scName").value.trim();
         const host = cleanHost(document.getElementById("scHost").value);
         const port = Number(document.getElementById("scPort").value) || 80;
@@ -2775,8 +3731,8 @@
       }
 
       /* ==========================================
-         SECTION 3: GROUP (Req #10)
-         ========================================== */
+                     SECTION 3: GROUP (Req #10)
+                     ========================================== */
       function renderGroupList() {
         const list = document.getElementById("groupList");
         const q = (document.getElementById("grpFilterInput")?.value || "")
@@ -2807,29 +3763,29 @@
             const colorSafe = escapeHtml(g.color || "#38bdf8");
 
             return `
-          <div class="dev-row">
-            <div class="dev-row-left">
-              <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">
-                <span style="width:14px;height:14px;border-radius:50%;background:${colorSafe};display:inline-block"></span>
-              </div>
-              <div>
-                <div class="dev-row-title">
-                  ${escapeHtml(g.name)}
-                  <span class="badge">${devCount} devices</span>
-                  <span class="badge">${scCount} shortcuts</span>
-                </div>
-                <div class="dev-row-sub">Accent: ${colorSafe}</div>
-              </div>
-            </div>
-            <div class="row-actions">
-              <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveGroup(${idx}, -1)">&uarr;</button>
-              <button class="btn btn-sm" title="Move Down" ${idx === config.groups.length - 1 ? "disabled" : ""} onclick="moveGroup(${idx}, 1)">&darr;</button>
-              <button class="btn btn-sm" onclick="cloneGroup('${gIdSafe}')">Clone</button>
-              <button class="btn btn-sm" onclick="openGroupModal('${gIdSafe}')">Edit</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteGroup('${gIdSafe}')">Delete</button>
-            </div>
-          </div>
-        `;
+                      <div class="dev-row">
+                        <div class="dev-row-left">
+                          <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">
+                            <span style="width:14px;height:14px;border-radius:50%;background:${colorSafe};display:inline-block"></span>
+                          </div>
+                          <div>
+                            <div class="dev-row-title">
+                              ${escapeHtml(g.name)}
+                              <span class="badge">${devCount} devices</span>
+                              <span class="badge">${scCount} shortcuts</span>
+                            </div>
+                            <div class="dev-row-sub">Accent: ${colorSafe}</div>
+                          </div>
+                        </div>
+                        <div class="row-actions">
+                          <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveGroup(${idx}, -1)">&uarr;</button>
+                          <button class="btn btn-sm" title="Move Down" ${idx === config.groups.length - 1 ? "disabled" : ""} onclick="moveGroup(${idx}, 1)">&darr;</button>
+                          <button class="btn btn-sm" onclick="cloneGroup('${gIdSafe}')">Clone</button>
+                          <button class="btn btn-sm" onclick="openGroupModal('${gIdSafe}')">Edit</button>
+                          <button class="btn btn-sm btn-danger" onclick="deleteGroup('${gIdSafe}')">Delete</button>
+                        </div>
+                      </div>
+                    `;
           })
           .join("");
       }
@@ -2884,13 +3840,14 @@
         document.getElementById("grpColorPicker").innerHTML =
           SWATCHES.map(
             (c) => `
-        <div class="swatch ${grpSelectedColor === c ? "selected" : ""}" style="background:${c}" onclick="grpSelectedColor='${c}'; renderGroupColorPicker()"></div>
-      `,
+                    <div class="swatch ${grpSelectedColor === c ? "selected" : ""}" style="background:${c}" onclick="grpSelectedColor='${c}'; renderGroupColorPicker()"></div>
+                  `,
           ).join("") +
           `<input type="color" value="${grpSelectedColor}" style="width:32px;height:28px;border:none;background:none" onchange="grpSelectedColor=this.value; renderGroupColorPicker()" />`;
       }
 
-      function saveGroupForm() {
+      async function saveGroupForm() {
+        if (!(await verifyAction("groups", "Modify Groups"))) return;
         const name = document.getElementById("grpName").value.trim();
         if (!name) return showToast("Group name is required");
 
@@ -2936,7 +3893,8 @@
         showToast(editingGroupId ? "Group updated" : "Group created");
       }
 
-      function cloneGroup(id) {
+      async function cloneGroup(id) {
+        if (!(await verifyAction("groups", "Modify Groups"))) return;
         const orig = config.groups.find((g) => g.id === id);
         if (!orig) return;
         const copy = structuredClone(orig);
@@ -2948,7 +3906,8 @@
         showToast("Group cloned");
       }
 
-      function moveGroup(idx, dir) {
+      async function moveGroup(idx, dir) {
+        if (!(await verifyAction("groups", "Modify Groups"))) return;
         const target = idx + dir;
         if (target < 0 || target >= config.groups.length) return;
         [config.groups[idx], config.groups[target]] = [
@@ -2959,7 +3918,8 @@
         renderGroupList();
       }
 
-      function deleteGroup(id) {
+      async function deleteGroup(id) {
+        if (!(await verifyAction("groups", "Modify Groups"))) return;
         if (
           !confirm(
             "Delete this group? Assigned devices will be set to 'None' (hidden on Home UI until assigned to a group).",
@@ -2983,8 +3943,8 @@
       }
 
       /* ==========================================
-         SECTION 4: FAVORITES (Req #11)
-         ========================================== */
+                     SECTION 4: FAVORITES (Req #11)
+                     ========================================== */
       function renderFavoriteList() {
         const list = document.getElementById("favoriteList");
         const q = (document.getElementById("favFilterInput")?.value || "")
@@ -3012,33 +3972,34 @@
             const gCount = (fav.groupIds || []).length;
 
             return `
-          <div class="dev-row">
-            <div class="dev-row-left">
-              <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">${svgIcon(fav.icon || "chip", 20)}</div>
-              <div>
-                <div class="dev-row-title">
-                  ${escapeHtml(fav.name)}
-                  ${dCount ? `<span class="badge">${dCount} device${dCount > 1 ? "s" : ""}</span>` : ""}
-                  ${sCount ? `<span class="badge">${sCount} shortcut${sCount > 1 ? "s" : ""}</span>` : ""}
-                  ${gCount ? `<span class="badge">${gCount} group${gCount > 1 ? "s" : ""}</span>` : ""}
-                </div>
-                <div class="dev-row-sub">Pinned in Favorites Dock</div>
-              </div>
-            </div>
-            <div class="row-actions">
-              <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveFavorite(${idx}, -1)">&uarr;</button>
-              <button class="btn btn-sm" title="Move Down" ${idx === config.favorites.length - 1 ? "disabled" : ""} onclick="moveFavorite(${idx}, 1)">&darr;</button>
-              <button class="btn btn-sm" onclick="cloneFavorite('${idSafe}')">Clone</button>
-              <button class="btn btn-sm" onclick="openFavoriteModal('${idSafe}')">Edit</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteFavorite('${idSafe}')">Delete</button>
-            </div>
-          </div>
-        `;
+                      <div class="dev-row">
+                        <div class="dev-row-left">
+                          <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">${svgIcon(fav.icon || "chip", 20)}</div>
+                          <div>
+                            <div class="dev-row-title">
+                              ${escapeHtml(fav.name)}
+                              ${dCount ? `<span class="badge">${dCount} device${dCount > 1 ? "s" : ""}</span>` : ""}
+                              ${sCount ? `<span class="badge">${sCount} shortcut${sCount > 1 ? "s" : ""}</span>` : ""}
+                              ${gCount ? `<span class="badge">${gCount} group${gCount > 1 ? "s" : ""}</span>` : ""}
+                            </div>
+                            <div class="dev-row-sub">Pinned in Favorites Dock</div>
+                          </div>
+                        </div>
+                        <div class="row-actions">
+                          <button class="btn btn-sm" title="Move Up" ${idx === 0 ? "disabled" : ""} onclick="moveFavorite(${idx}, -1)">&uarr;</button>
+                          <button class="btn btn-sm" title="Move Down" ${idx === config.favorites.length - 1 ? "disabled" : ""} onclick="moveFavorite(${idx}, 1)">&darr;</button>
+                          <button class="btn btn-sm" onclick="cloneFavorite('${idSafe}')">Clone</button>
+                          <button class="btn btn-sm" onclick="openFavoriteModal('${idSafe}')">Edit</button>
+                          <button class="btn btn-sm btn-danger" onclick="deleteFavorite('${idSafe}')">Delete</button>
+                        </div>
+                      </div>
+                    `;
           })
           .join("");
       }
 
-      function moveFavorite(idx, dir) {
+      async function moveFavorite(idx, dir) {
+        if (!(await verifyAction("favorites", "Modify Favorites"))) return;
         const target = idx + dir;
         if (target < 0 || target >= config.favorites.length) return;
         [config.favorites[idx], config.favorites[target]] = [
@@ -3049,7 +4010,8 @@
         renderFavoriteList();
       }
 
-      function cloneFavorite(id) {
+      async function cloneFavorite(id) {
+        if (!(await verifyAction("favorites", "Modify Favorites"))) return;
         const orig = config.favorites.find((f) => f.id === id);
         if (!orig) return;
         const copy = structuredClone(orig);
@@ -3061,7 +4023,8 @@
         showToast("Favorite cloned");
       }
 
-      function deleteFavorite(id) {
+      async function deleteFavorite(id) {
+        if (!(await verifyAction("favorites", "Modify Favorites"))) return;
         if (!confirm("Remove this item from Favorites?")) return;
         const fav = config.favorites.find((f) => f.id === id);
         if (fav) {
@@ -3148,23 +4111,24 @@
         document.getElementById("favIconPicker").innerHTML = Object.keys(ICONS)
           .map(
             (k) => `
-        <div class="pick-item ${favSelectedIcon === k ? "selected" : ""}" onclick="favSelectedIcon='${k}'; renderFavoritePickers()">
-          ${svgIcon(k, 18)}
-        </div>
-      `,
+                    <div class="pick-item ${favSelectedIcon === k ? "selected" : ""}" onclick="favSelectedIcon='${k}'; renderFavoritePickers()">
+                      ${svgIcon(k, 18)}
+                    </div>
+                  `,
           )
           .join("");
 
         document.getElementById("favColorPicker").innerHTML =
           SWATCHES.map(
             (c) => `
-        <div class="swatch ${favSelectedColor === c ? "selected" : ""}" style="background:${c}" onclick="favSelectedColor='${c}'; renderFavoritePickers()"></div>
-      `,
+                    <div class="swatch ${favSelectedColor === c ? "selected" : ""}" style="background:${c}" onclick="favSelectedColor='${c}'; renderFavoritePickers()"></div>
+                  `,
           ).join("") +
           `<input type="color" value="${favSelectedColor}" style="width:32px;height:28px;border:none;background:none" onchange="favSelectedColor=this.value; renderFavoritePickers()" />`;
       }
 
-      function saveFavoriteForm() {
+      async function saveFavoriteForm() {
+        if (!(await verifyAction("favorites", "Modify Favorites"))) return;
         let name = document.getElementById("favName").value.trim();
         const deviceIds = Array.from(
           document.querySelectorAll('input[name="favDevCheck"]:checked'),
@@ -3226,8 +4190,8 @@
       }
 
       /* ==========================================
-         SECTION 6: SCAN DEVICES (Real LAN IoT Discovery)
-         ========================================== */
+                     SECTION 6: SCAN DEVICES (Real LAN IoT Discovery)
+                     ========================================== */
       let isScanningLan = false;
       let scanAbortCtrl = null;
       let scannerInitialized = false;
@@ -3607,42 +4571,42 @@
                 : "Timeout";
 
             return `
-          <div class="dev-row">
-            <div class="dev-row-left">
-              <div class="icon-box" style="background:var(--accent-soft);color:var(--accent)">
-                ${svgIcon(iconName, 20)}
-              </div>
-              <div>
-                <div class="dev-row-title">
-                  ${escapeHtml(item.name)}
-                  <span class="badge">${escapeHtml(item.type || "IoT Node")}</span>
-                  <span class="btn btn-sm ${pingBadgeClass}" id="scanPingBadge_${idx}" style="pointer-events:none;padding:2px 8px;font-size:0.7rem">
-                    ${pingText}
-                  </span>
-                  ${exists ? '<span class="badge" style="color:var(--ok);border-color:var(--ok)">Saved</span>' : ""}
-                </div>
-                <div class="dev-row-sub">
-                  <a
-                    href="http://${escapeHtml(item.ip)}:${item.port || 80}"
-                    target="_blank"
-                    rel="noopener"
-                    style="color: var(--accent); text-decoration: none; font-weight: 600"
-                  >
-                    http://${escapeHtml(item.ip)}:${item.port || 80}
-                  </a>
-                </div>
-              </div>
-            </div>
-            <div class="row-actions">
-              <button class="btn btn-sm" id="pingAgainBtn_${idx}" onclick="pingScannedDevice(${idx})">
-                Ping Again
-              </button>
-              <button class="btn btn-primary btn-sm" onclick="importScannedItem(${idx})">
-                + Import
-              </button>
-            </div>
-          </div>
-        `;
+                      <div class="dev-row">
+                        <div class="dev-row-left">
+                          <div class="icon-box" style="background:var(--accent-soft);color:var(--accent)">
+                            ${svgIcon(iconName, 20)}
+                          </div>
+                          <div>
+                            <div class="dev-row-title">
+                              ${escapeHtml(item.name)}
+                              <span class="badge">${escapeHtml(item.type || "IoT Node")}</span>
+                              <span class="btn btn-sm ${pingBadgeClass}" id="scanPingBadge_${idx}" style="pointer-events:none;padding:2px 8px;font-size:0.7rem">
+                                ${pingText}
+                              </span>
+                              ${exists ? '<span class="badge" style="color:var(--ok);border-color:var(--ok)">Saved</span>' : ""}
+                            </div>
+                            <div class="dev-row-sub">
+                              <a
+                                href="http://${escapeHtml(item.ip)}:${item.port || 80}"
+                                target="_blank"
+                                rel="noopener"
+                                style="color: var(--accent); text-decoration: none; font-weight: 600"
+                              >
+                                http://${escapeHtml(item.ip)}:${item.port || 80}
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="row-actions">
+                          <button class="btn btn-sm" id="pingAgainBtn_${idx}" onclick="pingScannedDevice(${idx})">
+                            Ping Again
+                          </button>
+                          <button class="btn btn-primary btn-sm" onclick="importScannedItem(${idx})">
+                            + Import
+                          </button>
+                        </div>
+                      </div>
+                    `;
           })
           .join("");
       }
@@ -3697,8 +4661,8 @@
       }
 
       /* ==========================================
-         SECTION 5: NETWORK (IP, AP, WiFi, mDNS)
-         ========================================== */
+                     SECTION 5: NETWORK (IP, AP, WiFi, mDNS)
+                     ========================================== */
       function ensureNetObject() {
         if (!config.network || typeof config.network !== "object") {
           config.network = {
@@ -3894,6 +4858,7 @@
       }
 
       async function triggerWifiPortal(forgetCredentials) {
+        if (!(await verifyAction("network", "Modify WiFi Settings"))) return;
         const net = ensureNetObject();
         const apName =
           document.getElementById("netApName").value.trim() ||
@@ -3936,16 +4901,25 @@
       /* Preferences & NVS Storage */
       function populatePreferences() {
         const s = config.settings;
-        document.getElementById("prefTitle").value = s.title || "";
-        document.getElementById("prefSubtitle").value = s.subtitle || "";
-        document.getElementById("prefTheme").value = s.theme || "dark";
-        document.getElementById("prefTimeout").value = s.pingTimeoutMs || 1500;
-        document.getElementById("prefMdns").checked = !!s.preferMdns;
-        document.getElementById("prefNewTab").checked = !!s.openNewTab;
-        document.getElementById("prefShowIp").checked =
-          s.showIpOnCard !== false;
-        document.getElementById("prefAutoPing").checked = s.autoPing !== false;
-        document.getElementById("prefPin").value = s.pin || "";
+        if (document.getElementById("prefTitle"))
+          document.getElementById("prefTitle").value = s.title || "";
+        if (document.getElementById("prefSubtitle"))
+          document.getElementById("prefSubtitle").value = s.subtitle || "";
+        if (document.getElementById("prefTheme"))
+          document.getElementById("prefTheme").value = s.theme || "dark";
+        if (document.getElementById("prefTimeout"))
+          document.getElementById("prefTimeout").value =
+            s.pingTimeoutMs || 1500;
+        if (document.getElementById("prefMdns"))
+          document.getElementById("prefMdns").checked = !!s.preferMdns;
+        if (document.getElementById("prefNewTab"))
+          document.getElementById("prefNewTab").checked = !!s.openNewTab;
+        if (document.getElementById("prefShowIp"))
+          document.getElementById("prefShowIp").checked =
+            s.showIpOnCard !== false;
+        if (document.getElementById("prefAutoPing"))
+          document.getElementById("prefAutoPing").checked =
+            s.autoPing !== false;
 
         document.getElementById("enableShortcutsToggle").checked =
           s.enableShortcuts !== false;
@@ -3978,6 +4952,9 @@
         const safePreview = structuredClone(config);
         (safePreview.shortcuts || []).forEach((s) => {
           if (s.apiKey) s.apiKey = maskApiKey(s.apiKey);
+        });
+        (safePreview.admin?.users || []).forEach((u) => {
+          u.passHash = "••••••••••••";
         });
         document.getElementById("rawJsonPreview").textContent = JSON.stringify(
           safePreview,
@@ -4043,6 +5020,7 @@
       }
 
       async function saveToNvs() {
+        if (!(await verifyAction("network", "Save Configuration"))) return;
         // 1. Validate Static IP & AP settings before saving
         if (!validateNetworkConfig()) return;
         const bytes = getPayloadByteSize();
@@ -4117,6 +5095,7 @@
       }
 
       async function rebootHub() {
+        if (!(await verifyAction("restart", "Restart ESP32 Hub"))) return;
         if (!confirm("Restart the central ESP32 hub?")) return;
         showToast("Restarting ESP32...");
         if (!isOfflinePreview)
@@ -4125,6 +5104,7 @@
       }
 
       async function factoryReset() {
+        if (!(await verifyAction("reset", "Factory Reset NVS"))) return;
         if (!confirm("Erase all saved devices and reset NVS to defaults?"))
           return;
         localStorage.removeItem(STORAGE_KEY);
