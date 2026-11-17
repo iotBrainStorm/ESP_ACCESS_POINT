@@ -14,6 +14,9 @@
     />
     <title>ACCESS POINT</title>
     <style>
+      /* ==========================================================================
+         1. THEME VARIABLES & GLOBAL RESET
+         ========================================================================== */
       :root {
         --bg: #0b1120;
         --bg-elev: #111827;
@@ -56,7 +59,6 @@
         --shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
       }
 
-      /* Req #5: Hide all vertical & horizontal scrollbars globally, keep touch/wheel scroll */
       html,
       body,
       * {
@@ -88,13 +90,30 @@
         overflow-x: hidden;
       }
 
-      /* Req #2: Stop background scroll when modal is open */
       body.modal-open {
         overflow: hidden !important;
         touch-action: none;
       }
 
-      /* Header */
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ==========================================================================
+         2. HEADER & NAVIGATION BAR
+         ========================================================================== */
       .topbar {
         position: sticky;
         top: 0;
@@ -182,21 +201,6 @@
       .dot.checking {
         background: var(--warn);
         animation: pulse 1s infinite;
-      }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.35;
-        }
-      }
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
       }
 
       .header-actions {
@@ -310,7 +314,9 @@
         display: none;
       }
 
-      /* Main Container */
+      /* ==========================================================================
+         3. MAIN CONTAINER, FAVORITES & SHORTCUTS
+         ========================================================================== */
       .container {
         width: 100%;
         max-width: 1280px;
@@ -319,7 +325,6 @@
         flex: 1;
       }
 
-      /* Favorites Dock */
       .fav-section,
       .shortcut-section {
         margin-bottom: 20px;
@@ -386,7 +391,6 @@
         outline: none;
       }
 
-      /* Shortcut Toggle Grid */
       .shortcut-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
@@ -509,7 +513,9 @@
         border-color: var(--warn);
       }
 
-      /* View Controls Bar (groupTabs removed per Req #3) */
+      /* ==========================================================================
+         4. GROUPS & DEVICE CARDS (GRID / COMPACT VIEW)
+         ========================================================================== */
       .toolbar {
         display: flex;
         align-items: center;
@@ -517,7 +523,6 @@
         margin-bottom: 12px;
       }
 
-      /* Group Section */
       .group-block {
         margin-bottom: 24px;
       }
@@ -549,7 +554,6 @@
         background: rgba(148, 163, 184, 0.16);
       }
 
-      /* Device Grid & List */
       .device-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(265px, 1fr));
@@ -637,16 +641,6 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
-
-      /* .ping-ms {
-        font-size: 0.68rem;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        color: var(--ok);
-        background: rgba(34, 197, 94, 0.12);
-        padding: 1px 6px;
-        border-radius: 999px;
-        flex-shrink: 0;
-      } */
 
       .dev-meta {
         font-size: 0.75rem;
@@ -779,6 +773,7 @@
         color: var(--text);
         margin-bottom: 6px;
       }
+
       .btn-primary {
         display: inline-flex;
         align-items: center;
@@ -795,7 +790,9 @@
         cursor: pointer;
       }
 
-      /* Modal for Multi-Item Favorite Card */
+      /* ==========================================================================
+         5. MODALS, AUTH OVERLAY, FOOTER & TOAST
+         ========================================================================== */
       .modal-backdrop {
         position: fixed;
         inset: 0;
@@ -832,114 +829,7 @@
         border-bottom: 1px solid var(--border);
       }
 
-      /* Two-Line Footer */
-      footer {
-        border-top: 1px solid var(--border);
-        background: var(--bg-elev);
-        padding: 14px 16px;
-        font-size: 0.76rem;
-        color: var(--text-muted);
-        margin-top: auto;
-      }
-
-      .footer-inner {
-        max-width: 1280px;
-        margin: 0 auto;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        text-align: center;
-      }
-
-      .footer-credit {
-        font-size: 0.8rem;
-        color: var(--text);
-        font-weight: 500;
-        letter-spacing: 0.01em;
-      }
-
-      .footer-credit strong {
-        font-weight: 700;
-      }
-
-      .footer-credit .brand-tag {
-        font-weight: 700;
-      }
-
-      .footer-telemetry {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        font-size: 0.74rem;
-        color: var(--text-muted);
-      }
-
-      .sep {
-        opacity: 0.45;
-        user-select: none;
-      }
-
-      .footer-link {
-        color: var(--accent);
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-size: 0.74rem;
-        font-weight: 600;
-        text-decoration: none;
-        padding: 2px 4px;
-      }
-      .footer-link:hover {
-        opacity: 0.85;
-      }
-
-      /* Req #1: Full-screen background blur when Toast is shown */
-      .toast-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.25);
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.25s ease;
-        z-index: 98;
-      }
-      .toast-backdrop.show {
-        opacity: 1;
-      }
-
-      .toast {
-        position: fixed;
-        bottom: 24px;
-        left: 50%;
-        transform: translateX(-50%) translateY(80px);
-        background: var(--text);
-        color: var(--bg);
-        padding: 10px 18px;
-        border-radius: 999px;
-        font-size: 0.82rem;
-        font-weight: 600;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
-        opacity: 0;
-        pointer-events: none;
-        transition: 0.25s ease;
-        z-index: 100;
-        max-width: 92vw;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .toast.show {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-
-      /* Auth Modal & Form Controls for index.html */
+      /* Auth Modal Controls */
       .pin-overlay {
         position: fixed;
         inset: 0;
@@ -1022,6 +912,113 @@
         transition: width 0.15s;
       }
 
+      /* Footer */
+      footer {
+        border-top: 1px solid var(--border);
+        background: var(--bg-elev);
+        padding: 14px 16px;
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        margin-top: auto;
+      }
+
+      .footer-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        text-align: center;
+      }
+
+      .footer-credit {
+        font-size: 0.8rem;
+        color: var(--text);
+        font-weight: 500;
+        letter-spacing: 0.01em;
+      }
+
+      .footer-credit strong,
+      .footer-credit .brand-tag {
+        font-weight: 700;
+      }
+
+      .footer-telemetry {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 0.74rem;
+        color: var(--text-muted);
+      }
+
+      .sep {
+        opacity: 0.45;
+        user-select: none;
+      }
+
+      .footer-link {
+        color: var(--accent);
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 0.74rem;
+        font-weight: 600;
+        text-decoration: none;
+        padding: 2px 4px;
+      }
+      .footer-link:hover {
+        opacity: 0.85;
+      }
+
+      /* Toast & Backdrop */
+      .toast-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+        z-index: 98;
+      }
+      .toast-backdrop.show {
+        opacity: 1;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(80px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 10px 18px;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+        opacity: 0;
+        pointer-events: none;
+        transition: 0.25s ease;
+        z-index: 100;
+        max-width: 92vw;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      /* ==========================================================================
+         6. RESPONSIVE BREAKPOINTS
+         ========================================================================== */
       @media (max-width: 640px) {
         .topbar-inner {
           padding: 10px 12px;
@@ -1113,7 +1110,7 @@
           />
         </div>
 
-        <!-- 5-Second BOOT Button Reset Box (Hidden until Forget clicked) -->
+        <!-- 5-Second BOOT Button Reset Box -->
         <div
           id="forgetBootBox"
           style="
@@ -1174,6 +1171,7 @@
       </div>
     </div>
 
+    <!-- Top Navigation Header -->
     <header class="topbar">
       <div class="topbar-inner">
         <div class="brand">
@@ -1305,6 +1303,7 @@
       </div>
     </header>
 
+    <!-- Main Content -->
     <main class="container">
       <!-- Pinned Favorites Dock -->
       <section class="fav-section" id="favSection" style="display: none">
@@ -1326,7 +1325,7 @@
         <div class="shortcut-grid" id="favStrip"></div>
       </section>
 
-      <!-- Req #9: Shortcut Toggle Buttons Section (just after Favorites) -->
+      <!-- Shortcut Toggle Buttons Section -->
       <section
         class="shortcut-section"
         id="shortcutSection"
@@ -1348,7 +1347,7 @@
         <div class="shortcut-grid" id="shortcutGrid"></div>
       </section>
 
-      <!-- Req #3 & #4: groupTabs removed; Grid & Compact toggle with icons only -->
+      <!-- Grid & Compact View Toolbar -->
       <div class="toolbar" id="viewToolbar">
         <div class="seg-toggle" title="Switch layout">
           <button
@@ -1439,146 +1438,16 @@
       </div>
     </footer>
 
-    <!-- Req #1: Full-Background Blur Backdrop + Toast -->
+    <!-- Full-Background Blur Backdrop + Toast -->
     <div class="toast-backdrop" id="toastBackdrop"></div>
     <div class="toast" id="toast"></div>
 
     <script>
-      let authResolveCallback = null;
-      let requiredAuthRole = "all"; // "admin" | "user" | "all"
-      let forgetBootTimer = null;
-
-      function verifyCredentials(username, password, roleRequirement) {
-        const uName = String(username || "")
-          .trim()
-          .toLowerCase();
-        const hash = hashCredential(uName, password);
-        const user = (config.admin?.users || []).find(
-          (u) => u.username.toLowerCase() === uName && u.passHash === hash,
-        );
-        if (!user) return { ok: false, msg: "Invalid username or password" };
-        if (roleRequirement === "admin" && user.role !== "admin") {
-          return { ok: false, msg: "Admin role required for this action" };
-        }
-        if (roleRequirement === "user" && user.role !== "user") {
-          return { ok: false, msg: "Normal User role required" };
-        }
-        return { ok: true, user };
-      }
-
-      function promptVerification(roleReq, titleText, allowCancel = true) {
-        if (!roleReq || roleReq === "none") return Promise.resolve(true);
-        return new Promise((resolve) => {
-          requiredAuthRole = roleReq;
-          authResolveCallback = resolve;
-          const roleLabel =
-            roleReq === "admin"
-              ? "Admin Only"
-              : roleReq === "user"
-                ? "Normal User"
-                : "Admin or Normal User";
-          document.getElementById("authModalTitle").textContent =
-            titleText || "Verification Required";
-          document.getElementById("authModalSub").textContent =
-            `Required permission: ${roleLabel}`;
-          document.getElementById("authUser").value = "";
-          document.getElementById("authPass").value = "";
-          document.getElementById("authCancelBtn").style.display = allowCancel
-            ? "inline-flex"
-            : "none";
-          document.getElementById("forgetBootBox").style.display = "none";
-          document.getElementById("authModal").style.display = "flex";
-          syncModalScrollLock();
-          document.getElementById("authUser").focus();
-        });
-      }
-
-      function submitAuthModal() {
-        const u = document.getElementById("authUser").value;
-        const p = document.getElementById("authPass").value;
-        const res = verifyCredentials(u, p, requiredAuthRole);
-        if (!res.ok) return showToast(res.msg);
-
-        document.getElementById("authModal").style.display = "none";
-        syncModalScrollLock();
-        if (authResolveCallback) authResolveCallback(res.user);
-        authResolveCallback = null;
-      }
-
-      function closeAuthModal() {
-        clearInterval(forgetBootTimer);
-        document.getElementById("authModal").style.display = "none";
-        syncModalScrollLock();
-        if (authResolveCallback) authResolveCallback(false);
-        authResolveCallback = null;
-      }
-
-      // 5-Second Physical BOOT Button Forget Flow
-      async function triggerForgetUsers() {
-        const box = document.getElementById("forgetBootBox");
-        const txt = document.getElementById("forgetBootText");
-        const bar = document.getElementById("forgetBootBar");
-        box.style.display = "block";
-
-        let remainingMs = 5000;
-        clearInterval(forgetBootTimer);
-
-        // Notify ESP32 to watch GPIO 0 (BOOT button) for 5 seconds
-        const bootPromise = !isOfflinePreview
-          ? fetch("/api/auth/forget-boot", { method: "POST" })
-              .then((r) => r.json())
-              .catch(() => ({ bootHeld: false }))
-          : new Promise((res) => {
-              // Offline preview helper: confirm dialog simulates holding BOOT button
-              setTimeout(
-                () =>
-                  res({
-                    bootHeld: confirm(
-                      "Preview Mode: Simulate holding ESP32 BOOT button?",
-                    ),
-                  }),
-                1500,
-              );
-            });
-
-        forgetBootTimer = setInterval(() => {
-          remainingMs -= 100;
-          const sec = Math.max(0, (remainingMs / 1000).toFixed(1));
-          txt.textContent = `Hold ESP32 BOOT button within ${sec}s...`;
-          bar.style.width = `${(remainingMs / 5000) * 100}%`;
-          if (remainingMs <= 0) clearInterval(forgetBootTimer);
-        }, 100);
-
-        const result = await bootPromise;
-        clearInterval(forgetBootTimer);
-
-        if (result && result.bootHeld) {
-          config.admin.users = [
-            {
-              username: "esp",
-              passHash: hashCredential("esp", "456456"),
-              role: "admin",
-            },
-          ];
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-          if (typeof renderAdminPanel === "function") renderAdminPanel();
-          box.style.display = "none";
-          showToast("Users reset! Default is now esp / 456456");
-        } else {
-          box.style.display = "none";
-          showToast("Forget aborted: BOOT button was not held within 5s");
-        }
-      }
-
-      async function verifyAction(actionKey, label) {
-        const roleReq =
-          config.admin?.verification?.actions?.[actionKey] || "none";
-        if (roleReq === "none") return true;
-        const ok = await promptVerification(roleReq, `Verify: ${label}`, true);
-        return !!ok;
-      }
-
+      /* ==========================================================================
+         1. CONSTANTS & STATIC CONFIGURATION
+         ========================================================================== */
       const STORAGE_KEY = "esp_iot_hub_config_v1";
+      const KEY_SALT = "esp32_nvs_hub_v1_secret";
 
       const ICONS = {
         chip: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',
@@ -1717,22 +1586,152 @@
         favorites: [],
       };
 
+      /* ==========================================================================
+         2. APPLICATION STATE VARIABLES
+         ========================================================================== */
       let config = null;
       let viewMode = localStorage.getItem("hub_view_mode") || "grid";
+      let isOfflinePreview = false;
+
       let deviceStatus = {};
       let deviceLatency = {};
       let shortcutStatus = {};
       let shortcutBusy = {};
-      let isOfflinePreview = false;
 
-      const KEY_SALT = "esp32_nvs_hub_v1_secret";
+      let authResolveCallback = null;
+      let requiredAuthRole = "all"; // "admin" | "user" | "all"
+      let forgetBootTimer = null;
+
+      const searchInput = document.getElementById("searchInput");
+      const clearSearch = document.getElementById("clearSearch");
+
+      /* ==========================================================================
+         3. CORE UTILITIES & CRYPTO HELPERS
+         ========================================================================== */
+      function escapeHtml(str) {
+        return String(str || "").replace(
+          /[&<>"']/g,
+          (m) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[m],
+        );
+      }
+
+      function svgIcon(name, size = 20) {
+        const path = ICONS[name] || ICONS.chip;
+        return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+      }
+
+      function showToast(msg) {
+        const t = document.getElementById("toast");
+        const bg = document.getElementById("toastBackdrop");
+        t.textContent = msg;
+        t.classList.add("show");
+        bg.classList.add("show");
+        clearTimeout(t._timer);
+        t._timer = setTimeout(() => {
+          t.classList.remove("show");
+          bg.classList.remove("show");
+        }, 2200);
+      }
+
+      function syncModalScrollLock() {
+        const hasOpenModal = !!document.querySelector(".modal-backdrop.open");
+        const authOpen =
+          document.getElementById("authModal")?.style.display === "flex";
+        document.body.classList.toggle("modal-open", hasOpenModal || authOpen);
+      }
+
+      function rssiToPercent(dbm) {
+        const val = Number(dbm);
+        if (isNaN(val)) return 0;
+        return Math.max(0, Math.min(100, Math.round(((val + 92) / 50) * 100)));
+      }
+
+      function formatRssiText(dbm) {
+        const pct = rssiToPercent(dbm);
+        return `WiFi: ${dbm} dBm (${pct}%)`;
+      }
+
+      function cleanHostInput(h) {
+        return String(h || "")
+          .trim()
+          .replace(/^https?:\/\//i, "")
+          .replace(/\/+$/, "");
+      }
+
+      function buildTargetUrl(dev, customPath = null) {
+        if (!dev) return "#";
+        const host =
+          config.settings.preferMdns && dev.mdns
+            ? dev.mdns
+            : dev.ip || dev.mdns;
+        const cleanHost = cleanHostInput(host);
+        if (!cleanHost) return "#";
+        const portPart =
+          dev.port && Number(dev.port) !== 80 ? `:${dev.port}` : "";
+        let path = customPath !== null ? customPath : dev.path || "/";
+        if (!path.startsWith("/") && !path.startsWith(":")) path = "/" + path;
+        return path.startsWith(":")
+          ? `http://${cleanHost}${path}`
+          : `http://${cleanHost}${portPart}${path}`;
+      }
+
+      function getDisplayAddress(dev) {
+        const host =
+          config.settings.preferMdns && dev.mdns
+            ? dev.mdns
+            : dev.ip || dev.mdns;
+        const cleanHost = cleanHostInput(host);
+        const portPart =
+          dev.port && Number(dev.port) !== 80 ? `:${dev.port}` : "";
+        return `${cleanHost}${portPart}`;
+      }
+
+      function getGroupName(id) {
+        const g = config.groups.find((x) => x.id === id);
+        return g ? g.name : "None";
+      }
+
+      function copyAddress(e, text) {
+        e.stopPropagation();
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => showToast(`Copied: ${text}`))
+            .catch(() => fallbackCopyText(text));
+        } else {
+          fallbackCopyText(text);
+        }
+      }
+
+      function fallbackCopyText(text) {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+          showToast(`Copied: ${text}`);
+        } catch (_) {
+          showToast(`Address: ${text}`);
+        }
+      }
 
       function hashCredential(username, password) {
         const cleanUser = String(username || "")
           .trim()
           .toLowerCase();
         const raw = `${cleanUser}:${String(password || "")}:${KEY_SALT}`;
-        // Compact DJB2 + FNV-1a 64-bit hex digest (works over non-HTTPS http://192.168.x.x)
         let h1 = 0xdeadbeef ^ raw.length,
           h2 = 0x41c6ce57 ^ raw.length;
         for (let i = 0, ch; i < raw.length; i++) {
@@ -1751,39 +1750,6 @@
           (h2 >>> 0).toString(16).padStart(8, "0") +
           (h1 >>> 0).toString(16).padStart(8, "0")
         );
-      }
-
-      function getDefaultAdminConfig() {
-        return {
-          time: {
-            ntpServer: "pool.ntp.org",
-            format: "24h", // "12h" | "24h"
-            tzOffset: "5.5", // -12 to +12
-            tzCountry: "India (UTC+05:30)",
-            lastSync: "Never",
-          },
-          users: [
-            {
-              username: "esp",
-              passHash: hashCredential("esp", "456456"),
-              role: "admin",
-            },
-          ],
-          verification: {
-            homePage: { mode: "session", role: "all" }, // mode: "every"|"session"|"none", role: "admin"|"user"|"all"
-            configPage: { mode: "session", role: "admin" },
-            actions: {
-              devices: "admin", // "none" | "admin" | "user" | "all"
-              shortcuts: "admin",
-              homeToggle: "none",
-              groups: "admin",
-              favorites: "all",
-              network: "admin",
-              restart: "admin",
-              reset: "admin",
-            },
-          },
-        };
       }
 
       function encodeApiKey(rawKey) {
@@ -1821,6 +1787,91 @@
         if (!plain) return "None";
         const last4 = plain.slice(-4);
         return `••••••••••••${last4}`;
+      }
+
+      /* ==========================================================================
+         4. CONFIGURATION SANITIZATION & SYNC
+         ========================================================================== */
+      function getDefaultAdminConfig() {
+        return {
+          time: {
+            ntpServer: "pool.ntp.org",
+            format: "24h",
+            tzOffset: "5.5",
+            tzCountry: "India (UTC+05:30)",
+            lastSync: "Never",
+          },
+          users: [
+            {
+              username: "esp",
+              passHash: hashCredential("esp", "456456"),
+              role: "admin",
+            },
+          ],
+          verification: {
+            homePage: { mode: "session", role: "all" },
+            configPage: { mode: "session", role: "admin" },
+            actions: {
+              devices: "admin",
+              shortcuts: "admin",
+              homeToggle: "none",
+              groups: "admin",
+              favorites: "all",
+              network: "admin",
+              restart: "admin",
+              reset: "admin",
+            },
+          },
+        };
+      }
+
+      function syncLegacyFavorites(cfg) {
+        cfg.devices.forEach((d) => {
+          if (
+            d.fav &&
+            !cfg.favorites.some(
+              (f) =>
+                Array.isArray(f.deviceIds) &&
+                f.deviceIds.length === 1 &&
+                f.deviceIds[0] === d.id &&
+                (!f.shortcutIds || !f.shortcutIds.length) &&
+                (!f.groupIds || !f.groupIds.length),
+            )
+          ) {
+            cfg.favorites.push({
+              id: "fav_d_" + d.id,
+              name: d.name,
+              icon: d.icon || "chip",
+              color: d.color || "#38bdf8",
+              deviceIds: [d.id],
+              shortcutIds: [],
+              groupIds: [],
+            });
+          }
+        });
+        cfg.shortcuts.forEach((s) => {
+          if (
+            s.fav &&
+            !cfg.favorites.some(
+              (f) =>
+                Array.isArray(f.shortcutIds) &&
+                f.shortcutIds.length === 1 &&
+                f.shortcutIds[0] === s.id &&
+                (!f.deviceIds || !f.deviceIds.length) &&
+                (!f.groupIds || !f.groupIds.length),
+            )
+          ) {
+            cfg.favorites.push({
+              id: "fav_s_" + s.id,
+              name: s.name,
+              icon: s.icon || "switch",
+              color: s.color || "#38bdf8",
+              deviceIds: [],
+              shortcutIds: [s.id],
+              groupIds: [],
+            });
+          }
+        });
       }
 
       function sanitizeConfig(raw) {
@@ -1879,126 +1930,134 @@
         return merged;
       }
 
-      function syncLegacyFavorites(cfg) {
-        cfg.devices.forEach((d) => {
-          if (
-            d.fav &&
-            !cfg.favorites.some(
-              (f) =>
-                Array.isArray(f.deviceIds) &&
-                f.deviceIds.length === 1 &&
-                f.deviceIds[0] === d.id &&
-                (!f.shortcutIds || !f.shortcutIds.length) &&
-                (!f.groupIds || !f.groupIds.length),
-            )
-          ) {
-            cfg.favorites.push({
-              id: "fav_d_" + d.id,
-              name: d.name,
-              icon: d.icon || "chip",
-              color: d.color || "#38bdf8",
-              deviceIds: [d.id],
-              shortcutIds: [],
-              groupIds: [],
-            });
-          }
-        });
-        cfg.shortcuts.forEach((s) => {
-          if (
-            s.fav &&
-            !cfg.favorites.some(
-              (f) =>
-                Array.isArray(f.shortcutIds) &&
-                f.shortcutIds.length === 1 &&
-                f.shortcutIds[0] === s.id &&
-                (!f.deviceIds || !f.deviceIds.length) &&
-                (!f.groupIds || !f.groupIds.length),
-            )
-          ) {
-            cfg.favorites.push({
-              id: "fav_s_" + s.id,
-              name: s.name,
-              icon: s.icon || "switch",
-              color: s.color || "#38bdf8",
-              deviceIds: [],
-              shortcutIds: [s.id],
-              groupIds: [],
-            });
-          }
-        });
-      }
-
-      function svgIcon(name, size = 20) {
-        const path = ICONS[name] || ICONS.chip;
-        return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
-      }
-
-      /* Req #1: Show Toast with Full-Background Blur */
-      function showToast(msg) {
-        const t = document.getElementById("toast");
-        const bg = document.getElementById("toastBackdrop");
-        t.textContent = msg;
-        t.classList.add("show");
-        bg.classList.add("show");
-        clearTimeout(t._timer);
-        t._timer = setTimeout(() => {
-          t.classList.remove("show");
-          bg.classList.remove("show");
-        }, 2200);
-      }
-
-      function syncModalScrollLock() {
-        const hasOpenModal = !!document.querySelector(".modal-backdrop.open");
-        const authOpen =
-          document.getElementById("authModal")?.style.display === "flex";
-        document.body.classList.toggle("modal-open", hasOpenModal || authOpen);
-      }
-
-      /* Req #6: Format RSSI with percentage like "WiFi: -54 dBm (76%)" */
-      function rssiToPercent(dbm) {
-        const val = Number(dbm);
-        if (isNaN(val)) return 0;
-        return Math.max(0, Math.min(100, Math.round(((val + 92) / 50) * 100)));
-      }
-
-      function formatRssiText(dbm) {
-        const pct = rssiToPercent(dbm);
-        return `WiFi: ${dbm} dBm (${pct}%)`;
-      }
-
-      function cleanHostInput(h) {
-        return String(h || "")
+      /* ==========================================================================
+         5. AUTHENTICATION & VERIFICATION SYSTEM
+         ========================================================================== */
+      function verifyCredentials(username, password, roleRequirement) {
+        const uName = String(username || "")
           .trim()
-          .replace(/^https?:\/\//i, "")
-          .replace(/\/+$/, "");
+          .toLowerCase();
+        const hash = hashCredential(uName, password);
+        const user = (config.admin?.users || []).find(
+          (u) => u.username.toLowerCase() === uName && u.passHash === hash,
+        );
+        if (!user) return { ok: false, msg: "Invalid username or password" };
+        if (roleRequirement === "admin" && user.role !== "admin") {
+          return { ok: false, msg: "Admin role required for this action" };
+        }
+        if (roleRequirement === "user" && user.role !== "user") {
+          return { ok: false, msg: "Normal User role required" };
+        }
+        return { ok: true, user };
       }
 
-      function buildTargetUrl(dev, customPath = null) {
-        if (!dev) return "#";
-        const host =
-          config.settings.preferMdns && dev.mdns
-            ? dev.mdns
-            : dev.ip || dev.mdns;
-        const cleanHost = cleanHostInput(host);
-        if (!cleanHost) return "#";
-        const portPart =
-          dev.port && Number(dev.port) !== 80 ? `:${dev.port}` : "";
-        let path = customPath !== null ? customPath : dev.path || "/";
-        if (!path.startsWith("/") && !path.startsWith(":")) path = "/" + path;
-        return path.startsWith(":")
-          ? `http://${cleanHost}${path}`
-          : `http://${cleanHost}${portPart}${path}`;
+      function promptVerification(roleReq, titleText, allowCancel = true) {
+        if (!roleReq || roleReq === "none") return Promise.resolve(true);
+        return new Promise((resolve) => {
+          requiredAuthRole = roleReq;
+          authResolveCallback = resolve;
+          const roleLabel =
+            roleReq === "admin"
+              ? "Admin Only"
+              : roleReq === "user"
+                ? "Normal User"
+                : "Admin or Normal User";
+          document.getElementById("authModalTitle").textContent =
+            titleText || "Verification Required";
+          document.getElementById("authModalSub").textContent =
+            `Required permission: ${roleLabel}`;
+          document.getElementById("authUser").value = "";
+          document.getElementById("authPass").value = "";
+          document.getElementById("authCancelBtn").style.display = allowCancel
+            ? "inline-flex"
+            : "none";
+          document.getElementById("forgetBootBox").style.display = "none";
+          document.getElementById("authModal").style.display = "flex";
+          syncModalScrollLock();
+          document.getElementById("authUser").focus();
+        });
       }
 
-      function getDisplayAddress(dev) {
-        const host =
-          config.settings.preferMdns && dev.mdns
-            ? dev.mdns
-            : dev.ip || dev.mdns;
-        const cleanHost = cleanHostInput(host);
-        const portPart =
-          dev.port && Number(dev.port) !== 80 ? `:${dev.port}` : "";
-        return `${cleanHost}${portPart}`;
+      function submitAuthModal() {
+        const u = document.getElementById("authUser").value;
+        const p = document.getElementById("authPass").value;
+        const res = verifyCredentials(u, p, requiredAuthRole);
+        if (!res.ok) return showToast(res.msg);
+
+        document.getElementById("authModal").style.display = "none";
+        syncModalScrollLock();
+        if (authResolveCallback) authResolveCallback(res.user);
+        authResolveCallback = null;
+      }
+
+      function closeAuthModal() {
+        clearInterval(forgetBootTimer);
+        document.getElementById("authModal").style.display = "none";
+        syncModalScrollLock();
+        if (authResolveCallback) authResolveCallback(false);
+        authResolveCallback = null;
+      }
+
+      async function triggerForgetUsers() {
+        const box = document.getElementById("forgetBootBox");
+        const txt = document.getElementById("forgetBootText");
+        const bar = document.getElementById("forgetBootBar");
+        box.style.display = "block";
+
+        let remainingMs = 5000;
+        clearInterval(forgetBootTimer);
+
+        const bootPromise = !isOfflinePreview
+          ? fetch("/api/auth/forget-boot", { method: "POST" })
+              .then((r) => r.json())
+              .catch(() => ({ bootHeld: false }))
+          : new Promise((res) => {
+              setTimeout(
+                () =>
+                  res({
+                    bootHeld: confirm(
+                      "Preview Mode: Simulate holding ESP32 BOOT button?",
+                    ),
+                  }),
+                1500,
+              );
+            });
+
+        forgetBootTimer = setInterval(() => {
+          remainingMs -= 100;
+          const sec = Math.max(0, (remainingMs / 1000).toFixed(1));
+          txt.textContent = `Hold ESP32 BOOT button within ${sec}s...`;
+          bar.style.width = `${(remainingMs / 5000) * 100}%`;
+          if (remainingMs <= 0) clearInterval(forgetBootTimer);
+        }, 100);
+
+        const result = await bootPromise;
+        clearInterval(forgetBootTimer);
+
+        if (result && result.bootHeld) {
+          config.admin.users = [
+            {
+              username: "esp",
+              passHash: hashCredential("esp", "456456"),
+              role: "admin",
+            },
+          ];
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+          if (typeof renderAdminPanel === "function") renderAdminPanel();
+          box.style.display = "none";
+          showToast("Users reset! Default is now esp / 456456");
+        } else {
+          box.style.display = "none";
+          showToast("Forget aborted: BOOT button was not held within 5s");
+        }
+      }
+
+      async function verifyAction(actionKey, label) {
+        const roleReq =
+          config.admin?.verification?.actions?.[actionKey] || "none";
+        if (roleReq === "none") return true;
+        const ok = await promptVerification(roleReq, `Verify: ${label}`, true);
+        return !!ok;
       }
 
       async function enforcePageLogin(pageKey) {
@@ -2031,6 +2090,9 @@
         }
       }
 
+      /* ==========================================================================
+         6. CLOCK, TELEMETRY & UI PREFERENCES
+         ========================================================================== */
       function updateHomeClock() {
         const el = document.getElementById("homeClock");
         if (!el || !config?.admin?.time) return;
@@ -2047,36 +2109,6 @@
           second: "2-digit",
         });
       }
-      setInterval(updateHomeClock, 1000);
-
-      async function loadConfig() {
-        try {
-          const res = await fetch("/api/config", { cache: "no-store" });
-          if (!res.ok) throw new Error("No ESP endpoint");
-          const remote = await res.json();
-          config = sanitizeConfig(remote);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-          isOfflinePreview = false;
-        } catch (e) {
-          isOfflinePreview = true;
-          try {
-            const cached = localStorage.getItem(STORAGE_KEY);
-            config = cached
-              ? sanitizeConfig(JSON.parse(cached))
-              : sanitizeConfig(null);
-          } catch (_) {
-            config = sanitizeConfig(null);
-          }
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-        }
-
-        applySettingsUI();
-        updateHomeClock();
-        renderAll();
-        await enforcePageLogin("homePage");
-        if (config.settings.autoPing) pingAllDevices();
-        loadTelemetry();
-      }
 
       async function loadTelemetry() {
         if (isOfflinePreview) {
@@ -2088,13 +2120,15 @@
           const res = await fetch("/api/status", { cache: "no-store" });
           if (!res.ok) return;
           const data = await res.json();
-          if (data.rssi !== undefined)
+          if (data.rssi !== undefined) {
             document.getElementById("hubRssi").textContent = formatRssiText(
               data.rssi,
             );
-          if (data.uptime !== undefined)
+          }
+          if (data.uptime !== undefined) {
             document.getElementById("hubUptime").textContent =
               `Uptime: ${data.uptime}`;
+          }
         } catch (_) {}
       }
 
@@ -2137,6 +2171,20 @@
         renderDevices();
       }
 
+      /* ==========================================================================
+         7. PING, SHORTCUT SYNC & DEVICE ACTIONS
+         ========================================================================== */
+      function isSamePhysicalSwitch(a, b) {
+        if (!a || !b) return false;
+        const hostA = cleanHostInput(a.host).toLowerCase();
+        const hostB = cleanHostInput(b.host).toLowerCase();
+        const portA = Number(a.port) || 80;
+        const portB = Number(b.port) || 80;
+        const idxA = Number(a.index) || 0;
+        const idxB = Number(b.index) || 0;
+        return hostA === hostB && portA === portB && idxA === idxB;
+      }
+
       async function openDeviceById(id, customPath = null, event = null) {
         if (event) event.stopPropagation();
         if (!(await verifyAction("devices", "Open Device"))) return;
@@ -2149,18 +2197,6 @@
         } else {
           window.location.href = url;
         }
-      }
-
-      /* Helper: Check if two shortcuts control the exact same physical switch */
-      function isSamePhysicalSwitch(a, b) {
-        if (!a || !b) return false;
-        const hostA = cleanHostInput(a.host).toLowerCase();
-        const hostB = cleanHostInput(b.host).toLowerCase();
-        const portA = Number(a.port) || 80;
-        const portB = Number(b.port) || 80;
-        const idxA = Number(a.index) || 0;
-        const idxB = Number(b.index) || 0;
-        return hostA === hostB && portA === portB && idxA === idxB;
       }
 
       async function triggerShortcut(id, event) {
@@ -2177,7 +2213,6 @@
         const rawKey = revealApiKey(sc.apiKey);
         const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=toggle&key=${encodeURIComponent(rawKey)}`;
 
-        // 1. Mark this shortcut AND all its clones as busy
         const matchingShortcuts = config.shortcuts.filter((item) =>
           isSamePhysicalSwitch(item, sc),
         );
@@ -2201,7 +2236,6 @@
 
           const newState = !!data.state;
 
-          // 2. Sync ON/OFF state & online status across all matching shortcuts
           matchingShortcuts.forEach((item) => {
             item.state = newState;
             shortcutStatus[item.id] = "online";
@@ -2210,7 +2244,6 @@
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
           showToast(`${sc.name} is now: ${newState ? "ON" : "OFF"}`);
 
-          // 3. Immediately sync all shortcut hosts (syncs IP + .local duplicates too)
           syncAllShortcuts(true);
         } catch (err) {
           showToast(err.message || `Failed to toggle ${sc.name}`);
@@ -2228,35 +2261,6 @@
           ) {
             handleFavoriteClick(favModal.dataset.activeFavId);
           }
-        }
-      }
-
-      function copyAddress(e, text) {
-        e.stopPropagation();
-        if (navigator.clipboard && window.isSecureContext) {
-          navigator.clipboard
-            .writeText(text)
-            .then(() => showToast(`Copied: ${text}`))
-            .catch(() => fallbackCopyText(text));
-        } else {
-          fallbackCopyText(text);
-        }
-      }
-
-      function fallbackCopyText(text) {
-        try {
-          const ta = document.createElement("textarea");
-          ta.value = text;
-          ta.style.position = "fixed";
-          ta.style.opacity = "0";
-          document.body.appendChild(ta);
-          ta.focus();
-          ta.select();
-          document.execCommand("copy");
-          document.body.removeChild(ta);
-          showToast(`Copied: ${text}`);
-        } catch (_) {
-          showToast(`Address: ${text}`);
         }
       }
 
@@ -2344,7 +2348,6 @@
         }
       }
 
-      // Fetches all 4 relay states from a Smart Switch board in 1 request
       async function syncShortcutsForHost(hostKey, silent = false) {
         const group = (config.shortcuts || []).filter((s) => {
           const h = cleanHostInput(s.host).toLowerCase();
@@ -2378,7 +2381,6 @@
         let stateChanged = false;
 
         try {
-          // /api/switches returns {"states":[bool,bool,bool,bool]} for all 4 relays
           const res = await fetch(`http://${cleanH}${portPart}/api/switches`, {
             cache: "no-store",
             signal: controller.signal,
@@ -2504,7 +2506,6 @@
             });
         });
 
-        // Update multi-item bundle dots in-place without rebuilding favStrip
         (config.favorites || []).forEach((fav) => {
           const dIds = (fav.deviceIds || []).filter((id) =>
             config.devices.some((d) => d.id === id),
@@ -2536,7 +2537,64 @@
         });
       }
 
-      /* Req #11: Render Favorites Section (Supports Devices, Shortcuts, Groups & Bundles) */
+      /* ==========================================================================
+         8. UI RENDERING (FAVORITES, SHORTCUTS, DEVICES & MODALS)
+         ========================================================================== */
+      function createShortcutHtml(sc) {
+        const idSafe = escapeHtml(sc.id);
+        const colorSafe = escapeHtml(sc.color || "#38bdf8");
+        const isBusy = !!shortcutBusy[sc.id];
+        const isOn = !!sc.state;
+        const st = shortcutStatus[sc.id] || "checking";
+
+        return `
+          <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" data-sc-card-id="${idSafe}" style="--sc-color:${colorSafe}" onclick="triggerShortcut('${idSafe}', event)">
+            <div class="sc-left">
+              <div class="sc-icon">${svgIcon(sc.icon || "switch", 19)}</div>
+              <div style="min-width:0">
+                <div class="sc-title">
+                  <span class="dot ${st}" data-sc-status-id="${idSafe}" title="Status: ${st}"></span>
+                  <span class="sc-title-text">${escapeHtml(sc.name)}</span>
+                </div>
+              </div>
+            </div>
+            <span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>
+          </div>
+        `;
+      }
+
+      function createCardHtml(dev) {
+        const st = deviceStatus[dev.id] || "checking";
+        const addr = getDisplayAddress(dev);
+        const showAddr = config.settings.showIpOnCard !== false;
+        const idSafe = escapeHtml(dev.id);
+        const altPathSafe = escapeHtml(dev.altPath || "");
+
+        return `
+        <article class="card" style="--card-accent:${escapeHtml(dev.color || "var(--accent)")}" onclick="openDeviceById('${idSafe}')">
+          <div class="card-top">
+            <div class="dev-icon">${svgIcon(dev.icon, 21)}</div>
+            <div class="dev-info">
+              <div class="dev-title-row">
+                <span class="dot ${st}" data-status-id="${idSafe}" title="Status: ${st}"></span>
+                <h2 class="dev-name">${escapeHtml(dev.name)}</h2>
+              </div>
+              <div class="dev-meta">${escapeHtml(dev.note || getGroupName(dev.group))}</div>
+            </div>
+            <button class="fav-btn ${dev.fav ? "active" : ""}" title="Pin to Favorites" onclick="toggleFavorite(event, '${idSafe}')">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="${dev.fav ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </button>
+          </div>
+          <div class="card-bottom">
+            ${showAddr ? `<span class="addr-pill" title="Tap to copy address" onclick="copyAddress(event, '${escapeHtml(addr)}')">${escapeHtml(addr)}</span>` : "<span></span>"}
+            <div class="card-links">
+              ${dev.altLabel && dev.altPath ? `<button class="mini-btn" onclick="openDeviceById('${idSafe}', '${altPathSafe}', event)">${escapeHtml(dev.altLabel)}</button>` : ""}
+            </div>
+          </div>
+        </article>
+      `;
+      }
+
       function renderFavorites() {
         const sec = document.getElementById("favSection");
         const strip = document.getElementById("favStrip");
@@ -2565,7 +2623,7 @@
               config.groups.some((g) => g.id === id),
             );
 
-            // Case 1: Single Shortcut Favorite -> dot before switch name + ON/OFF pill
+            // Case 1: Single Shortcut Favorite
             if (sIds.length === 1 && !dIds.length && !gIds.length) {
               const sc = config.shortcuts.find((x) => x.id === sIds[0]);
               const scIdSafe = escapeHtml(sc.id);
@@ -2588,7 +2646,7 @@
               `;
             }
 
-            // Case 2: Single Device Favorite -> right-side duplicate dot removed
+            // Case 2: Single Device Favorite
             if (dIds.length === 1 && !sIds.length && !gIds.length) {
               const dev = config.devices.find((x) => x.id === dIds[0]);
               const st = deviceStatus[dev.id] || "checking";
@@ -2608,7 +2666,7 @@
               `;
             }
 
-            // Case 3: Group or Multi-Item Favorite Card -> combined green/red dot
+            // Case 3: Group or Multi-Item Favorite Bundle
             const totalItems = dIds.length + sIds.length + gIds.length;
             const anyOnline =
               dIds.some((id) => deviceStatus[id] === "online") ||
@@ -2673,7 +2731,6 @@
           }
         }
 
-        // Open Favorite Card Modal for multi-item favorite cards
         const modal = document.getElementById("favCardModal");
         document.getElementById("favCardModalTitle").textContent =
           fav.name || "Favorite Card";
@@ -2716,37 +2773,10 @@
         syncModalScrollLock();
       }
 
-      function createShortcutHtml(sc) {
-        const idSafe = escapeHtml(sc.id);
-        const colorSafe = escapeHtml(sc.color || "#38bdf8");
-        const isBusy = !!shortcutBusy[sc.id];
-        const isOn = !!sc.state;
-        const st = shortcutStatus[sc.id] || "checking";
-
-        return `
-          <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" data-sc-card-id="${idSafe}" style="--sc-color:${colorSafe}" onclick="triggerShortcut('${idSafe}', event)">
-            <div class="sc-left">
-              <div class="sc-icon">${svgIcon(sc.icon || "switch", 19)}</div>
-              <div style="min-width:0">
-                <div class="sc-title">
-                  <span class="dot ${st}" data-sc-status-id="${idSafe}" title="Status: ${st}"></span>
-                  <span class="sc-title-text">${escapeHtml(sc.name)}</span>
-                </div>
-              </div>
-            </div>
-            <span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>
-          </div>
-        `;
-      }
-
-      /* Req #9: Render Shortcut Buttons Section */
       function renderShortcuts() {
         const sec = document.getElementById("shortcutSection");
         const grid = document.getElementById("shortcutGrid");
-        const query = document
-          .getElementById("searchInput")
-          .value.trim()
-          .toLowerCase();
+        const query = searchInput.value.trim().toLowerCase();
 
         if (
           config.settings.enableShortcuts === false ||
@@ -2774,41 +2804,6 @@
         grid.innerHTML = filtered.map(createShortcutHtml).join("");
       }
 
-      function createCardHtml(dev) {
-        const st = deviceStatus[dev.id] || "checking";
-        const ms = deviceLatency[dev.id];
-        const addr = getDisplayAddress(dev);
-        const showAddr = config.settings.showIpOnCard !== false;
-        const idSafe = escapeHtml(dev.id);
-        const altPathSafe = escapeHtml(dev.altPath || "");
-
-        return `
-        <article class="card" style="--card-accent:${escapeHtml(dev.color || "var(--accent)")}" onclick="openDeviceById('${idSafe}')">
-          <div class="card-top">
-            <div class="dev-icon">${svgIcon(dev.icon, 21)}</div>
-            <div class="dev-info">
-              <div class="dev-title-row">
-                <span class="dot ${st}" data-status-id="${idSafe}" title="Status: ${st}"></span>
-                <h2 class="dev-name">${escapeHtml(dev.name)}</h2>
-              </div>
-              <div class="dev-meta">${escapeHtml(dev.note || getGroupName(dev.group))}</div>
-            </div>
-            <button class="fav-btn ${dev.fav ? "active" : ""}" title="Pin to Favorites" onclick="toggleFavorite(event, '${idSafe}')">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="${dev.fav ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            </button>
-          </div>
-          <div class="card-bottom">
-            ${showAddr ? `<span class="addr-pill" title="Tap to copy address" onclick="copyAddress(event, '${escapeHtml(addr)}')">${escapeHtml(addr)}</span>` : "<span></span>"}
-            <div class="card-links">
-              ${dev.altLabel && dev.altPath ? `<button class="mini-btn" onclick="openDeviceById('${idSafe}', '${altPathSafe}', event)">${escapeHtml(dev.altLabel)}</button>` : ""}
-              
-            </div>
-          </div>
-        </article>
-      `;
-      }
-
-      /* Req #8 & #10: Devices with group 'none' are invisible in Home UI; Group section respects enableGroups */
       function renderDevices() {
         const container = document.getElementById("devicesContainer");
         const toolbar = document.getElementById("viewToolbar");
@@ -2819,12 +2814,8 @@
           return;
         }
 
-        const query = document
-          .getElementById("searchInput")
-          .value.trim()
-          .toLowerCase();
+        const query = searchInput.value.trim().toLowerCase();
 
-        // Req #8: Devices with group === 'none' (or unassigned) are invisible in Home UI until assigned to a group
         const visibleDevices = config.devices.filter((d) => {
           if (
             !d.group ||
@@ -2896,25 +2887,9 @@
         updateStatusIndicators();
       }
 
-      function getGroupName(id) {
-        const g = config.groups.find((x) => x.id === id);
-        return g ? g.name : "None";
-      }
-
-      function escapeHtml(str) {
-        return String(str || "").replace(
-          /[&<>"']/g,
-          (m) =>
-            ({
-              "&": "&amp;",
-              "<": "&lt;",
-              ">": "&gt;",
-              '"': "&quot;",
-              "'": "&#39;",
-            })[m],
-        );
-      }
-
+      /* ==========================================================================
+         9. SYSTEM CONTROL & INITIALIZATION
+         ========================================================================== */
       async function rebootHub() {
         if (!(await verifyAction("restart", "Restart ESP32 Hub"))) return;
         if (!confirm("Restart the central ESP32 hub now?")) return;
@@ -2925,9 +2900,36 @@
         setTimeout(() => location.reload(), 4000);
       }
 
-      const searchInput = document.getElementById("searchInput");
-      const clearSearch = document.getElementById("clearSearch");
+      async function loadConfig() {
+        try {
+          const res = await fetch("/api/config", { cache: "no-store" });
+          if (!res.ok) throw new Error("No ESP endpoint");
+          const remote = await res.json();
+          config = sanitizeConfig(remote);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+          isOfflinePreview = false;
+        } catch (e) {
+          isOfflinePreview = true;
+          try {
+            const cached = localStorage.getItem(STORAGE_KEY);
+            config = cached
+              ? sanitizeConfig(JSON.parse(cached))
+              : sanitizeConfig(null);
+          } catch (_) {
+            config = sanitizeConfig(null);
+          }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        }
 
+        applySettingsUI();
+        updateHomeClock();
+        renderAll();
+        await enforcePageLogin("homePage");
+        if (config.settings.autoPing) pingAllDevices();
+        loadTelemetry();
+      }
+
+      /* Event Listeners & Background Intervals */
       searchInput.addEventListener("input", () => {
         clearSearch.style.display = searchInput.value ? "block" : "none";
         renderShortcuts();
@@ -2958,7 +2960,8 @@
         }
       });
 
-      // Real-time 2.5s sync for all Shortcut Toggle Buttons (physical, web, or API)
+      setInterval(updateHomeClock, 1000);
+
       setInterval(() => {
         if (config && config.shortcuts && config.shortcuts.length) {
           syncAllShortcuts(true);
