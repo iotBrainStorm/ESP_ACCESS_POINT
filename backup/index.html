@@ -889,6 +889,10 @@
         cursor: pointer;
         margin-top: 0;
       }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
       .btn-sm {
         padding: 6px 12px;
         font-size: 0.76rem;
@@ -1075,19 +1079,54 @@
       "
     >
       <div class="pin-card" style="max-width: 370px; text-align: left">
-        <h3 id="authModalTitle" style="margin-bottom: 4px">
-          Verification Required
-        </h3>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+          "
+        >
+          <h3 id="authModalTitle" style="margin: 0">Verification Required</h3>
+          <button
+            type="button"
+            class="btn btn-sm"
+            id="authCloseXBtn"
+            title="Cancel & Close"
+            onclick="closeAuthModal()"
+            style="padding: 2px 9px; font-size: 1rem; line-height: 1.2"
+          >
+            &times;
+          </button>
+        </div>
         <p
           id="authModalSub"
           style="
             font-size: 0.78rem;
             color: var(--text-muted);
-            margin-bottom: 14px;
+            margin-bottom: 10px;
           "
         >
           Sign in to continue
         </p>
+
+        <!-- Live Attempt & Lockout Status Banner -->
+        <div
+          id="authLiveStatus"
+          style="
+            display: block;
+            padding: 8px 10px;
+            border-radius: 9px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            font-size: 0.75rem;
+            font-family: monospace;
+            margin-bottom: 12px;
+            color: var(--text-muted);
+          "
+        >
+          Attempts left: 3/3 • Lockout: Restart / 1h
+        </div>
 
         <div class="field" style="margin-bottom: 10px">
           <label>Username</label>
@@ -1162,6 +1201,7 @@
             <button
               type="button"
               class="btn btn-sm btn-primary"
+              id="authVerifyBtn"
               onclick="submitAuthModal()"
             >
               Verify
@@ -1447,6 +1487,7 @@
          1. CONSTANTS & STATIC CONFIGURATION
          ========================================================================== */
       const STORAGE_KEY = "esp_iot_hub_config_v1";
+      const LOCKOUT_STORAGE_KEY = "esp_iot_hub_lockout_v1";
       const KEY_SALT = "esp32_nvs_hub_v1_secret";
 
       const ICONS = {
@@ -1474,118 +1515,6 @@
           '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
       };
 
-      const DEFAULT_CONFIG = {
-        settings: {
-          title: "ACCESS POINT",
-          subtitle: "ESP32 Central Gateway",
-          theme: "dark",
-          preferMdns: false,
-          openNewTab: false,
-          showIpOnCard: true,
-          autoPing: true,
-          pingTimeoutMs: 1500,
-          pin: "",
-          enableShortcuts: true,
-          enableGroups: true,
-          enableFavorites: true,
-        },
-        network: {
-          mode: "dhcp",
-          staticIp: "",
-          gateway: "192.168.0.1",
-          subnet: "255.255.255.0",
-          dns: "8.8.8.8",
-          apName: "HOME ACCESS",
-          apPass: "",
-          apTimeout: 180,
-          mdnsEnabled: true,
-          mdns: "homeaccess.local",
-        },
-        groups: [
-          { id: "g1", name: "LED & Displays", color: "#38bdf8" },
-          { id: "g2", name: "Living Room", color: "#34d399" },
-          { id: "g3", name: "Sensors & Power", color: "#f59e0b" },
-        ],
-        devices: [
-          {
-            id: "d1",
-            name: "ESP LED Studio",
-            note: "Desk WS2812B & MAX7219",
-            ip: "192.168.1.42",
-            mdns: "esp-led-studio.local",
-            port: 80,
-            path: "/",
-            altLabel: "OTA",
-            altPath: "/update",
-            group: "g1",
-            icon: "matrix",
-            color: "#38bdf8",
-            fav: true,
-          },
-          {
-            id: "d2",
-            name: "Bedroom Ambient",
-            note: "WLED Strip Controller",
-            ip: "192.168.1.45",
-            mdns: "bedroom-led.local",
-            port: 80,
-            path: "/",
-            altLabel: "Presets",
-            altPath: "/win",
-            group: "g1",
-            icon: "led",
-            color: "#a855f7",
-            fav: true,
-          },
-          {
-            id: "d3",
-            name: "Main Hall Relay",
-            note: "4-Channel Smart Switch",
-            ip: "192.168.1.51",
-            mdns: "hall-relay.local",
-            port: 80,
-            path: "/",
-            altLabel: "OTA",
-            altPath: "/update",
-            group: "g2",
-            icon: "switch",
-            color: "#34d399",
-            fav: true,
-          },
-          {
-            id: "d4",
-            name: "Weather Station",
-            note: "AHT10 & BH1750 Telemetry",
-            ip: "192.168.1.60",
-            mdns: "env-sensor.local",
-            port: 80,
-            path: "/",
-            altLabel: "JSON",
-            altPath: "/api/data",
-            group: "g3",
-            icon: "weather",
-            color: "#f59e0b",
-            fav: false,
-          },
-        ],
-        shortcuts: [
-          {
-            id: "s1",
-            name: "COMPUTER",
-            host: "smarthome.local",
-            port: 80,
-            index: 0,
-            apiKey: "sh_5003c0712e4ad3c9af2b1fd04efcf",
-            group: "none",
-            icon: "switch",
-            color: "#38bdf8",
-            fav: false,
-            state: false,
-          },
-        ],
-        favorites: [],
-      };
-
       /* ==========================================================================
          2. APPLICATION STATE VARIABLES
          ========================================================================== */
@@ -1601,6 +1530,7 @@
       let authResolveCallback = null;
       let requiredAuthRole = "all"; // "admin" | "user" | "all"
       let forgetBootTimer = null;
+      let authStatusTimer = null;
 
       const searchInput = document.getElementById("searchInput");
       const clearSearch = document.getElementById("clearSearch");
@@ -1809,6 +1739,8 @@
             },
           ],
           verification: {
+            maxAttempts: 3,
+            lockoutPolicy: "restart_or_1h", // "restart_or_1h" | "restart_only"
             homePage: { mode: "session", role: "all" },
             configPage: { mode: "session", role: "admin" },
             actions: {
@@ -1825,7 +1757,7 @@
         };
       }
 
-      function syncLegacyFavorites(cfg) {
+      function syncPinsToFavorites(cfg) {
         cfg.devices.forEach((d) => {
           if (
             d.fav &&
@@ -1875,16 +1807,42 @@
       }
 
       function sanitizeConfig(raw) {
-        const base = structuredClone(DEFAULT_CONFIG);
         const defAdmin = getDefaultAdminConfig();
-        if (!raw || typeof raw !== "object") {
-          base.shortcuts.forEach((s) => {
-            if (s.apiKey) s.apiKey = encodeApiKey(s.apiKey);
-          });
-          base.admin = defAdmin;
-          syncLegacyFavorites(base);
-          return base;
-        }
+        const fallback = {
+          settings: {
+            title: "ACCESS POINT",
+            subtitle: "ESP32 Central Gateway",
+            theme: "dark",
+            preferMdns: false,
+            openNewTab: false,
+            showIpOnCard: true,
+            autoPing: true,
+            pingTimeoutMs: 1500,
+            pin: "",
+            enableShortcuts: true,
+            enableGroups: true,
+            enableFavorites: true,
+          },
+          network: {
+            mode: "dhcp",
+            staticIp: "",
+            gateway: "192.168.0.1",
+            subnet: "255.255.255.0",
+            dns: "8.8.8.8",
+            apName: "HOME ACCESS",
+            apPass: "",
+            apTimeout: 180,
+            mdnsEnabled: true,
+            mdns: "homeaccess.local",
+          },
+          groups: [{ id: "g1", name: "General", color: "#38bdf8" }],
+          devices: [],
+          shortcuts: [],
+          favorites: [],
+          admin: defAdmin,
+        };
+        if (!raw || typeof raw !== "object") return fallback;
+
         const rawAdmin = raw?.admin || {};
         const mergedUsers =
           Array.isArray(rawAdmin.users) && rawAdmin.users.length
@@ -1896,18 +1854,24 @@
         }
 
         const merged = {
-          settings: { ...base.settings, ...(raw.settings || {}) },
-          network: { ...base.network, ...(raw.network || {}) },
-          groups: Array.isArray(raw.groups) ? raw.groups : base.groups,
-          devices: Array.isArray(raw.devices) ? raw.devices : base.devices,
-          shortcuts: Array.isArray(raw.shortcuts)
-            ? raw.shortcuts
-            : base.shortcuts,
+          settings: { ...fallback.settings, ...(raw.settings || {}) },
+          network: { ...fallback.network, ...(raw.network || {}) },
+          groups: Array.isArray(raw.groups) ? raw.groups : fallback.groups,
+          devices: Array.isArray(raw.devices) ? raw.devices : [],
+          shortcuts: Array.isArray(raw.shortcuts) ? raw.shortcuts : [],
           favorites: Array.isArray(raw.favorites) ? raw.favorites : [],
           admin: {
             time: { ...defAdmin.time, ...(rawAdmin.time || {}) },
             users: mergedUsers,
             verification: {
+              maxAttempts: Math.min(
+                5,
+                Math.max(1, Number(rawAdmin.verification?.maxAttempts) || 3),
+              ),
+              lockoutPolicy:
+                rawAdmin.verification?.lockoutPolicy === "restart_only"
+                  ? "restart_only"
+                  : "restart_or_1h",
               homePage: {
                 ...defAdmin.verification.homePage,
                 ...(rawAdmin.verification?.homePage || {}),
@@ -1926,13 +1890,112 @@
         merged.shortcuts.forEach((s) => {
           if (s.apiKey) s.apiKey = encodeApiKey(s.apiKey);
         });
-        syncLegacyFavorites(merged);
+        syncPinsToFavorites(merged);
         return merged;
       }
 
       /* ==========================================================================
-         5. AUTHENTICATION & VERIFICATION SYSTEM
+         5. AUTHENTICATION, LOCKOUT POLICY & VERIFICATION SYSTEM
          ========================================================================== */
+      function getLockoutData() {
+        try {
+          return (
+            JSON.parse(localStorage.getItem(LOCKOUT_STORAGE_KEY)) || {
+              failedAttempts: 0,
+              lockedAt: null,
+              bootSession: sessionStorage.getItem("esp_boot_id") || "boot_1",
+            }
+          );
+        } catch {
+          return { failedAttempts: 0, lockedAt: null, bootSession: "boot_1" };
+        }
+      }
+
+      function setLockoutData(data) {
+        localStorage.setItem(LOCKOUT_STORAGE_KEY, JSON.stringify(data));
+      }
+
+      function clearLockoutData() {
+        localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+      }
+
+      function checkLockoutState() {
+        const maxAtt = Math.min(
+          5,
+          Math.max(1, Number(config?.admin?.verification?.maxAttempts) || 3),
+        );
+        const policy =
+          config?.admin?.verification?.lockoutPolicy || "restart_or_1h";
+        const data = getLockoutData();
+
+        if (!data.lockedAt) {
+          return {
+            locked: false,
+            remainingAttempts: Math.max(0, maxAtt - (data.failedAttempts || 0)),
+            maxAttempts: maxAtt,
+            policy,
+          };
+        }
+
+        if (policy === "restart_or_1h") {
+          const elapsedMs = Date.now() - data.lockedAt;
+          if (elapsedMs >= 3600000) {
+            clearLockoutData();
+            return {
+              locked: false,
+              remainingAttempts: maxAtt,
+              maxAttempts: maxAtt,
+              policy,
+            };
+          }
+          const remSec = Math.ceil((3600000 - elapsedMs) / 1000);
+          const mm = String(Math.floor(remSec / 60)).padStart(2, "0");
+          const ss = String(remSec % 60).padStart(2, "0");
+          return {
+            locked: true,
+            msg: `Device Locked! Wait ${mm}m ${ss}s or Restart ESP32`,
+            policy,
+          };
+        }
+
+        return {
+          locked: true,
+          msg: "Device Locked! Fresh ESP32 Restart Required",
+          policy,
+        };
+      }
+
+      function refreshAuthModalLiveStatus() {
+        const banner = document.getElementById("authLiveStatus");
+        const verifyBtn = document.getElementById("authVerifyBtn");
+        const uInput = document.getElementById("authUser");
+        const pInput = document.getElementById("authPass");
+        if (!banner) return;
+
+        const st = checkLockoutState();
+        if (st.locked) {
+          banner.style.borderColor = "var(--err)";
+          banner.style.color = "var(--err)";
+          banner.style.background = "rgba(239, 68, 68, 0.12)";
+          banner.textContent = st.msg;
+          if (verifyBtn) verifyBtn.disabled = true;
+          if (uInput) uInput.disabled = true;
+          if (pInput) pInput.disabled = true;
+        } else {
+          const policyText =
+            st.policy === "restart_only"
+              ? "Lockout: Restart Only"
+              : "Lockout: Restart / 1h";
+          banner.style.borderColor = "var(--border)";
+          banner.style.color = "var(--text-muted)";
+          banner.style.background = "var(--bg)";
+          banner.textContent = `Attempts left: ${st.remainingAttempts}/${st.maxAttempts} • ${policyText}`;
+          if (verifyBtn) verifyBtn.disabled = false;
+          if (uInput) uInput.disabled = false;
+          if (pInput) pInput.disabled = false;
+        }
+      }
+
       function verifyCredentials(username, password, roleRequirement) {
         const uName = String(username || "")
           .trim()
@@ -1951,7 +2014,7 @@
         return { ok: true, user };
       }
 
-      function promptVerification(roleReq, titleText, allowCancel = true) {
+      function promptVerification(roleReq, titleText) {
         if (!roleReq || roleReq === "none") return Promise.resolve(true);
         return new Promise((resolve) => {
           requiredAuthRole = roleReq;
@@ -1968,22 +2031,54 @@
             `Required permission: ${roleLabel}`;
           document.getElementById("authUser").value = "";
           document.getElementById("authPass").value = "";
-          document.getElementById("authCancelBtn").style.display = allowCancel
-            ? "inline-flex"
-            : "none";
+          document.getElementById("authCancelBtn").style.display =
+            "inline-flex";
+          document.getElementById("authCloseXBtn").style.display =
+            "inline-flex";
           document.getElementById("forgetBootBox").style.display = "none";
           document.getElementById("authModal").style.display = "flex";
+
+          refreshAuthModalLiveStatus();
+          clearInterval(authStatusTimer);
+          authStatusTimer = setInterval(refreshAuthModalLiveStatus, 1000);
+
           syncModalScrollLock();
           document.getElementById("authUser").focus();
         });
       }
 
       function submitAuthModal() {
+        const st = checkLockoutState();
+        if (st.locked) return showToast(st.msg);
+
         const u = document.getElementById("authUser").value;
         const p = document.getElementById("authPass").value;
         const res = verifyCredentials(u, p, requiredAuthRole);
-        if (!res.ok) return showToast(res.msg);
 
+        if (!res.ok) {
+          const maxAtt = Math.min(
+            5,
+            Math.max(1, Number(config?.admin?.verification?.maxAttempts) || 3),
+          );
+          const data = getLockoutData();
+          data.failedAttempts = (data.failedAttempts || 0) + 1;
+
+          if (data.failedAttempts >= maxAtt) {
+            data.lockedAt = Date.now();
+          }
+          setLockoutData(data);
+          refreshAuthModalLiveStatus();
+
+          const updated = checkLockoutState();
+          return showToast(
+            updated.locked
+              ? updated.msg
+              : `${res.msg} (${updated.remainingAttempts} left)`,
+          );
+        }
+
+        clearLockoutData();
+        clearInterval(authStatusTimer);
         document.getElementById("authModal").style.display = "none";
         syncModalScrollLock();
         if (authResolveCallback) authResolveCallback(res.user);
@@ -1992,6 +2087,7 @@
 
       function closeAuthModal() {
         clearInterval(forgetBootTimer);
+        clearInterval(authStatusTimer);
         document.getElementById("authModal").style.display = "none";
         syncModalScrollLock();
         if (authResolveCallback) authResolveCallback(false);
@@ -2042,8 +2138,9 @@
               role: "admin",
             },
           ];
+          clearLockoutData();
+          refreshAuthModalLiveStatus();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-          if (typeof renderAdminPanel === "function") renderAdminPanel();
           box.style.display = "none";
           showToast("Users reset! Default is now esp / 456456");
         } else {
@@ -2056,7 +2153,7 @@
         const roleReq =
           config.admin?.verification?.actions?.[actionKey] || "none";
         if (roleReq === "none") return true;
-        const ok = await promptVerification(roleReq, `Verify: ${label}`, true);
+        const ok = await promptVerification(roleReq, `Verify: ${label}`);
         return !!ok;
       }
 
@@ -2065,7 +2162,7 @@
           mode: "session",
           role: "all",
         };
-        if (policy.mode === "none") return;
+        if (policy.mode === "none") return true;
 
         const sessionKey = `hub_auth_${pageKey}`;
         if (policy.mode === "session") {
@@ -2076,18 +2173,18 @@
               savedRole === policy.role ||
               savedRole === "admin")
           ) {
-            return;
+            return true;
           }
         }
 
         const user = await promptVerification(
           policy.role,
           "Login Required - Home",
-          false,
         );
         if (user && policy.mode === "session") {
           sessionStorage.setItem(sessionKey, user.role);
         }
+        return !!user;
       }
 
       /* ==========================================================================
@@ -2128,6 +2225,13 @@
           if (data.uptime !== undefined) {
             document.getElementById("hubUptime").textContent =
               `Uptime: ${data.uptime}`;
+          }
+          if (
+            data.bootId &&
+            getLockoutData().bootSession !== String(data.bootId)
+          ) {
+            clearLockoutData();
+            sessionStorage.setItem("esp_boot_id", String(data.bootId));
           }
         } catch (_) {}
       }
@@ -2200,9 +2304,9 @@
       }
 
       async function triggerShortcut(id, event) {
+        if (event) event.stopPropagation();
         if (!(await verifyAction("homeToggle", "Toggle Shortcut Switch")))
           return;
-        if (event) event.stopPropagation();
         const sc = config.shortcuts.find((s) => s.id === id);
         if (!sc || shortcutBusy[id]) return;
 
@@ -2265,8 +2369,8 @@
       }
 
       async function toggleFavorite(e, id) {
-        if (!(await verifyAction("favorites", "Modify Favorites"))) return;
         e.stopPropagation();
+        if (!(await verifyAction("favorites", "Modify Favorites"))) return;
         const dev = config.devices.find((d) => d.id === id);
         if (!dev) return;
         dev.fav = !dev.fav;
@@ -2894,6 +2998,7 @@
         if (!(await verifyAction("restart", "Restart ESP32 Hub"))) return;
         if (!confirm("Restart the central ESP32 hub now?")) return;
         showToast("Sending restart command...");
+        clearLockoutData();
         if (!isOfflinePreview) {
           await fetch("/api/reboot", { method: "POST" }).catch(() => {});
         }
@@ -2950,6 +3055,7 @@
           searchInput.focus();
         } else if (e.key === "Escape") {
           closeFavCardModal();
+          closeAuthModal();
           if (document.activeElement === searchInput) {
             searchInput.value = "";
             clearSearch.style.display = "none";

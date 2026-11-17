@@ -82,6 +82,12 @@
         touch-action: none;
       }
 
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
       /* ==========================================
          2. HEADER & NAVIGATION TABS
          ========================================== */
@@ -766,19 +772,54 @@
     <!-- Universal Auth & Verification Modal -->
     <div class="pin-overlay" id="authModal">
       <div class="pin-card">
-        <h3 id="authModalTitle" style="margin-bottom: 4px">
-          Verification Required
-        </h3>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+          "
+        >
+          <h3 id="authModalTitle" style="margin: 0">Verification Required</h3>
+          <button
+            type="button"
+            class="btn btn-sm"
+            id="authCloseXBtn"
+            title="Cancel & Close"
+            onclick="closeAuthModal()"
+            style="padding: 2px 9px; font-size: 1rem; line-height: 1.2"
+          >
+            &times;
+          </button>
+        </div>
         <p
           id="authModalSub"
           style="
             font-size: 0.78rem;
             color: var(--text-muted);
-            margin-bottom: 14px;
+            margin-bottom: 10px;
           "
         >
           Sign in to continue
         </p>
+
+        <!-- Live Attempt & Lockout Status Banner -->
+        <div
+          id="authLiveStatus"
+          style="
+            display: block;
+            padding: 8px 10px;
+            border-radius: 9px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            font-size: 0.75rem;
+            font-family: monospace;
+            margin-bottom: 12px;
+            color: var(--text-muted);
+          "
+        >
+          Attempts left: 3/3 • Lockout: Restart / 1h
+        </div>
 
         <div class="field" style="margin-bottom: 10px">
           <label>Username</label>
@@ -853,6 +894,7 @@
             <button
               type="button"
               class="btn btn-sm btn-primary"
+              id="authVerifyBtn"
               onclick="submitAuthModal()"
             >
               Verify
@@ -1607,6 +1649,50 @@
         <!-- 3. User Verification -->
         <div class="card-box">
           <h3>3. User Verification &amp; Login Policy</h3>
+
+          <!-- Top Row: Max Login Attempts & Lockout Policy -->
+          <div
+            class="form-grid"
+            style="
+              margin-bottom: 14px;
+              padding-bottom: 14px;
+              border-bottom: 1px solid var(--border);
+            "
+          >
+            <div class="field">
+              <label>Max Login Attempts (Default 3, Max 5)</label>
+              <select
+                id="verMaxAttempts"
+                class="select"
+                onchange="
+                  updateSecurityPolicy('maxAttempts', Number(this.value))
+                "
+              >
+                <option value="1">1 Attempt</option>
+                <option value="2">2 Attempts</option>
+                <option value="3" selected>3 Attempts (Default)</option>
+                <option value="4">4 Attempts</option>
+                <option value="5">5 Attempts (Maximum)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>After Max Login Attempts</label>
+              <select
+                id="verLockoutPolicy"
+                class="select"
+                onchange="updateSecurityPolicy('lockoutPolicy', this.value)"
+              >
+                <option value="restart_or_1h">
+                  Restart / 1 Hour (Default)
+                </option>
+                <option value="restart_only">
+                  Restart Required (More Secure)
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Second Row: Home & Config Page Login Modals -->
           <div class="form-grid" style="margin-bottom: 14px">
             <div class="field">
               <label>Home Page Login Modal</label>
@@ -1683,7 +1769,10 @@
             <h3 style="margin-bottom: 0">4. Real-Time System Performance</h3>
             <span class="badge" style="color: var(--ok)">Live (2s Poll)</span>
           </div>
-          <div class="form-grid">
+          <div
+            class="form-grid"
+            style="grid-template-columns: repeat(auto-fit, minmax(135px, 1fr))"
+          >
             <div class="field">
               <label>CPU Temperature</label>
               <div
@@ -1713,10 +1802,24 @@
               </div>
             </div>
             <div class="field">
-              <label>Connected SSID &amp; IP</label>
+              <label>Connected SSID</label>
               <div
                 class="input"
-                id="perfNet"
+                id="perfSsid"
+                style="
+                  display: flex;
+                  align-items: center;
+                  font-family: monospace;
+                "
+              >
+                --
+              </div>
+            </div>
+            <div class="field">
+              <label>IP Address</label>
+              <div
+                class="input"
+                id="perfIp"
                 style="
                   display: flex;
                   align-items: center;
@@ -2318,6 +2421,43 @@
       </div>
     </div>
 
+    <!-- MODAL 5: Backup Export / Import Loading Modal -->
+    <div class="modal-backdrop" id="backupLoadingModal" style="z-index: 95">
+      <div
+        class="modal"
+        style="
+          max-width: 340px;
+          text-align: center;
+          padding: 26px 20px;
+          border-radius: 16px;
+        "
+      >
+        <div
+          style="
+            width: 38px;
+            height: 38px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            margin: 0 auto 14px;
+            animation: spin 0.8s linear infinite;
+          "
+        ></div>
+        <h3
+          id="backupLoadingTitle"
+          style="font-size: 0.95rem; margin-bottom: 4px"
+        >
+          Processing Backup...
+        </h3>
+        <p
+          id="backupLoadingSub"
+          style="font-size: 0.78rem; color: var(--text-muted)"
+        >
+          Please wait until JSON operation completes
+        </p>
+      </div>
+    </div>
+
     <!-- Toast Notification & Blur Backdrop -->
     <div class="toast-backdrop" id="toastBackdrop"></div>
     <div class="toast" id="toast"></div>
@@ -2673,6 +2813,8 @@
             },
           ],
           verification: {
+            maxAttempts: 3,
+            lockoutPolicy: "restart_or_1h", // "restart_or_1h" | "restart_only"
             homePage: { mode: "session", role: "all" },
             configPage: { mode: "session", role: "admin" },
             actions: {
@@ -2812,6 +2954,14 @@
             time: { ...defAdmin.time, ...(rawAdmin.time || {}) },
             users: mergedUsers,
             verification: {
+              maxAttempts: Math.min(
+                5,
+                Math.max(1, Number(rawAdmin.verification?.maxAttempts) || 3),
+              ),
+              lockoutPolicy:
+                rawAdmin.verification?.lockoutPolicy === "restart_only"
+                  ? "restart_only"
+                  : "restart_or_1h",
               homePage: {
                 ...defAdmin.verification.homePage,
                 ...(rawAdmin.verification?.homePage || {}),
@@ -2867,25 +3017,111 @@
       /* ============================================================================
          5. AUTHENTICATION & VERIFICATION FLOW
          ============================================================================ */
-      function verifyCredentials(username, password, roleRequirement) {
-        const uName = String(username || "")
-          .trim()
-          .toLowerCase();
-        const hash = hashCredential(uName, password);
-        const user = (config.admin?.users || []).find(
-          (u) => u.username.toLowerCase() === uName && u.passHash === hash,
-        );
-        if (!user) return { ok: false, msg: "Invalid username or password" };
-        if (roleRequirement === "admin" && user.role !== "admin") {
-          return { ok: false, msg: "Admin role required for this action" };
+      const LOCKOUT_STORAGE_KEY = "esp_iot_hub_lockout_v1";
+      let authStatusTimer = null;
+
+      function getLockoutData() {
+        try {
+          return (
+            JSON.parse(localStorage.getItem(LOCKOUT_STORAGE_KEY)) || {
+              failedAttempts: 0,
+              lockedAt: null,
+              bootSession: sessionStorage.getItem("esp_boot_id") || "boot_1",
+            }
+          );
+        } catch {
+          return { failedAttempts: 0, lockedAt: null, bootSession: "boot_1" };
         }
-        if (roleRequirement === "user" && user.role !== "user") {
-          return { ok: false, msg: "Normal User role required" };
-        }
-        return { ok: true, user };
       }
 
-      function promptVerification(roleReq, titleText, allowCancel = true) {
+      function setLockoutData(data) {
+        localStorage.setItem(LOCKOUT_STORAGE_KEY, JSON.stringify(data));
+      }
+
+      function clearLockoutData() {
+        localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+      }
+
+      function checkLockoutState() {
+        const maxAtt = Math.min(
+          5,
+          Math.max(1, Number(config?.admin?.verification?.maxAttempts) || 3),
+        );
+        const policy =
+          config?.admin?.verification?.lockoutPolicy || "restart_or_1h";
+        const data = getLockoutData();
+
+        if (!data.lockedAt) {
+          return {
+            locked: false,
+            remainingAttempts: Math.max(0, maxAtt - (data.failedAttempts || 0)),
+            maxAttempts: maxAtt,
+            policy,
+          };
+        }
+
+        // If policy allows 1 Hour unlock, check if 3600 seconds have passed
+        if (policy === "restart_or_1h") {
+          const elapsedMs = Date.now() - data.lockedAt;
+          if (elapsedMs >= 3600000) {
+            clearLockoutData();
+            return {
+              locked: false,
+              remainingAttempts: maxAtt,
+              maxAttempts: maxAtt,
+              policy,
+            };
+          }
+          const remSec = Math.ceil((3600000 - elapsedMs) / 1000);
+          const mm = String(Math.floor(remSec / 60)).padStart(2, "0");
+          const ss = String(remSec % 60).padStart(2, "0");
+          return {
+            locked: true,
+            msg: `Device Locked! Wait ${mm}m ${ss}s or Restart ESP32`,
+            policy,
+          };
+        }
+
+        // Otherwise "restart_only"
+        return {
+          locked: true,
+          msg: "Device Locked! Fresh ESP32 Restart Required",
+          policy,
+        };
+      }
+
+      function refreshAuthModalLiveStatus() {
+        const banner = document.getElementById("authLiveStatus");
+        const verifyBtn = document.getElementById("authVerifyBtn");
+        const uInput = document.getElementById("authUser");
+        const pInput = document.getElementById("authPass");
+        if (!banner) return;
+
+        const st = checkLockoutState();
+        if (st.locked) {
+          banner.style.borderColor = "var(--err)";
+          banner.style.color = "var(--err)";
+          banner.style.background = "rgba(239, 68, 68, 0.12)";
+          banner.textContent = st.msg;
+          if (verifyBtn) verifyBtn.disabled = true;
+          if (uInput) uInput.disabled = true;
+          if (pInput) pInput.disabled = true;
+        } else {
+          const policyText =
+            st.policy === "restart_only"
+              ? "Lockout: Restart Only"
+              : "Lockout: Restart / 1h";
+          banner.style.borderColor = "var(--border)";
+          banner.style.color = "var(--text-muted)";
+          banner.style.background = "var(--bg)";
+          banner.textContent = `Attempts left: ${st.remainingAttempts}/${st.maxAttempts} • ${policyText}`;
+          if (verifyBtn) verifyBtn.disabled = false;
+          if (uInput) uInput.disabled = false;
+          if (pInput) pInput.disabled = false;
+        }
+      }
+
+      function promptVerification(roleReq, titleText) {
         if (!roleReq || roleReq === "none") return Promise.resolve(true);
         return new Promise((resolve) => {
           requiredAuthRole = roleReq;
@@ -2902,22 +3138,53 @@
             `Required permission: ${roleLabel}`;
           document.getElementById("authUser").value = "";
           document.getElementById("authPass").value = "";
-          document.getElementById("authCancelBtn").style.display = allowCancel
-            ? "inline-flex"
-            : "none";
+          document.getElementById("authCancelBtn").style.display =
+            "inline-flex";
           document.getElementById("forgetBootBox").style.display = "none";
           document.getElementById("authModal").style.display = "flex";
+
+          refreshAuthModalLiveStatus();
+          clearInterval(authStatusTimer);
+          authStatusTimer = setInterval(refreshAuthModalLiveStatus, 1000);
+
           syncModalScrollLock();
           document.getElementById("authUser").focus();
         });
       }
 
       function submitAuthModal() {
+        const st = checkLockoutState();
+        if (st.locked) return showToast(st.msg);
+
         const u = document.getElementById("authUser").value;
         const p = document.getElementById("authPass").value;
         const res = verifyCredentials(u, p, requiredAuthRole);
-        if (!res.ok) return showToast(res.msg);
 
+        if (!res.ok) {
+          const maxAtt = Math.min(
+            5,
+            Math.max(1, Number(config?.admin?.verification?.maxAttempts) || 3),
+          );
+          const data = getLockoutData();
+          data.failedAttempts = (data.failedAttempts || 0) + 1;
+
+          if (data.failedAttempts >= maxAtt) {
+            data.lockedAt = Date.now();
+          }
+          setLockoutData(data);
+          refreshAuthModalLiveStatus();
+
+          const updated = checkLockoutState();
+          return showToast(
+            updated.locked
+              ? updated.msg
+              : `${res.msg} (${updated.remainingAttempts} left)`,
+          );
+        }
+
+        // Success -> reset failed attempts
+        clearLockoutData();
+        clearInterval(authStatusTimer);
         document.getElementById("authModal").style.display = "none";
         syncModalScrollLock();
         if (authResolveCallback) authResolveCallback(res.user);
@@ -2926,10 +3193,29 @@
 
       function closeAuthModal() {
         clearInterval(forgetBootTimer);
+        clearInterval(authStatusTimer);
         document.getElementById("authModal").style.display = "none";
         syncModalScrollLock();
         if (authResolveCallback) authResolveCallback(false);
         authResolveCallback = null;
+      }
+
+      function verifyCredentials(username, password, roleRequirement) {
+        const uName = String(username || "")
+          .trim()
+          .toLowerCase();
+        const hash = hashCredential(uName, password);
+        const user = (config.admin?.users || []).find(
+          (u) => u.username.toLowerCase() === uName && u.passHash === hash,
+        );
+        if (!user) return { ok: false, msg: "Invalid username or password" };
+        if (roleRequirement === "admin" && user.role !== "admin") {
+          return { ok: false, msg: "Admin role required for this action" };
+        }
+        if (roleRequirement === "user" && user.role !== "user") {
+          return { ok: false, msg: "Normal User role required" };
+        }
+        return { ok: true, user };
       }
 
       async function triggerForgetUsers() {
@@ -2976,8 +3262,9 @@
               role: "admin",
             },
           ];
+          clearLockoutData();
+          refreshAuthModalLiveStatus();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-          populateAdministrator();
           box.style.display = "none";
           showToast("Users reset! Default is now esp / 456456");
         } else {
@@ -2990,7 +3277,7 @@
         const roleReq =
           config.admin?.verification?.actions?.[actionKey] || "none";
         if (roleReq === "none") return true;
-        const ok = await promptVerification(roleReq, `Verify: ${label}`, true);
+        const ok = await promptVerification(roleReq, `Verify: ${label}`);
         return !!ok;
       }
 
@@ -2999,7 +3286,7 @@
           mode: "session",
           role: "all",
         };
-        if (policy.mode === "none") return;
+        if (policy.mode === "none") return true;
 
         const sessionKey = `hub_auth_${pageKey}`;
         if (policy.mode === "session") {
@@ -3010,18 +3297,18 @@
               savedRole === policy.role ||
               savedRole === "admin")
           ) {
-            return;
+            return true;
           }
         }
 
         const user = await promptVerification(
           policy.role,
-          `Login Required ${pageKey === "homePage" ? "- Home" : "- Settings"}`,
-          false,
+          "Login Required - Settings",
         );
         if (user && policy.mode === "session") {
           sessionStorage.setItem(sessionKey, user.role);
         }
+        return !!user;
       }
 
       /* ============================================================================
@@ -3045,7 +3332,10 @@
 
         applyTheme();
         renderAll();
-        await enforcePageLogin("configPage");
+        const loggedIn = await enforcePageLogin("configPage");
+        if (!loggedIn) {
+          window.location.href = "index.html";
+        }
       }
 
       function switchTab(tabName, btn) {
@@ -4761,6 +5051,11 @@
           adm.verification.configPage.mode;
         document.getElementById("verConfigRole").value =
           adm.verification.configPage.role;
+        document.getElementById("verMaxAttempts").value = String(
+          adm.verification.maxAttempts || 3,
+        );
+        document.getElementById("verLockoutPolicy").value =
+          adm.verification.lockoutPolicy || "restart_or_1h";
 
         document.getElementById("actionVerificationGrid").innerHTML =
           Object.entries(ACTION_LABELS)
@@ -4952,6 +5247,14 @@
         markDirty();
       }
 
+      function updateSecurityPolicy(field, val) {
+        if (field === "maxAttempts") {
+          val = Math.min(5, Math.max(1, Number(val) || 3));
+        }
+        config.admin.verification[field] = val;
+        markDirty();
+      }
+
       function updateActionVer(actionKey, val) {
         config.admin.verification.actions[actionKey] = val;
         markDirty();
@@ -4991,7 +5294,9 @@
         document.getElementById("perfTemp").textContent =
           `${Number(d.cpuTemp).toFixed(1)} °C`;
         document.getElementById("perfUptime").textContent = d.uptime;
-        document.getElementById("perfNet").textContent = `${d.ssid} (${d.ip})`;
+        document.getElementById("perfSsid").textContent =
+          d.ssid || "Not Connected";
+        document.getElementById("perfIp").textContent = d.ip || "0.0.0.0";
         document.getElementById("perfRssi").textContent =
           `${d.rssi} dBm (${sigPct}%)`;
 
@@ -5089,21 +5394,49 @@
         }
       }
 
-      function exportBackup() {
-        const blob = new Blob([JSON.stringify(config, null, 2)], {
-          type: "application/json",
-        });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `esp-iot-hub-${new Date().toISOString().slice(0, 10)}.json`;
-        a.click();
+      function setBackupLoadingModal(show, title = "", sub = "") {
+        const modal = document.getElementById("backupLoadingModal");
+        if (!modal) return;
+        if (title)
+          document.getElementById("backupLoadingTitle").textContent = title;
+        if (sub) document.getElementById("backupLoadingSub").textContent = sub;
+        modal.classList.toggle("open", !!show);
+        syncModalScrollLock();
+      }
+
+      async function exportBackup() {
+        setBackupLoadingModal(
+          true,
+          "Exporting JSON Backup...",
+          "Preparing NVS configuration file for download",
+        );
+        await new Promise((r) => setTimeout(r, 600));
+        try {
+          const blob = new Blob([JSON.stringify(config, null, 2)], {
+            type: "application/json",
+          });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = `esp-iot-hub-${new Date().toISOString().slice(0, 10)}.json`;
+          a.click();
+          URL.revokeObjectURL(a.href);
+          showToast("Backup JSON exported!");
+        } finally {
+          setBackupLoadingModal(false);
+        }
       }
 
       function importBackup(event) {
         const file = event.target.files[0];
         if (!file) return;
+        setBackupLoadingModal(
+          true,
+          "Importing JSON Backup...",
+          "Validating and restoring configuration",
+        );
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
+          await new Promise((r) => setTimeout(r, 600));
           try {
             const parsed = JSON.parse(e.target.result);
             if (!parsed.devices || !parsed.groups || !parsed.settings)
@@ -5115,7 +5448,14 @@
             showToast("Backup imported! Click Save to write to NVS.");
           } catch {
             showToast("Invalid backup JSON file");
+          } finally {
+            setBackupLoadingModal(false);
+            event.target.value = "";
           }
+        };
+        reader.onerror = () => {
+          setBackupLoadingModal(false);
+          showToast("Failed to read file");
         };
         reader.readAsText(file);
       }
@@ -5124,8 +5464,9 @@
         if (!(await verifyAction("restart", "Restart ESP32 Hub"))) return;
         if (!confirm("Restart the central ESP32 hub?")) return;
         showToast("Restarting ESP32...");
-        if (!isOfflinePreview)
-          await fetch("/api/reboot", { method: "POST" }).catch(() => {});
+        if (!isOfflinePreview) clearLockoutData();
+        clearLockoutData();
+        await fetch("/api/reboot", { method: "POST" }).catch(() => {});
         setTimeout(() => (location.href = "index.html"), 4000);
       }
 
