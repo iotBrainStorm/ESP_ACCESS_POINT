@@ -1,0 +1,3448 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#0b1120" />
+    <title>2D Home Building Designer — ACCESS POINT</title>
+    <style>
+      /* ==========================================================================
+         1. THEME VARIABLES & GLOBAL RESET (MATCHES HUB THEME)
+         ========================================================================== */
+      :root {
+        --bg: #0b1120;
+        --bg-elev: #111827;
+        --card: #162033;
+        --card-hover: #1d2942;
+        --border: #24324d;
+        --text: #f1f5f9;
+        --text-muted: #94a3b8;
+        --accent: #38bdf8;
+        --accent-soft: rgba(56, 189, 248, 0.15);
+        --ok: #22c55e;
+        --err: #ef4444;
+        --warn: #f59e0b;
+        --star: #fbbf24;
+        --grid-minor: rgba(148, 163, 184, 0.07);
+        --grid-major: rgba(56, 189, 248, 0.14);
+        --canvas-bg: #080d1a;
+        --radius: 12px;
+        --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      }
+
+      [data-theme="amoled"] {
+        --bg: #000000;
+        --bg-elev: #09090b;
+        --card: #121215;
+        --card-hover: #1a1a1f;
+        --border: #27272a;
+        --text: #fafafa;
+        --text-muted: #a1a1aa;
+        --canvas-bg: #000000;
+        --grid-minor: rgba(255, 255, 255, 0.05);
+        --grid-major: rgba(56, 189, 248, 0.15);
+      }
+
+      [data-theme="light"] {
+        --bg: #f1f5f9;
+        --bg-elev: #ffffff;
+        --card: #ffffff;
+        --card-hover: #f8fafc;
+        --border: #cbd5e1;
+        --text: #0f172a;
+        --text-muted: #64748b;
+        --accent: #0284c7;
+        --accent-soft: rgba(2, 132, 199, 0.12);
+        --canvas-bg: #f8fafc;
+        --grid-minor: rgba(15, 23, 42, 0.06);
+        --grid-major: rgba(2, 132, 199, 0.16);
+      }
+
+      html,
+      body,
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+        scrollbar-width: thin;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        user-select: none;
+      }
+
+      /* ==========================================================================
+         2. TOP NAVIGATION & WORKFLOW BAR
+         ========================================================================== */
+      .topbar {
+        background: var(--bg-elev);
+        border-bottom: 1px solid var(--border);
+        padding: 8px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        z-index: 30;
+      }
+
+      .topbar-left,
+      .topbar-center,
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--text);
+        text-decoration: none;
+        font-size: 0.8rem;
+        font-weight: 700;
+        transition: 0.15s;
+      }
+      .back-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .brand-title {
+        font-size: 0.95rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .badge {
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+      }
+
+      /* Step & Mode Switcher */
+      .mode-switch {
+        display: inline-flex;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 3px;
+        gap: 2px;
+      }
+
+      .mode-btn {
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.76rem;
+        font-weight: 700;
+        padding: 6px 12px;
+        border-radius: 7px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: 0.15s;
+      }
+
+      .mode-btn:hover {
+        color: var(--text);
+      }
+
+      .mode-btn.active {
+        background: var(--accent);
+        color: #031525;
+      }
+
+      .mode-btn.sim-btn.active {
+        background: var(--ok);
+        color: #031525;
+        box-shadow: 0 0 14px rgba(34, 197, 94, 0.4);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--text);
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.15s;
+        white-space: nowrap;
+      }
+      .btn:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #031525;
+        font-weight: 700;
+      }
+      .btn-primary:hover:not(:disabled) {
+        color: #031525;
+        filter: brightness(1.08);
+      }
+      .btn-danger {
+        border-color: rgba(239, 68, 68, 0.4);
+        color: var(--err);
+      }
+      .btn-danger:hover:not(:disabled) {
+        background: rgba(239, 68, 68, 0.12);
+        border-color: var(--err);
+        color: var(--err);
+      }
+      .btn-sm {
+        height: 28px;
+        padding: 0 8px;
+        font-size: 0.72rem;
+        border-radius: 7px;
+      }
+
+      /* ==========================================================================
+         3. MAIN 3-COLUMN WORKSPACE
+         ========================================================================== */
+      .workspace {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 290px 1fr 310px;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .workspace.sim-active {
+        grid-template-columns: 260px 1fr 0px;
+      }
+      .workspace.sim-active .right-panel {
+        display: none;
+      }
+
+      .side-panel {
+        background: var(--bg-elev);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 12px;
+        gap: 14px;
+      }
+
+      .right-panel {
+        border-right: none;
+        border-left: 1px solid var(--border);
+      }
+
+      .panel-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px;
+      }
+
+      .panel-title {
+        font-size: 0.74rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+      }
+
+      .step-tag {
+        background: var(--accent-soft);
+        color: var(--accent);
+        padding: 2px 7px;
+        border-radius: 6px;
+        font-size: 0.68rem;
+      }
+
+      /* Building Elevation Mini Visualizer */
+      .building-stack {
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 4px;
+        padding: 10px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        margin-top: 8px;
+      }
+
+      .stack-roof {
+        height: 14px;
+        background: linear-gradient(
+          90deg,
+          transparent 5%,
+          var(--accent) 50%,
+          transparent 95%
+        );
+        clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        opacity: 0.45;
+      }
+
+      .floor-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition: 0.15s;
+      }
+
+      .floor-item:hover {
+        border-color: var(--accent);
+      }
+
+      .floor-item.active {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
+
+      .floor-item-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        flex: 1;
+      }
+
+      .floor-level-badge {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--accent);
+        font-size: 0.7rem;
+        font-weight: 800;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+      }
+
+      .floor-name {
+        font-size: 0.82rem;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .floor-meta {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+      }
+
+      .floor-actions {
+        display: flex;
+        gap: 3px;
+      }
+
+      .icon-action {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text-muted);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        font-size: 0.75rem;
+      }
+      .icon-action:hover {
+        background: var(--card);
+        border-color: var(--border);
+        color: var(--text);
+      }
+      .icon-action.del:hover {
+        color: var(--err);
+        border-color: rgba(239, 68, 68, 0.35);
+      }
+
+      /* Tool Palette Grid */
+      .tool-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 7px;
+      }
+
+      .tool-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 10px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.15s;
+        text-align: left;
+      }
+      .tool-btn:hover {
+        border-color: var(--accent);
+      }
+      .tool-btn.active {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .tool-btn svg {
+        flex-shrink: 0;
+      }
+      .acc-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .acc-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        padding: 7px 4px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text-muted);
+        font-size: 0.64rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.15s;
+      }
+      .acc-btn:hover {
+        border-color: var(--accent);
+        color: var(--text);
+      }
+      .acc-btn.active {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      /* Form Controls */
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 9px;
+      }
+      .field:last-child {
+        margin-bottom: 0;
+      }
+      .field label {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--text-muted);
+      }
+      .field-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .input,
+      .select {
+        width: 100%;
+        height: 34px;
+        padding: 0 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 0.8rem;
+        outline: none;
+      }
+      .input:focus,
+      .select:focus {
+        border-color: var(--accent);
+      }
+
+      .swatch-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+      .swatch {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        cursor: pointer;
+        transition: 0.12s;
+      }
+      .swatch.selected {
+        border-color: #ffffff;
+        transform: scale(1.14);
+      }
+
+      /* ==========================================================================
+         4. INTERACTIVE 2D SVG CANVAS AREA
+         ========================================================================== */
+      .canvas-stage {
+        position: relative;
+        background: var(--canvas-bg);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .canvas-hud-top {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        pointer-events: none;
+        z-index: 10;
+      }
+
+      .hud-pill {
+        pointer-events: auto;
+        background: color-mix(in srgb, var(--card) 90%, transparent);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 5px 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      .canvas-viewport {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        display: grid;
+        place-items: center;
+        padding: 36px;
+        cursor: crosshair;
+      }
+
+      .canvas-viewport.tool-select {
+        cursor: default;
+      }
+
+      .canvas-viewport.panning {
+        cursor: grabbing !important;
+      }
+
+      svg#floorSvg {
+        background: var(--canvas-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+        transition: box-shadow 0.25s ease;
+        touch-action: none;
+      }
+
+      /* SVG Shape Styling */
+      .svg-shape-group {
+        cursor: move;
+      }
+
+      .workspace.sim-active .svg-shape-group {
+        cursor: default;
+      }
+
+      .workspace.sim-active .svg-shape-group.is-clickable {
+        cursor: pointer;
+      }
+
+      .workspace.sim-active .svg-shape-group.is-clickable:hover .shape-prim {
+        filter: brightness(1.22) drop-shadow(0 0 8px var(--accent));
+      }
+
+      /* Active ON state during live simulation */
+      .svg-shape-group.sim-on .shape-prim {
+        stroke: var(--ok) !important;
+        filter: drop-shadow(0 0 12px rgba(34, 197, 94, 0.65));
+      }
+
+      .svg-shape-group.sim-on rect.shape-prim,
+      .svg-shape-group.sim-on circle.shape-prim {
+        fill-opacity: 0.38 !important;
+      }
+
+      .shape-label {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-weight: 700;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .shape-sublabel {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 10px;
+        fill: var(--text-muted);
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .selection-box {
+        fill: none;
+        stroke: var(--accent);
+        stroke-width: 1.5;
+        stroke-dasharray: 4 3;
+        pointer-events: none;
+      }
+
+      .resize-handle {
+        fill: #031525;
+        stroke: var(--accent);
+        stroke-width: 2;
+        cursor: nwse-resize;
+      }
+      .resize-handle:hover {
+        fill: var(--accent);
+      }
+
+      /* Live Simulation Floating Status Bar */
+      .sim-banner {
+        position: absolute;
+        bottom: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: color-mix(in srgb, var(--card) 94%, transparent);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--ok);
+        border-radius: 999px;
+        padding: 8px 18px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text);
+        display: none;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        z-index: 20;
+      }
+      .workspace.sim-active .sim-banner {
+        display: inline-flex;
+      }
+
+      .pulse-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--ok);
+        box-shadow: 0 0 10px var(--ok);
+      }
+
+      /* ==========================================================================
+         5. MODALS & TOAST
+         ========================================================================== */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.72);
+        backdrop-filter: blur(5px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 80;
+      }
+      .modal-backdrop.open {
+        display: flex;
+      }
+      .modal {
+        width: 100%;
+        max-width: 460px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: var(--shadow);
+      }
+      .modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 10px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 22px;
+        right: 22px;
+        background: var(--text);
+        color: var(--bg);
+        padding: 9px 16px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        box-shadow: var(--shadow);
+        opacity: 0;
+        transform: translateY(20px);
+        pointer-events: none;
+        transition: 0.22s ease;
+        z-index: 100;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @media (max-width: 1024px) {
+        .workspace {
+          grid-template-columns: 250px 1fr 270px;
+        }
+      }
+      @media (max-width: 820px) {
+        body {
+          overflow: auto;
+          height: auto;
+        }
+        .workspace {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+        .canvas-stage {
+          height: 62vh;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ========================================================================
+         TOP NAVIGATION BAR
+         ======================================================================== -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <a href="index.html" class="back-btn" title="Back to Home Dashboard">
+          <span>&larr;</span>
+          <span>HUB</span>
+        </a>
+        <div class="brand-title">
+          <svg
+            width="19"
+            height="19"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--accent)"
+            stroke-width="2.2"
+          >
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+          <span id="topBuildingName">MY SMART HOME</span>
+          <span class="badge" id="topFloorBadge">Ground Floor</span>
+        </div>
+      </div>
+
+      <!-- Mode Switcher: Design vs Live Simulation -->
+      <div class="topbar-center">
+        <div class="mode-switch">
+          <button
+            class="mode-btn active"
+            id="designModeBtn"
+            onclick="setAppMode('design')"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+            >
+              <path d="M12 20h9" />
+              <path
+                d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+              />
+            </svg>
+            Design Blueprint
+          </button>
+          <button
+            class="mode-btn sim-btn"
+            id="simModeBtn"
+            onclick="setAppMode('sim')"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.4"
+            >
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            Live Simulation
+          </button>
+        </div>
+      </div>
+
+      <!-- Actions: Sample Home, Undo, Export, Save -->
+      <div class="topbar-right">
+        <button
+          class="btn"
+          onclick="loadDemoSmartHome()"
+          title="Load a complete 2-Floor Smart Home sample drawing"
+        >
+          Load Sample Home
+        </button>
+        <button class="btn" id="undoBtn" onclick="undo()" title="Undo (Ctrl+Z)">
+          Undo
+        </button>
+        <button class="btn" onclick="exportDesignJson()" title="Download JSON">
+          Export
+        </button>
+        <button
+          class="btn btn-primary"
+          onclick="saveBuildingDesign()"
+          title="Save to Browser & ESP32 Storage"
+        >
+          Save Design
+        </button>
+      </div>
+    </header>
+
+    <!-- ========================================================================
+         MAIN 3-PANEL WORKSPACE
+         ======================================================================== -->
+    <div class="workspace" id="workspace">
+      <!-- LEFT PANEL: STEP 1 (BUILDING), STEP 2 (FLOORS), STEP 3 (DRAWING TOOLS) -->
+      <aside class="side-panel">
+        <!-- STEP 1: BUILDING SETUP -->
+        <div class="panel-card">
+          <div class="panel-title">
+            <span>Building Setup</span>
+            <span class="step-tag">STEP 1</span>
+          </div>
+
+          <div class="field">
+            <label>Building / House Name</label>
+            <input
+              type="text"
+              id="bldgNameInput"
+              class="input"
+              value="My Smart Home"
+              oninput="updateBuildingMeta()"
+            />
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>Quick Total Floors</label>
+              <select
+                id="quickFloorCount"
+                class="select"
+                onchange="syncFloorCount(Number(this.value))"
+              >
+                <option value="1">1 Floor (G)</option>
+                <option value="2" selected>2 Floors (G + 1)</option>
+                <option value="3">3 Floors (G + 2)</option>
+                <option value="4">4 Floors (G + 3)</option>
+                <option value="5">5 Floors (G + 4)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Grid Scale</label>
+              <select
+                id="bldgUnitSelect"
+                class="select"
+                onchange="updateBuildingMeta()"
+              >
+                <option value="ft">Feet (1 sq = 2 ft)</option>
+                <option value="m">Meters (1 sq = 0.5 m)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2: FLOOR DESIGN & MANAGER (CLONE, EDIT, DELETE) -->
+        <div class="panel-card">
+          <div class="panel-title">
+            <span>Floors (<span id="floorCountBadge">2</span>)</span>
+            <span class="step-tag">STEP 2</span>
+          </div>
+
+          <!-- 2D Stacked Building Elevation & Floor Selector -->
+          <div class="building-stack" id="floorListContainer"></div>
+
+          <div style="display: flex; gap: 6px; margin-top: 10px">
+            <button
+              class="btn btn-sm btn-primary"
+              style="flex: 1"
+              onclick="addFloor()"
+            >
+              + Add Floor
+            </button>
+            <button
+              class="btn btn-sm"
+              style="flex: 1"
+              onclick="cloneActiveFloor()"
+              title="Copy all walls & rooms from current floor to a new floor"
+            >
+              Clone Floor
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 3: ROOM & SVG SHAPE TOOLS -->
+        <div class="panel-card" id="drawingToolsCard">
+          <div class="panel-title">
+            <span>Room &amp; SVG Tools</span>
+            <span class="step-tag">STEP 3</span>
+          </div>
+
+          <div class="tool-grid">
+            <button
+              class="tool-btn active"
+              data-tool="select"
+              onclick="selectTool('select')"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+              </svg>
+              <span>Select</span>
+            </button>
+
+            <button
+              class="tool-btn"
+              data-tool="rect"
+              onclick="selectTool('rect')"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+              </svg>
+              <span>Box</span>
+            </button>
+
+            <button
+              class="tool-btn"
+              data-tool="line"
+              onclick="selectTool('line')"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+              >
+                <line x1="4" y1="20" x2="20" y2="4" />
+              </svg>
+              <span>line</span>
+            </button>
+
+            <button
+              class="tool-btn"
+              data-tool="circle"
+              onclick="selectTool('circle')"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="8" />
+              </svg>
+              <span>Circle</span>
+            </button>
+
+            <button
+              class="tool-btn"
+              data-tool="door"
+              onclick="selectTool('door')"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M4 20V4h12a12 12 0 0 1-12 16z" />
+              </svg>
+              <span>Door</span>
+            </button>
+
+            <button
+              class="tool-btn"
+              data-tool="text"
+              onclick="selectTool('text')"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="4 7 4 4 20 4 20 7" />
+                <line x1="9" y1="20" x2="15" y2="20" />
+                <line x1="12" y1="4" x2="12" y2="20" />
+              </svg>
+              <span>Text</span>
+            </button>
+            <button
+              class="tool-btn"
+              data-tool="stair"
+              onclick="selectTool('stair')"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M4 20h4v-4h4v-4h4V8h4" />
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+              <span>Stairs</span>
+            </button>
+
+            <button
+              class="tool-btn"
+              data-tool="cut"
+              onclick="selectTool('cut')"
+              title="Click a wall line to split a gap, or drag a box to erase part of a shape"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="6" cy="6" r="3" />
+                <circle cx="6" cy="18" r="3" />
+                <line x1="20" y1="4" x2="8.12" y2="15.88" />
+                <line x1="14.47" y1="14.48" x2="20" y2="20" />
+                <line x1="8.12" y1="8.12" x2="12" y2="12" />
+              </svg>
+              <span>Erase</span>
+            </button>
+          </div>
+
+          <!-- HOME ACCESSORIES PALETTE -->
+          <div style="margin-top: 12px">
+            <label
+              style="
+                font-size: 0.72rem;
+                font-weight: 700;
+                color: var(--text-muted);
+                display: block;
+              "
+            >
+              Home Accessories (Click &amp; Place in Room)
+            </label>
+            <div class="acc-grid" id="accessoryPalette"></div>
+          </div>
+
+          <div class="field-row" style="margin-top: 10px">
+            <div class="field">
+              <label>Grid Snap</label>
+              <select
+                id="snapSelect"
+                class="select"
+                onchange="snapSize = Number(this.value)"
+              >
+                <option value="20" selected>20px (Standard)</option>
+                <option value="10">10px (Fine)</option>
+                <option value="1">Off (Freehand)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Show Dimensions</label>
+              <select
+                id="showDimSelect"
+                class="select"
+                onchange="
+                  showDimensions = this.value === '1';
+                  renderCanvas();
+                "
+              >
+                <option value="1" selected>Show Sizes</option>
+                <option value="0">Hide Sizes</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CENTER PANEL: 2D SVG BLUEPRINT & SIMULATION CANVAS -->
+      <main class="canvas-stage">
+        <div class="canvas-hud-top">
+          <div class="hud-pill">
+            <span id="hudFloorTitle" style="color: var(--accent)">
+              Ground Floor
+            </span>
+            <span>&bull;</span>
+            <span id="hudCursorPos" style="font-family: monospace">
+              X: 0, Y: 0
+            </span>
+          </div>
+
+          <div class="hud-pill">
+            <button class="btn btn-sm" onclick="adjustZoom(-0.1)">-</button>
+            <span
+              id="zoomLabel"
+              style="
+                font-family: monospace;
+                min-width: 44px;
+                text-align: center;
+              "
+            >
+              100%
+            </span>
+            <button class="btn btn-sm" onclick="adjustZoom(0.1)">+</button>
+            <button class="btn btn-sm" onclick="resetZoom()">Reset</button>
+          </div>
+        </div>
+
+        <div class="canvas-viewport tool-select" id="canvasViewport">
+          <svg
+            id="floorSvg"
+            width="920"
+            height="600"
+            viewBox="0 0 920 600"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <pattern
+                id="minorGrid"
+                width="20"
+                height="20"
+                patternUnits="userSpaceOnUse"
+              >
+                <path
+                  d="M 20 0 L 0 0 0 20"
+                  fill="none"
+                  stroke="var(--grid-minor)"
+                  stroke-width="1"
+                />
+              </pattern>
+              <pattern
+                id="majorGrid"
+                width="100"
+                height="100"
+                patternUnits="userSpaceOnUse"
+              >
+                <rect width="100" height="100" fill="url(#minorGrid)" />
+                <path
+                  d="M 100 0 L 0 0 0 100"
+                  fill="none"
+                  stroke="var(--grid-major)"
+                  stroke-width="1.2"
+                />
+              </pattern>
+            </defs>
+
+            <!-- Background Blueprint Grid -->
+            <rect
+              id="svgGridBg"
+              width="920"
+              height="600"
+              fill="url(#majorGrid)"
+            />
+
+            <!-- Drawn Shapes Layer -->
+            <g id="shapesLayer"></g>
+
+            <!-- Active Selection & Resize Handles Layer -->
+            <g id="handlesLayer"></g>
+          </svg>
+        </div>
+
+        <!-- Live Simulation Status Pill -->
+        <div class="sim-banner">
+          <span class="pulse-dot"></span>
+          <span id="simStatusText">
+            Live Simulation Active — Click any linked Room, Switch Circle, or
+            Label!
+          </span>
+        </div>
+      </main>
+
+      <!-- RIGHT PANEL: SHAPE INSPECTOR & CLICKABLE IOT BINDING -->
+      <aside class="side-panel right-panel">
+        <div class="panel-card" id="noSelectionCard">
+          <div class="panel-title">
+            <span>Shape Inspector</span>
+          </div>
+          <p
+            style="
+              font-size: 0.78rem;
+              color: var(--text-muted);
+              line-height: 1.5;
+            "
+          >
+            Select any <strong>Room Rectangle</strong>,
+            <strong>Wall Line</strong>, <strong>Circle Node</strong>, or
+            <strong>Text Label</strong> on the canvas to customize its geometry,
+            colors, and clickable Smart Hub connection.
+          </p>
+        </div>
+
+        <!-- Active Element Properties -->
+        <div
+          id="inspectorContent"
+          style="display: none; flex-direction: column; gap: 14px"
+        >
+          <div class="panel-card">
+            <div class="panel-title">
+              <span id="inspTypeTitle">Room / Shape</span>
+              <span class="step-tag" id="inspIdBadge">#id</span>
+            </div>
+
+            <div class="field">
+              <label>Label / Room Name</label>
+              <input
+                type="text"
+                id="inspLabel"
+                class="input"
+                placeholder="e.g. Living Room, Ceiling Fan"
+                oninput="updateSelectedProp('label', this.value)"
+              />
+            </div>
+
+            <!-- Dynamic Geometry Fields -->
+            <div class="field-row" id="geomPosRow">
+              <div class="field">
+                <label id="lblX1">X Position</label>
+                <input
+                  type="number"
+                  id="inspX"
+                  class="input"
+                  oninput="updateSelectedGeom()"
+                />
+              </div>
+              <div class="field">
+                <label id="lblY1">Y Position</label>
+                <input
+                  type="number"
+                  id="inspY"
+                  class="input"
+                  oninput="updateSelectedGeom()"
+                />
+              </div>
+            </div>
+
+            <div class="field-row" id="geomSizeRow">
+              <div class="field">
+                <label id="lblW">Width / X2</label>
+                <input
+                  type="number"
+                  id="inspW"
+                  class="input"
+                  oninput="updateSelectedGeom()"
+                />
+              </div>
+              <div class="field" id="geomHWrap">
+                <label id="lblH">Height / Y2</label>
+                <input
+                  type="number"
+                  id="inspH"
+                  class="input"
+                  oninput="updateSelectedGeom()"
+                />
+              </div>
+            </div>
+
+            <div class="field" style="margin-top: 8px">
+              <label>Accent / Stroke Color</label>
+              <div class="swatch-row" id="inspColorSwatches"></div>
+            </div>
+
+            <div class="field-row" style="margin-top: 8px">
+              <div class="field">
+                <label>Wall / Line Width</label>
+                <input
+                  type="number"
+                  id="inspStrokeWidth"
+                  class="input"
+                  min="1"
+                  max="16"
+                  value="2"
+                  oninput="
+                    updateSelectedProp('strokeWidth', Number(this.value))
+                  "
+                />
+              </div>
+              <div class="field">
+                <label>Fill Opacity</label>
+                <select
+                  id="inspFillOpacity"
+                  class="select"
+                  onchange="
+                    updateSelectedProp('fillOpacity', Number(this.value))
+                  "
+                >
+                  <option value="0">0% (Transparent)</option>
+                  <option value="0.12">12% (Subtle Room)</option>
+                  <option value="0.22">22% (Standard)</option>
+                  <option value="0.4">40% (Solid Glow)</option>
+                  <option value="0.85">85% (Opaque)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field-row" style="margin-top: 8px">
+              <div class="field">
+                <label>Line Style</label>
+                <select
+                  id="inspDash"
+                  class="select"
+                  onchange="updateSelectedProp('dashed', this.value === '1')"
+                >
+                  <option value="0">Solid Line</option>
+                  <option value="1">Dashed Line</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Label Size (px)</label>
+                <input
+                  type="number"
+                  id="inspFontSize"
+                  class="input"
+                  min="9"
+                  max="36"
+                  value="13"
+                  oninput="updateSelectedProp('fontSize', Number(this.value))"
+                />
+              </div>
+            </div>
+
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 6px;
+                margin-top: 12px;
+              "
+            >
+              <button
+                class="btn btn-sm"
+                onclick="reorderSelected(1)"
+                title="Bring Forward"
+              >
+                Front
+              </button>
+              <button
+                class="btn btn-sm"
+                onclick="reorderSelected(-1)"
+                title="Send Backward"
+              >
+                Back
+              </button>
+              <button
+                class="btn btn-sm"
+                onclick="duplicateSelected()"
+                title="Clone Shape (Ctrl+D)"
+              >
+                Clone
+              </button>
+              <button
+                class="btn btn-sm btn-danger"
+                onclick="deleteSelected()"
+                title="Delete Shape (Del)"
+              >
+                Del
+              </button>
+            </div>
+          </div>
+
+          <!-- CLICKABLE IOT HUB LINKER -->
+          <div class="panel-card">
+            <div class="panel-title">
+              <span>Clickable Hub Link</span>
+              <span class="step-tag">INTERACTIVE</span>
+            </div>
+
+            <div class="field">
+              <label>Connection Category</label>
+              <select
+                id="inspLinkType"
+                class="select"
+                onchange="onLinkTypeChange(this.value)"
+              >
+                <option value="none">None (Static Drawing Only)</option>
+                <option value="shortcut">
+                  Shortcut Button (Toggle ON/OFF)
+                </option>
+                <option value="device">ESP Device (Open Web UI)</option>
+                <option value="group">Group (Room Category)</option>
+                <option value="favorite">Favorites Bundle</option>
+              </select>
+            </div>
+
+            <div class="field" id="linkTargetWrap" style="display: none">
+              <label>Select Target Item</label>
+              <select
+                id="inspLinkTarget"
+                class="select"
+                onchange="onLinkTargetChange(this.value)"
+              ></select>
+            </div>
+
+            <div class="field" id="linkCustomNameWrap" style="display: none">
+              <label>Display Badge / Action Tag</label>
+              <input
+                type="text"
+                id="inspLinkTitle"
+                class="input"
+                placeholder="e.g. Relay CH-1"
+                oninput="updateSelectedLink('targetName', this.value)"
+              />
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- ========================================================================
+         FLOOR RENAME / EDIT MODAL
+         ======================================================================== -->
+    <div class="modal-backdrop" id="floorEditModal">
+      <div class="modal">
+        <div class="modal-head">
+          <h3>Edit Floor Details</h3>
+          <button class="btn btn-sm" onclick="closeFloorEditModal()">
+            &times;
+          </button>
+        </div>
+        <div class="field">
+          <label>Floor Name</label>
+          <input
+            type="text"
+            id="editFloorNameInput"
+            class="input"
+            placeholder="e.g. Ground Floor, First Floor, Terrace"
+          />
+        </div>
+        <div class="field">
+          <label>Floor Level Tag (Short Code)</label>
+          <input
+            type="text"
+            id="editFloorCodeInput"
+            class="input"
+            maxlength="3"
+            placeholder="e.g. G, 1F, 2F, R"
+          />
+        </div>
+        <div
+          style="
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 14px;
+          "
+        >
+          <button class="btn" onclick="closeFloorEditModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveFloorEditModal()">
+            Save Floor
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================
+         LIVE SIMULATION INTERACTION MODAL (FOR DEVICES / GROUPS / FAVORITES)
+         ======================================================================== -->
+    <div
+      class="modal-backdrop"
+      id="simActionModal"
+      onclick="if (event.target === this) closeSimModal();"
+    >
+      <div class="modal">
+        <div class="modal-head">
+          <h3 id="simModalTitle">Connected Hub Item</h3>
+          <button class="btn btn-sm" onclick="closeSimModal()">&times;</button>
+        </div>
+        <div
+          id="simModalBody"
+          style="font-size: 0.85rem; line-height: 1.5"
+        ></div>
+        <div
+          style="
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 16px;
+          "
+        >
+          <button class="btn btn-primary" onclick="closeSimModal()">
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- ========================================================================
+         APPLICATION JAVASCRIPT
+         ======================================================================== -->
+    <script>
+      const HUB_CONFIG_KEY = "esp_iot_hub_config_v1";
+      const DESIGN_STORAGE_KEY = "esp_iot_hub_building_design_v1";
+
+      const SWATCHES = [
+        "#38bdf8",
+        "#22c55e",
+        "#a855f7",
+        "#f59e0b",
+        "#f43f5e",
+        "#14b8a6",
+        "#6366f1",
+        "#94a3b8",
+        "#ffffff",
+      ];
+
+      const ACCESSORY_ICONS = {
+        plug: {
+          label: "Plug",
+          color: "#38bdf8",
+          svg: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
+        },
+        bulb: {
+          label: "Bulb",
+          color: "#fbbf24",
+          svg: '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>',
+        },
+        fan: {
+          label: "Fan",
+          color: "#38bdf8",
+          svg: '<path d="M12 12c0-3 2.5-5 5-5 2.8 0 5 2.2 5 5s-2.2 5-5 5h-5"/><path d="M12 12c3 0 5 2.5 5 5 0 2.8-2.2 5-5 5s-5-2.2-5-5v-5"/><path d="M12 12c0 3-2.5 5-5 5-2.8 0-5-2.2-5-5s2.2-5 5-5h5"/><path d="M12 12c-3 0-5-2.5-5-5 0-2.8 2.2-5 5-5s5 2.2 5 5v5"/>',
+        },
+        ac: {
+          label: "AC",
+          color: "#14b8a6",
+          svg: '<rect x="2" y="5" width="20" height="9" rx="2"/><path d="M6 14v3"/><path d="M10 14v4"/><path d="M14 14v4"/><path d="M18 14v3"/>',
+        },
+        tv: {
+          label: "TV",
+          color: "#a855f7",
+          svg: '<rect x="2" y="6" width="20" height="13" rx="2"/><line x1="8" y1="22" x2="16" y2="22"/><line x1="12" y1="19" x2="12" y2="22"/>',
+        },
+        speaker: {
+          label: "Speaker",
+          color: "#f43f5e",
+          svg: '<rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="14" r="4"/><line x1="12" y1="6" x2="12.01" y2="6"/>',
+        },
+        router: {
+          label: "Router",
+          color: "#22c55e",
+          svg: '<rect x="2" y="14" width="20" height="7" rx="2"/><path d="M6 17.5h.01"/><path d="M10 17.5h.01"/><path d="M15 10v4"/><path d="M18.5 7.5a5 5 0 0 0-7 0"/>',
+        },
+        oven: {
+          label: "Oven",
+          color: "#f59e0b",
+          svg: '<rect x="3" y="4" width="18" height="16" rx="2"/><rect x="6" y="10" width="12" height="7" rx="1"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="11" y1="7" x2="11.01" y2="7"/>',
+        },
+        fridge: {
+          label: "Fridge",
+          color: "#6366f1",
+          svg: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="5" y1="10" x2="19" y2="10"/><line x1="8" y1="6" x2="8" y2="8"/><line x1="8" y1="13" x2="8" y2="16"/>',
+        },
+        pump: {
+          label: "Pump",
+          color: "#0ea5e9",
+          svg: '<circle cx="12" cy="12" r="6"/><path d="M12 6V2h6"/><path d="M6 12H2v4"/><circle cx="12" cy="12" r="2"/>',
+        },
+      };
+
+      let activeAccessoryKey = "bulb";
+
+      // Fallback Demo Targets (Merged with actual Hub NVS localStorage if available)
+      const DEMO_TARGETS = {
+        shortcut: [
+          { id: "sc_living_light", name: "Living Room Main Light (CH-1)" },
+          { id: "sc_ac_relay", name: "Master Bedroom Split AC" },
+          { id: "sc_ceiling_fan", name: "Atomberg BLDC Fan" },
+          { id: "sc_kitchen_exhaust", name: "Kitchen Chimneys & Exhaust" },
+          { id: "sc_garden_pump", name: "Outdoor Water Pump" },
+        ],
+        device: [
+          {
+            id: "dev_switch_4ch",
+            name: "4-CH Smart Switch Node (192.168.0.51)",
+          },
+          {
+            id: "dev_led_matrix",
+            name: "ESP LED Studio Matrix (192.168.0.60)",
+          },
+          { id: "dev_solar_mon", name: "RS485 Solar Telemetry (192.168.0.75)" },
+          { id: "dev_cam_gate", name: "ESP32-S3 Gate Camera (192.168.0.88)" },
+        ],
+        group: [
+          { id: "grp_living", name: "Living & Hall Group" },
+          { id: "grp_bedroom", name: "Master Bedroom Group" },
+          { id: "grp_solar", name: "Solar & Inverter Room" },
+          { id: "grp_workshop", name: "Electronics Lab & Desk" },
+        ],
+        favorite: [
+          { id: "fav_night_mode", name: "All Lights Master Bundle" },
+          { id: "fav_work_desk", name: "Lab Bench Power Bundle" },
+          { id: "fav_morning", name: "Morning Solar & Geyser" },
+        ],
+      };
+
+      /* ========================================================================
+         STATE VARIABLES
+         ======================================================================== */
+      let building = null;
+      let activeFloorId = null;
+      let selectedShapeId = null;
+      let activeTool = "select"; // "select" | "rect" | "line" | "circle" | "door" | "text"
+      let appMode = "design"; // "design" | "sim"
+      let snapSize = 20;
+      let showDimensions = true;
+      let zoomLevel = 1;
+
+      // Pointer / Dragging State
+      let dragState = null;
+      let undoStack = [];
+      let editingFloorModalId = null;
+
+      // Simulation Runtime State (stores live ON/OFF state per shape ID)
+      let simSwitchStates = {};
+
+      const svgEl = document.getElementById("floorSvg");
+      const shapesLayer = document.getElementById("shapesLayer");
+      const handlesLayer = document.getElementById("handlesLayer");
+
+      /* ========================================================================
+         1. INITIALIZATION & SAMPLE SMART HOME GENERATOR
+         ======================================================================== */
+      function applyHubTheme() {
+        try {
+          const hubRaw = JSON.parse(localStorage.getItem(HUB_CONFIG_KEY));
+          if (hubRaw?.settings?.theme) {
+            document.documentElement.setAttribute(
+              "data-theme",
+              hubRaw.settings.theme,
+            );
+          }
+        } catch (_) {}
+      }
+
+      function createDefaultSampleBuilding() {
+        return {
+          name: "Vaikunth Smart Villa",
+          unit: "ft",
+          width: 920,
+          height: 600,
+          floors: [
+            {
+              id: "fl_0",
+              name: "Ground Floor",
+              code: "G",
+              shapes: [
+                // Outer Building Footprint
+                {
+                  id: "sh_outer_g",
+                  type: "rect",
+                  x: 80,
+                  y: 60,
+                  w: 760,
+                  h: 480,
+                  label: "",
+                  color: "#94a3b8",
+                  strokeWidth: 4,
+                  fillOpacity: 0,
+                  dashed: false,
+                  fontSize: 14,
+                  link: { type: "none", targetId: "", targetName: "" },
+                },
+                // Living Room
+                {
+                  id: "sh_living",
+                  type: "rect",
+                  x: 80,
+                  y: 60,
+                  w: 440,
+                  h: 300,
+                  label: "Living & Hall",
+                  color: "#38bdf8",
+                  strokeWidth: 2.5,
+                  fillOpacity: 0.12,
+                  dashed: false,
+                  fontSize: 15,
+                  link: {
+                    type: "group",
+                    targetId: "grp_living",
+                    targetName: "Living & Hall Group",
+                  },
+                },
+                // Kitchen & Dining
+                {
+                  id: "sh_kitchen",
+                  type: "rect",
+                  x: 520,
+                  y: 60,
+                  w: 320,
+                  h: 240,
+                  label: "All-Electric Kitchen",
+                  color: "#f59e0b",
+                  strokeWidth: 2.5,
+                  fillOpacity: 0.12,
+                  dashed: false,
+                  fontSize: 14,
+                  link: {
+                    type: "shortcut",
+                    targetId: "sc_kitchen_exhaust",
+                    targetName: "Kitchen Exhaust",
+                  },
+                },
+                // Guest Bedroom
+                {
+                  id: "sh_guest",
+                  type: "rect",
+                  x: 80,
+                  y: 360,
+                  w: 320,
+                  h: 180,
+                  label: "Guest Bedroom",
+                  color: "#a855f7",
+                  strokeWidth: 2.5,
+                  fillOpacity: 0.12,
+                  dashed: false,
+                  fontSize: 14,
+                  link: {
+                    type: "device",
+                    targetId: "dev_switch_4ch",
+                    targetName: "4-CH Smart Switch",
+                  },
+                },
+                // Main Veranda / Entrance Lobby
+                {
+                  id: "sh_lobby",
+                  type: "rect",
+                  x: 400,
+                  y: 360,
+                  w: 220,
+                  h: 180,
+                  label: "Entrance Porch",
+                  color: "#14b8a6",
+                  strokeWidth: 2,
+                  fillOpacity: 0.12,
+                  dashed: true,
+                  fontSize: 13,
+                  link: {
+                    type: "device",
+                    targetId: "dev_cam_gate",
+                    targetName: "Gate Camera",
+                  },
+                },
+                // Inverter & Solar Telemetry Room
+                {
+                  id: "sh_utility",
+                  type: "rect",
+                  x: 620,
+                  y: 300,
+                  w: 220,
+                  h: 240,
+                  label: "Solar & Inverter Bay",
+                  color: "#22c55e",
+                  strokeWidth: 2.5,
+                  fillOpacity: 0.12,
+                  dashed: false,
+                  fontSize: 13,
+                  link: {
+                    type: "device",
+                    targetId: "dev_solar_mon",
+                    targetName: "RS485 Solar Telemetry",
+                  },
+                },
+                // Doors
+                {
+                  id: "sh_door_main",
+                  type: "door",
+                  x: 480,
+                  y: 500,
+                  w: 40,
+                  h: 40,
+                  label: "Main Door",
+                  color: "#38bdf8",
+                  strokeWidth: 2,
+                  fillOpacity: 0.12,
+                  dashed: false,
+                  fontSize: 10,
+                  link: { type: "none", targetId: "", targetName: "" },
+                },
+                // Circular Smart Nodes (Ceiling Fan & Lights)
+                {
+                  id: "sh_node_fan",
+                  type: "circle",
+                  x: 300,
+                  y: 200,
+                  r: 26,
+                  label: "BLDC Fan",
+                  color: "#38bdf8",
+                  strokeWidth: 2.5,
+                  fillOpacity: 0.22,
+                  dashed: false,
+                  fontSize: 11,
+                  link: {
+                    type: "shortcut",
+                    targetId: "sc_ceiling_fan",
+                    targetName: "Atomberg Fan",
+                  },
+                },
+                {
+                  id: "sh_node_light",
+                  type: "circle",
+                  x: 160,
+                  y: 130,
+                  r: 20,
+                  label: "Chandelier",
+                  color: "#22c55e",
+                  strokeWidth: 2.5,
+                  fillOpacity: 0.22,
+                  dashed: false,
+                  fontSize: 10,
+                  link: {
+                    type: "shortcut",
+                    targetId: "sc_living_light",
+                    targetName: "Living Light",
+                  },
+                },
+                // Partition Wall Line
+                {
+                  id: "sh_wall_1",
+                  type: "line",
+                  x1: 400,
+                  y1: 360,
+                  x2: 520,
+                  y2: 360,
+                  label: "Archway",
+                  color: "#f43f5e",
+                  strokeWidth: 4,
+                  fillOpacity: 0,
+                  dashed: true,
+                  fontSize: 11,
+                  link: { type: "none", targetId: "", targetName: "" },
+                },
+                // Clickable Text Label
+                {
+                  id: "sh_txt_master",
+                  type: "text",
+                  x: 460,
+                  y: 35,
+                  label: "★ Master Night Mode (Click to Trigger)",
+                  color: "#38bdf8",
+                  strokeWidth: 1,
+                  fillOpacity: 1,
+                  dashed: false,
+                  fontSize: 14,
+                  link: {
+                    type: "favorite",
+                    targetId: "fav_night_mode",
+                    targetName: "All Lights Master Bundle",
+                  },
+                },
+              ],
+            },
+            {
+              id: "fl_1",
+              name: "First Floor",
+              code: "1F",
+              shapes: [
+                {
+                  id: "sh_outer_1f",
+                  type: "rect",
+                  x: 80,
+                  y: 60,
+                  w: 760,
+                  h: 480,
+                  label: "",
+                  color: "#94a3b8",
+                  strokeWidth: 4,
+                  fillOpacity: 0,
+                  dashed: false,
+                  fontSize: 14,
+                  link: { type: "none", targetId: "", targetName: "" },
+                },
+                {
+                  id: "sh_master_bed",
+                  type: "rect",
+                  x: 80,
+                  y: 60,
+                  w: 400,
+                  h: 320,
+                  label: "Master Bedroom",
+                  color: "#38bdf8",
+                  strokeWidth: 2.5,
+                  fillOpacity: 0.12,
+                  dashed: false,
+                  fontSize: 15,
+                  link: {
+                    type: "group",
+                    targetId: "grp_bedroom",
+                    targetName: "Master Bedroom Group",
+                  },
+                },
+                {
+                  id: "sh_iot_lab",
+                  type: "rect",
+                  x: 480,
+                  y: 60,
+                  w: 360,
+                  h: 320,
+                  label: "IoT & PCB Hardware Lab",
+                  color: "#a855f7",
+                  strokeWidth: 2.5,
+                  fillOpacity: 0.12,
+                  dashed: false,
+                  fontSize: 14,
+                  link: {
+                    type: "favorite",
+                    targetId: "fav_work_desk",
+                    targetName: "Lab Bench Power Bundle",
+                  },
+                },
+                {
+                  id: "sh_balcony",
+                  type: "rect",
+                  x: 80,
+                  y: 380,
+                  w: 760,
+                  h: 160,
+                  label: "Open Terrace & 8kW Solar Array",
+                  color: "#22c55e",
+                  strokeWidth: 2.5,
+                  fillOpacity: 0.12,
+                  dashed: true,
+                  fontSize: 14,
+                  link: {
+                    type: "device",
+                    targetId: "dev_solar_mon",
+                    targetName: "Solar Array Telemetry",
+                  },
+                },
+                {
+                  id: "sh_matrix_node",
+                  type: "circle",
+                  x: 660,
+                  y: 220,
+                  r: 28,
+                  label: "LED Matrix",
+                  color: "#f43f5e",
+                  strokeWidth: 2.5,
+                  fillOpacity: 0.22,
+                  dashed: false,
+                  fontSize: 11,
+                  link: {
+                    type: "device",
+                    targetId: "dev_led_matrix",
+                    targetName: "ESP LED Studio",
+                  },
+                },
+              ],
+            },
+          ],
+        };
+      }
+
+      function init() {
+        applyHubTheme();
+        try {
+          const saved = localStorage.getItem(DESIGN_STORAGE_KEY);
+          building = saved ? JSON.parse(saved) : createDefaultSampleBuilding();
+        } catch {
+          building = createDefaultSampleBuilding();
+        }
+        if (!building.floors || !building.floors.length) {
+          building = createDefaultSampleBuilding();
+        }
+        activeFloorId = building.floors[0].id;
+        syncBuildingInputs();
+        renderFloorList();
+        renderAccessoryPalette();
+        renderCanvas();
+        setupCanvasEvents();
+      }
+
+      function pushUndo() {
+        undoStack.push(JSON.stringify(building));
+        if (undoStack.length > 30) undoStack.shift();
+      }
+
+      function undo() {
+        if (!undoStack.length) return showToast("Nothing to undo");
+        building = JSON.parse(undoStack.pop());
+        if (!building.floors.some((f) => f.id === activeFloorId)) {
+          activeFloorId = building.floors[0].id;
+        }
+        selectedShapeId = null;
+        syncBuildingInputs();
+        renderFloorList();
+        renderCanvas();
+        updateInspector();
+        showToast("Undid last action");
+      }
+
+      function loadDemoSmartHome() {
+        if (
+          !confirm(
+            "Load the 2-Floor Smart Home sample layout? Current unsaved canvas changes will be replaced.",
+          )
+        )
+          return;
+        pushUndo();
+        building = createDefaultSampleBuilding();
+        activeFloorId = building.floors[0].id;
+        selectedShapeId = null;
+        syncBuildingInputs();
+        renderFloorList();
+        renderCanvas();
+        updateInspector();
+        showToast("2-Floor Smart Home layout loaded!");
+      }
+
+      /* ========================================================================
+         2. STEP 1 & STEP 2: BUILDING & FLOOR MANAGEMENT
+         ======================================================================== */
+      function getFloorNameByIndex(idx) {
+        if (idx === 0) return { name: "Ground Floor", code: "G" };
+        if (idx === 1) return { name: "First Floor", code: "1F" };
+        if (idx === 2) return { name: "Second Floor", code: "2F" };
+        if (idx === 3) return { name: "Third Floor", code: "3F" };
+        return { name: `Floor ${idx}`, code: `${idx}F` };
+      }
+
+      function syncBuildingInputs() {
+        document.getElementById("bldgNameInput").value =
+          building.name || "My Smart Home";
+        document.getElementById("topBuildingName").textContent = (
+          building.name || "MY SMART HOME"
+        ).toUpperCase();
+        document.getElementById("bldgUnitSelect").value = building.unit || "ft";
+        document.getElementById("quickFloorCount").value = String(
+          Math.min(5, building.floors.length),
+        );
+      }
+
+      function updateBuildingMeta() {
+        building.name =
+          document.getElementById("bldgNameInput").value.trim() ||
+          "My Smart Home";
+        building.unit = document.getElementById("bldgUnitSelect").value;
+        document.getElementById("topBuildingName").textContent =
+          building.name.toUpperCase();
+        renderCanvas();
+      }
+
+      function syncFloorCount(targetCount) {
+        pushUndo();
+        while (building.floors.length < targetCount) {
+          const idx = building.floors.length;
+          const meta = getFloorNameByIndex(idx);
+          building.floors.push({
+            id: "fl_" + Date.now().toString(36) + "_" + idx,
+            name: meta.name,
+            code: meta.code,
+            shapes: [
+              {
+                id: "sh_outer_" + idx,
+                type: "rect",
+                x: 80,
+                y: 60,
+                w: 760,
+                h: 480,
+                label: `${meta.name} Footprint`,
+                color: "#94a3b8",
+                strokeWidth: 4,
+                fillOpacity: 0,
+                dashed: false,
+                fontSize: 14,
+                link: { type: "none", targetId: "", targetName: "" },
+              },
+            ],
+          });
+        }
+        if (building.floors.length > targetCount) {
+          if (
+            !confirm(
+              `Reduce building to ${targetCount} floor(s)? Upper floors above level ${targetCount} will be removed.`,
+            )
+          ) {
+            document.getElementById("quickFloorCount").value = String(
+              building.floors.length,
+            );
+            return;
+          }
+          building.floors = building.floors.slice(0, targetCount);
+          if (!building.floors.some((f) => f.id === activeFloorId)) {
+            activeFloorId = building.floors[building.floors.length - 1].id;
+          }
+        }
+        renderFloorList();
+        renderCanvas();
+        showToast(`Building set to ${building.floors.length} floor(s)`);
+      }
+
+      function getActiveFloor() {
+        return (
+          building.floors.find((f) => f.id === activeFloorId) ||
+          building.floors[0]
+        );
+      }
+
+      function switchFloor(floorId) {
+        activeFloorId = floorId;
+        selectedShapeId = null;
+        renderFloorList();
+        renderCanvas();
+        updateInspector();
+      }
+
+      function addFloor() {
+        pushUndo();
+        const idx = building.floors.length;
+        const meta = getFloorNameByIndex(idx);
+        const newFloor = {
+          id: "fl_" + Date.now().toString(36),
+          name: meta.name,
+          code: meta.code,
+          shapes: [
+            {
+              id: "sh_outer_" + Date.now().toString(36),
+              type: "rect",
+              x: 80,
+              y: 60,
+              w: 760,
+              h: 480,
+              label: "",
+              color: "#94a3b8",
+              strokeWidth: 4,
+              fillOpacity: 0,
+              dashed: false,
+              fontSize: 14,
+              link: { type: "none", targetId: "", targetName: "" },
+            },
+          ],
+        };
+        building.floors.push(newFloor);
+        activeFloorId = newFloor.id;
+        selectedShapeId = null;
+        syncBuildingInputs();
+        renderFloorList();
+        renderCanvas();
+        updateInspector();
+        showToast(`Added ${newFloor.name}`);
+      }
+
+      function cloneActiveFloor(sourceFloorId = null) {
+        const src = sourceFloorId
+          ? building.floors.find((f) => f.id === sourceFloorId)
+          : getActiveFloor();
+        if (!src) return;
+        pushUndo();
+        const clonedShapes = JSON.parse(JSON.stringify(src.shapes)).map(
+          (s, i) => ({
+            ...s,
+            id: "sh_" + Date.now().toString(36) + "_" + i,
+          }),
+        );
+        const idx = building.floors.length;
+        const newFloor = {
+          id: "fl_" + Date.now().toString(36),
+          name: `${src.name} (Copy)`,
+          code: `${idx}F`,
+          shapes: clonedShapes,
+        };
+        building.floors.push(newFloor);
+        activeFloorId = newFloor.id;
+        selectedShapeId = null;
+        syncBuildingInputs();
+        renderFloorList();
+        renderCanvas();
+        updateInspector();
+        showToast(`Cloned "${src.name}"`);
+      }
+
+      function openFloorEditModal(floorId, e) {
+        if (e) e.stopPropagation();
+        const fl = building.floors.find((f) => f.id === floorId);
+        if (!fl) return;
+        editingFloorModalId = floorId;
+        document.getElementById("editFloorNameInput").value = fl.name;
+        document.getElementById("editFloorCodeInput").value = fl.code || "F";
+        document.getElementById("floorEditModal").classList.add("open");
+      }
+
+      function closeFloorEditModal() {
+        document.getElementById("floorEditModal").classList.remove("open");
+        editingFloorModalId = null;
+      }
+
+      function saveFloorEditModal() {
+        const fl = building.floors.find((f) => f.id === editingFloorModalId);
+        if (!fl) return;
+        const name = document.getElementById("editFloorNameInput").value.trim();
+        const code = document.getElementById("editFloorCodeInput").value.trim();
+        if (!name) return showToast("Floor name required");
+        pushUndo();
+        fl.name = name;
+        fl.code = code || "F";
+        closeFloorEditModal();
+        renderFloorList();
+        renderCanvas();
+        showToast("Floor updated");
+      }
+
+      function deleteFloor(floorId, e) {
+        if (e) e.stopPropagation();
+        if (building.floors.length <= 1) {
+          return showToast("At least 1 floor is required in the building");
+        }
+        const fl = building.floors.find((f) => f.id === floorId);
+        if (!confirm(`Delete "${fl?.name}" and all rooms on it?`)) return;
+        pushUndo();
+        building.floors = building.floors.filter((f) => f.id !== floorId);
+        if (activeFloorId === floorId) {
+          activeFloorId = building.floors[0].id;
+        }
+        selectedShapeId = null;
+        syncBuildingInputs();
+        renderFloorList();
+        renderCanvas();
+        updateInspector();
+        showToast("Floor deleted");
+      }
+
+      function renderFloorList() {
+        const box = document.getElementById("floorListContainer");
+        document.getElementById("floorCountBadge").textContent =
+          building.floors.length;
+        const activeFl = getActiveFloor();
+        document.getElementById("topFloorBadge").textContent = activeFl.name;
+        document.getElementById("hudFloorTitle").textContent = activeFl.name;
+
+        const floorsHtml = building.floors
+          .map((fl) => {
+            const isAct = fl.id === activeFloorId;
+            const roomCount = fl.shapes.filter((s) => s.type === "rect").length;
+            const linkedCount = fl.shapes.filter(
+              (s) => s.link && s.link.type !== "none",
+            ).length;
+            return `
+              <div class="floor-item ${isAct ? "active" : ""}" onclick="switchFloor('${fl.id}')">
+                <div class="floor-item-left">
+                  <div class="floor-level-badge">${escapeHtml(fl.code || "F")}</div>
+                  <div style="min-width:0">
+                    <div class="floor-name">${escapeHtml(fl.name)}</div>
+                    <div class="floor-meta">${roomCount} boxes &bull; ${linkedCount} linked</div>
+                  </div>
+                </div>
+                <div class="floor-actions">
+                  <button class="icon-action" title="Clone Floor" onclick="event.stopPropagation(); cloneActiveFloor('${fl.id}')">&#10697;</button>
+                  <button class="icon-action" title="Edit Floor Name" onclick="openFloorEditModal('${fl.id}', event)">&#9998;</button>
+                  <button class="icon-action del" title="Delete Floor" onclick="deleteFloor('${fl.id}', event)">&times;</button>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+
+        box.innerHTML =
+          floorsHtml + `<div class="stack-roof" title="Building Roof"></div>`;
+      }
+
+      /* ========================================================================
+         3. STEP 3: 2D SVG CANVAS RENDERING & GEOMETRY
+         ======================================================================== */
+      function snap(val) {
+        return Math.round(val / snapSize) * snapSize;
+      }
+
+      function formatDim(px) {
+        const unit = building.unit || "ft";
+        if (unit === "ft") {
+          const ft = ((px / 20) * 2).toFixed(0);
+          return `${ft}ft`;
+        }
+        const m = ((px / 20) * 0.5).toFixed(1);
+        return `${m}m`;
+      }
+
+      function renderAccessoryPalette() {
+        const box = document.getElementById("accessoryPalette");
+        if (!box) return;
+        box.innerHTML = Object.entries(ACCESSORY_ICONS)
+          .map(
+            ([key, item]) => `
+            <button type="button" class="acc-btn ${activeTool === "icon" && activeAccessoryKey === key ? "active" : ""}"
+                    onclick="selectAccessory('${key}')" title="Place ${item.label}">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${item.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${item.svg}</svg>
+              <span>${item.label}</span>
+            </button>
+          `,
+          )
+          .join("");
+      }
+
+      function selectAccessory(key) {
+        activeAccessoryKey = key;
+        selectTool("icon");
+      }
+
+      function selectTool(tool) {
+        if (appMode === "sim") setAppMode("design");
+        activeTool = tool;
+        document.querySelectorAll(".tool-btn").forEach((b) => {
+          b.classList.toggle("active", b.dataset.tool === tool);
+        });
+        renderAccessoryPalette();
+        document
+          .getElementById("canvasViewport")
+          .classList.toggle("tool-select", tool === "select");
+      }
+
+      function setAppMode(mode) {
+        appMode = mode;
+        document
+          .getElementById("designModeBtn")
+          .classList.toggle("active", mode === "design");
+        document
+          .getElementById("simModeBtn")
+          .classList.toggle("active", mode === "sim");
+        document
+          .getElementById("workspace")
+          .classList.toggle("sim-active", mode === "sim");
+        document.getElementById("svgGridBg").style.opacity =
+          mode === "sim" ? "0.25" : "1";
+
+        if (mode === "sim") {
+          selectedShapeId = null;
+          showToast(
+            "Live Simulation Started! Click any glowing room or switch.",
+          );
+        }
+        renderCanvas();
+        updateInspector();
+      }
+
+      function renderCanvas() {
+        const floor = getActiveFloor();
+        if (!floor) return;
+
+        shapesLayer.innerHTML = floor.shapes
+          .map((s) => renderShapeSvg(s))
+          .join("");
+
+        renderSelectionHandles();
+      }
+
+      function renderShapeSvg(s) {
+        const hasLink = s.link && s.link.type !== "none";
+        const isSimOn = !!simSwitchStates[s.id];
+        const dashAttr = s.dashed ? `stroke-dasharray="7 5"` : "";
+        const color = s.color || "#38bdf8";
+        const sw = s.strokeWidth ?? 2;
+        const fo = s.fillOpacity ?? 0.14;
+        const fs = s.fontSize || 13;
+
+        const linkBadgeText = hasLink
+          ? `${s.link.type.toUpperCase()}: ${s.link.targetName || "Linked"}${
+              s.link.type === "shortcut" ? (isSimOn ? " [ON]" : " [OFF]") : ""
+            }`
+          : "";
+
+        let primHtml = "";
+
+        if (s.type === "rect") {
+          const cx = s.x + s.w / 2;
+          const cy = s.y + s.h / 2;
+          const dimText =
+            showDimensions && s.w >= 60 && s.h >= 40
+              ? `${formatDim(s.w)} × ${formatDim(s.h)}`
+              : "";
+
+          primHtml = `
+            <rect class="shape-prim" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="4"
+              fill="${color}" fill-opacity="${fo}" stroke="${color}" stroke-width="${sw}" ${dashAttr} />
+            ${
+              s.label
+                ? `<text class="shape-label" x="${cx}" y="${cy - (dimText || linkBadgeText ? 6 : 0)}"
+                    text-anchor="middle" dominant-baseline="middle" fill="var(--text)" font-size="${fs}">${escapeHtml(s.label)}</text>`
+                : ""
+            }
+            ${
+              dimText && appMode === "design"
+                ? `<text class="shape-sublabel" x="${cx}" y="${cy + 12}" text-anchor="middle">${dimText}</text>`
+                : ""
+            }
+            ${
+              hasLink
+                ? `<text class="shape-sublabel" x="${cx}" y="${cy + (appMode === "design" && dimText ? 26 : 14)}"
+                    text-anchor="middle" fill="${isSimOn ? "var(--ok)" : color}">⚡ ${escapeHtml(linkBadgeText)}</text>`
+                : ""
+            }
+          `;
+        } else if (s.type === "stair") {
+          // Architectural 2D Staircase (Auto-adjusts horizontal vs vertical steps)
+          const isHoriz = s.w > s.h;
+          const stepGap = 14;
+          const count = Math.max(
+            2,
+            Math.floor((isHoriz ? s.w : s.h) / stepGap),
+          );
+          let stepsSvg = "";
+          for (let i = 1; i < count; i++) {
+            if (isHoriz) {
+              const sx = s.x + (s.w / count) * i;
+              stepsSvg += `<line x1="${sx}" y1="${s.y}" x2="${sx}" y2="${s.y + s.h}" stroke="${color}" stroke-width="1.5" />`;
+            } else {
+              const sy = s.y + (s.h / count) * i;
+              stepsSvg += `<line x1="${s.x}" y1="${sy}" x2="${s.x + s.w}" y2="${sy}" stroke="${color}" stroke-width="1.5" />`;
+            }
+          }
+          const cx = s.x + s.w / 2;
+          const cy = s.y + s.h / 2;
+          const arrowLine = isHoriz
+            ? `<line x1="${s.x + 8}" y1="${cy}" x2="${s.x + s.w - 8}" y2="${cy}" stroke="${color}" stroke-width="2" />`
+            : `<line x1="${cx}" y1="${s.y + s.h - 8}" x2="${cx}" y2="${s.y + 8}" stroke="${color}" stroke-width="2" />`;
+
+          primHtml = `
+            <rect class="shape-prim" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="3"
+              fill="${color}" fill-opacity="${fo}" stroke="${color}" stroke-width="${sw}" />
+            ${stepsSvg}
+            ${arrowLine}
+            ${
+              s.label
+                ? `<text class="shape-sublabel" x="${cx}" y="${s.y + s.h + 13}" text-anchor="middle" fill="var(--text)">${escapeHtml(s.label)}</text>`
+                : ""
+            }
+          `;
+        } else if (s.type === "cut") {
+          // Cut / Erase Mask: Paints over underlying walls/shapes with canvas background
+          const showCutOutline =
+            appMode === "design" && selectedShapeId === s.id;
+          primHtml = `
+            <rect class="shape-prim" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"
+              fill="var(--canvas-bg)" stroke="${
+                appMode === "design"
+                  ? "rgba(239,68,68,0.55)"
+                  : "var(--canvas-bg)"
+              }" stroke-width="${showCutOutline ? 2 : 1}" stroke-dasharray="4 3" />
+          `;
+        } else if (s.type === "icon") {
+          // Home Accessory Stamp
+          const acc = ACCESSORY_ICONS[s.icon] || ACCESSORY_ICONS.bulb;
+          const r = s.r || 20;
+          const iconScale = (r / 18).toFixed(2);
+          primHtml = `
+            <circle class="shape-prim" cx="${s.x}" cy="${s.y}" r="${r}"
+              fill="${color}" fill-opacity="${fo}" stroke="${isSimOn ? "var(--ok)" : color}" stroke-width="${sw}" />
+            <g transform="translate(${s.x - 12 * iconScale}, ${s.y - 12 * iconScale}) scale(${iconScale})"
+               stroke="${isSimOn ? "var(--ok)" : color}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"
+               style="pointer-events:none">
+              ${acc.svg}
+            </g>
+            ${
+              s.label
+                ? `<text class="shape-label" x="${s.x}" y="${s.y + r + 13}"
+                    text-anchor="middle" fill="var(--text)" font-size="${fs}">${escapeHtml(s.label)}</text>`
+                : ""
+            }
+            ${
+              hasLink && s.link.type === "shortcut"
+                ? `<text class="shape-sublabel" x="${s.x}" y="${s.y - r - 5}"
+                    text-anchor="middle" fill="${isSimOn ? "var(--ok)" : color}">${isSimOn ? "● ON" : "○ OFF"}</text>`
+                : ""
+            }
+          `;
+        } else if (s.type === "circle") {
+          primHtml = `
+            <circle class="shape-prim" cx="${s.x}" cy="${s.y}" r="${s.r}"
+              fill="${color}" fill-opacity="${fo}" stroke="${color}" stroke-width="${sw}" ${dashAttr} />
+            <circle cx="${s.x}" cy="${s.y}" r="4" fill="${isSimOn ? "var(--ok)" : color}" />
+            ${
+              s.label
+                ? `<text class="shape-label" x="${s.x}" y="${s.y + s.r + 14}"
+                    text-anchor="middle" fill="var(--text)" font-size="${fs}">${escapeHtml(s.label)}</text>`
+                : ""
+            }
+            ${
+              hasLink && s.link.type === "shortcut"
+                ? `<text class="shape-sublabel" x="${s.x}" y="${s.y - s.r - 6}"
+                    text-anchor="middle" fill="${isSimOn ? "var(--ok)" : color}">${isSimOn ? "● ON" : "○ OFF"}</text>`
+                : ""
+            }
+          `;
+        } else if (s.type === "line") {
+          const mx = (s.x1 + s.x2) / 2;
+          const my = (s.y1 + s.y2) / 2;
+          const len = Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
+          const dimText = showDimensions && len >= 40 ? formatDim(len) : "";
+          primHtml = `
+            <line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="transparent" stroke-width="14" />
+            <line class="shape-prim" x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}"
+              stroke="${color}" stroke-width="${sw}" stroke-linecap="round" ${dashAttr} />
+            ${
+              s.label || (dimText && appMode === "design")
+                ? `<text class="shape-sublabel" x="${mx}" y="${my - 8}" text-anchor="middle" fill="var(--text)">${escapeHtml(
+                    s.label ? `${s.label} (${dimText})` : dimText,
+                  )}</text>`
+                : ""
+            }
+          `;
+        } else if (s.type === "door") {
+          const x = s.x,
+            y = s.y,
+            w = s.w || 40;
+          primHtml = `
+            <path class="shape-prim" d="M ${x} ${y + w} L ${x} ${y} A ${w} ${w} 0 0 1 ${x + w} ${y + w} Z"
+              fill="${color}" fill-opacity="${fo}" stroke="${color}" stroke-width="${sw}" stroke-dasharray="4 2" />
+            <line x1="${x}" y1="${y + w}" x2="${x}" y2="${y}" stroke="${color}" stroke-width="${sw + 1.5}" />
+            ${
+              s.label
+                ? `<text class="shape-sublabel" x="${x + w / 2}" y="${y + w + 12}" text-anchor="middle">${escapeHtml(s.label)}</text>`
+                : ""
+            }
+          `;
+        } else if (s.type === "text") {
+          const approxW = Math.max(70, (s.label || "Label").length * fs * 0.62);
+          const approxH = fs + 16;
+          primHtml = `
+            <rect x="${s.x - approxW / 2}" y="${s.y - approxH / 2}" width="${approxW}" height="${approxH}"
+              rx="4" fill="transparent" stroke="none" style="pointer-events:all" />
+            <text class="shape-prim shape-label" x="${s.x}" y="${s.y}"
+              fill="${isSimOn ? "var(--ok)" : color}" font-size="${fs}"
+              style="pointer-events:all" text-anchor="middle" dominant-baseline="middle">
+              ${escapeHtml(s.label || "Label")}
+            </text>
+          `;
+        }
+
+        return `
+          <g class="svg-shape-group ${hasLink ? "is-clickable" : ""} ${isSimOn ? "sim-on" : ""}"
+             data-shape-id="${s.id}"
+             onmousedown="onShapeMouseDown(event, '${s.id}')"
+             onclick="onShapeClick(event, '${s.id}')">
+            ${primHtml}
+          </g>
+        `;
+      }
+
+      function renderSelectionHandles() {
+        if (appMode === "sim" || !selectedShapeId) {
+          handlesLayer.innerHTML = "";
+          return;
+        }
+        const floor = getActiveFloor();
+        const s = floor.shapes.find((x) => x.id === selectedShapeId);
+        if (!s) {
+          handlesLayer.innerHTML = "";
+          return;
+        }
+
+        if (["rect", "door", "stair", "cut"].includes(s.type)) {
+          const w = s.w || 40;
+          const h = s.type === "door" ? w : s.h;
+          handlesLayer.innerHTML = `
+            <rect class="selection-box" x="${s.x - 3}" y="${s.y - 3}" width="${w + 6}" height="${h + 6}" rx="5" />
+            <rect class="resize-handle" x="${s.x + w - 5}" y="${s.y + h - 5}" width="10" height="10" rx="2"
+              onmousedown="onHandleMouseDown(event, '${s.id}', 'se')" />
+          `;
+        } else if (s.type === "circle" || s.type === "icon") {
+          handlesLayer.innerHTML = `
+            <circle class="selection-box" cx="${s.x}" cy="${s.y}" r="${s.r + 4}" />
+            <circle class="resize-handle" cx="${s.x + s.r}" cy="${s.y}" r="5"
+              onmousedown="onHandleMouseDown(event, '${s.id}', 'radius')" />
+          `;
+        } else if (s.type === "line") {
+          handlesLayer.innerHTML = `
+            <circle class="resize-handle" cx="${s.x1}" cy="${s.y1}" r="5"
+              onmousedown="onHandleMouseDown(event, '${s.id}', 'p1')" />
+            <circle class="resize-handle" cx="${s.x2}" cy="${s.y2}" r="5"
+              onmousedown="onHandleMouseDown(event, '${s.id}', 'p2')" />
+          `;
+        } else if (s.type === "text") {
+          const fs = s.fontSize || 14;
+          const approxW = Math.max(70, (s.label || "Label").length * fs * 0.62);
+          const approxH = fs + 16;
+          handlesLayer.innerHTML = `
+            <rect class="selection-box" x="${s.x - approxW / 2}" y="${s.y - approxH / 2}" width="${approxW}" height="${approxH}" rx="4" />
+            <rect class="resize-handle" x="${s.x + approxW / 2 - 5}" y="${s.y + approxH / 2 - 5}" width="10" height="10" rx="2"
+              title="Drag to resize text"
+              onmousedown="onHandleMouseDown(event, '${s.id}', 'text-size')" />
+          `;
+        }
+      }
+
+      /* ========================================================================
+         4. MOUSE & TOUCH DRAWING / DRAGGING INTERACTION
+         ======================================================================== */
+      function getSvgPoint(evt) {
+        const rect = svgEl.getBoundingClientRect();
+        const scaleX = 920 / rect.width;
+        const scaleY = 600 / rect.height;
+        return {
+          x: Math.round((evt.clientX - rect.left) * scaleX),
+          y: Math.round((evt.clientY - rect.top) * scaleY),
+        };
+      }
+
+      // Splits a wall line into two segments with a 40px gap if clicked with the Cut tool
+      function trySplitWallLineAtPoint(floor, px, py) {
+        const GAP_HALF = 20;
+        for (let i = floor.shapes.length - 1; i >= 0; i--) {
+          const s = floor.shapes[i];
+          if (s.type !== "line") continue;
+          const dx = s.x2 - s.x1;
+          const dy = s.y2 - s.y1;
+          const len = Math.hypot(dx, dy);
+          if (len < GAP_HALF * 2.5) continue;
+
+          // Projection of point onto line segment
+          const t = ((px - s.x1) * dx + (py - s.y1) * dy) / (len * len);
+          if (t < 0.12 || t > 0.88) continue;
+          const projX = s.x1 + t * dx;
+          const projY = s.y1 + t * dy;
+          if (Math.hypot(px - projX, py - projY) <= 14) {
+            const ux = dx / len;
+            const uy = dy / len;
+            const secondSeg = {
+              ...JSON.parse(JSON.stringify(s)),
+              id: "sh_" + Date.now().toString(36) + "_split",
+              x1: Math.round(projX + ux * GAP_HALF),
+              y1: Math.round(projY + uy * GAP_HALF),
+            };
+            s.x2 = Math.round(projX - ux * GAP_HALF);
+            s.y2 = Math.round(projY - uy * GAP_HALF);
+            floor.shapes.push(secondSeg);
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function setupCanvasEvents() {
+        svgEl.addEventListener("mousedown", (e) => {
+          if (appMode === "sim") return;
+          const pt = getSvgPoint(e);
+          const sx = snap(pt.x);
+          const sy = snap(pt.y);
+
+          if (activeTool === "select") {
+            if (e.target === svgEl || e.target.id === "svgGridBg") {
+              selectedShapeId = null;
+              renderSelectionHandles();
+              updateInspector();
+            }
+            return;
+          }
+
+          pushUndo();
+          const floor = getActiveFloor();
+          const newId = "sh_" + Date.now().toString(36);
+
+          if (activeTool === "rect") {
+            const newShape = {
+              id: newId,
+              type: "rect",
+              x: sx,
+              y: sy,
+              w: 20,
+              h: 20,
+              label: "New Room",
+              color: "#38bdf8",
+              strokeWidth: 2.5,
+              fillOpacity: 0.12,
+              dashed: false,
+              fontSize: 14,
+              link: { type: "none", targetId: "", targetName: "" },
+            };
+            floor.shapes.push(newShape);
+            selectedShapeId = newId;
+            dragState = {
+              mode: "draw-rect",
+              shape: newShape,
+              startX: sx,
+              startY: sy,
+            };
+          } else if (activeTool === "line") {
+            const newShape = {
+              id: newId,
+              type: "line",
+              x1: sx,
+              y1: sy,
+              x2: sx + 20,
+              y2: sy,
+              label: "",
+              color: "#94a3b8",
+              strokeWidth: 4,
+              fillOpacity: 0,
+              dashed: false,
+              fontSize: 12,
+              link: { type: "none", targetId: "", targetName: "" },
+            };
+            floor.shapes.push(newShape);
+            selectedShapeId = newId;
+            dragState = { mode: "draw-line", shape: newShape };
+          } else if (activeTool === "circle") {
+            const newShape = {
+              id: newId,
+              type: "circle",
+              x: sx,
+              y: sy,
+              r: 20,
+              label: "Node",
+              color: "#22c55e",
+              strokeWidth: 2.5,
+              fillOpacity: 0.22,
+              dashed: false,
+              fontSize: 11,
+              link: {
+                type: "shortcut",
+                targetId: "sc_living_light",
+                targetName: "Smart Switch",
+              },
+            };
+            floor.shapes.push(newShape);
+            selectedShapeId = newId;
+            dragState = { mode: "draw-circle", shape: newShape };
+          } else if (activeTool === "door") {
+            const newShape = {
+              id: newId,
+              type: "door",
+              x: sx,
+              y: sy,
+              w: 40,
+              h: 40,
+              label: "Door",
+              color: "#38bdf8",
+              strokeWidth: 2,
+              fillOpacity: 0.12,
+              dashed: false,
+              fontSize: 10,
+              link: { type: "none", targetId: "", targetName: "" },
+            };
+            floor.shapes.push(newShape);
+            selectedShapeId = newId;
+            selectTool("select");
+          } else if (activeTool === "stair") {
+            const newShape = {
+              id: newId,
+              type: "stair",
+              x: sx,
+              y: sy,
+              w: 40,
+              h: 100,
+              label: "Stairs",
+              color: "#f59e0b",
+              strokeWidth: 2,
+              fillOpacity: 0.12,
+              dashed: false,
+              fontSize: 11,
+              link: { type: "none", targetId: "", targetName: "" },
+            };
+            floor.shapes.push(newShape);
+            selectedShapeId = newId;
+            dragState = {
+              mode: "draw-rect",
+              shape: newShape,
+              startX: sx,
+              startY: sy,
+            };
+          } else if (activeTool === "cut") {
+            // If clicked directly on a wall line, split a doorway/window gap into it
+            if (trySplitWallLineAtPoint(floor, pt.x, pt.y)) {
+              renderCanvas();
+              showToast("Wall line split! Gap created.");
+              return;
+            }
+            // Otherwise drag a Cut / Erase box to erase any room wall or shape section
+            const newShape = {
+              id: newId,
+              type: "cut",
+              x: sx,
+              y: sy,
+              w: 20,
+              h: 20,
+              label: "",
+              color: "#ef4444",
+              strokeWidth: 1,
+              fillOpacity: 1,
+              dashed: true,
+              fontSize: 10,
+              link: { type: "none", targetId: "", targetName: "" },
+            };
+            floor.shapes.push(newShape);
+            selectedShapeId = newId;
+            dragState = {
+              mode: "draw-rect",
+              shape: newShape,
+              startX: sx,
+              startY: sy,
+            };
+          } else if (activeTool === "icon") {
+            const acc =
+              ACCESSORY_ICONS[activeAccessoryKey] || ACCESSORY_ICONS.bulb;
+            const newShape = {
+              id: newId,
+              type: "icon",
+              icon: activeAccessoryKey,
+              x: sx,
+              y: sy,
+              r: 20,
+              label: acc.label,
+              color: acc.color,
+              strokeWidth: 2,
+              fillOpacity: 0.22,
+              dashed: false,
+              fontSize: 11,
+              link: {
+                type: "shortcut",
+                targetId: "sc_living_light",
+                targetName: acc.label,
+              },
+            };
+            floor.shapes.push(newShape);
+            selectedShapeId = newId;
+            selectTool("select");
+          } else if (activeTool === "text") {
+            const newShape = {
+              id: newId,
+              type: "text",
+              x: sx,
+              y: sy,
+              label: "New Text Label",
+              color: "#38bdf8",
+              strokeWidth: 1,
+              fillOpacity: 1,
+              dashed: false,
+              fontSize: 15,
+              link: { type: "none", targetId: "", targetName: "" },
+            };
+            floor.shapes.push(newShape);
+            selectedShapeId = newId;
+            selectTool("select");
+            setTimeout(() => {
+              const inp = document.getElementById("inspLabel");
+              if (inp) {
+                inp.focus();
+                inp.select();
+              }
+            }, 30);
+          }
+
+          renderFloorList();
+          renderCanvas();
+          updateInspector();
+        });
+
+        window.addEventListener("mousemove", (e) => {
+          const pt = getSvgPoint(e);
+          document.getElementById("hudCursorPos").textContent =
+            `X: ${Math.max(0, Math.min(920, pt.x))}, Y: ${Math.max(0, Math.min(600, pt.y))}`;
+
+          if (!dragState) return;
+          const sx = snap(pt.x);
+          const sy = snap(pt.y);
+          const s = dragState.shape;
+
+          if (dragState.mode === "move") {
+            const dx = snap(pt.x - dragState.startMouseX);
+            const dy = snap(pt.y - dragState.startMouseY);
+            if (s.type === "line") {
+              s.x1 = dragState.orig.x1 + dx;
+              s.y1 = dragState.orig.y1 + dy;
+              s.x2 = dragState.orig.x2 + dx;
+              s.y2 = dragState.orig.y2 + dy;
+            } else {
+              s.x = dragState.orig.x + dx;
+              s.y = dragState.orig.y + dy;
+            }
+          } else if (
+            dragState.mode === "draw-rect" ||
+            dragState.mode === "se"
+          ) {
+            const baseX = dragState.startX ?? s.x;
+            const baseY = dragState.startY ?? s.y;
+            s.x = Math.min(baseX, sx);
+            s.y = Math.min(baseY, sy);
+            s.w = Math.max(20, Math.abs(sx - baseX));
+            s.h = s.type === "door" ? s.w : Math.max(20, Math.abs(sy - baseY));
+          } else if (
+            dragState.mode === "draw-line" ||
+            dragState.mode === "p2"
+          ) {
+            s.x2 = sx;
+            s.y2 = sy;
+          } else if (dragState.mode === "p1") {
+            s.x1 = sx;
+            s.y1 = sy;
+          } else if (
+            dragState.mode === "draw-circle" ||
+            dragState.mode === "radius"
+          ) {
+            s.r = Math.max(10, Math.round(Math.hypot(sx - s.x, sy - s.y)));
+          } else if (dragState.mode === "text-size") {
+            const dist = Math.max(18, Math.hypot(pt.x - s.x, pt.y - s.y));
+            s.fontSize = Math.min(48, Math.max(10, Math.round(dist / 3)));
+            document.getElementById("inspFontSize").value = s.fontSize;
+          }
+
+          renderCanvas();
+          syncInspectorGeometryInputs();
+        });
+
+        window.addEventListener("mouseup", () => {
+          if (dragState) {
+            if (dragState.mode.startsWith("draw-")) {
+              selectTool("select");
+            }
+            dragState = null;
+            renderFloorList();
+            updateInspector();
+          }
+        });
+
+        window.addEventListener("keydown", (e) => {
+          if (
+            ["INPUT", "SELECT", "TEXTAREA"].includes(
+              document.activeElement?.tagName,
+            )
+          )
+            return;
+          if (
+            (e.key === "Delete" || e.key === "Backspace") &&
+            selectedShapeId
+          ) {
+            e.preventDefault();
+            deleteSelected();
+          } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+            e.preventDefault();
+            undo();
+          } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
+            e.preventDefault();
+            duplicateSelected();
+          }
+        });
+      }
+
+      function onShapeMouseDown(e, shapeId) {
+        if (appMode === "sim") return;
+        // If any drawing or cut tool is active, let the click pass through to the canvas!
+        if (activeTool !== "select") return;
+
+        e.stopPropagation();
+        selectedShapeId = shapeId;
+        const floor = getActiveFloor();
+        const s = floor.shapes.find((x) => x.id === shapeId);
+        if (!s) return;
+
+        pushUndo();
+        const pt = getSvgPoint(e);
+        dragState = {
+          mode: "move",
+          shape: s,
+          startMouseX: pt.x,
+          startMouseY: pt.y,
+          orig: { ...s },
+        };
+        renderSelectionHandles();
+        updateInspector();
+      }
+
+      function onHandleMouseDown(e, shapeId, handleType) {
+        e.stopPropagation();
+        const floor = getActiveFloor();
+        const s = floor.shapes.find((x) => x.id === shapeId);
+        if (!s) return;
+        pushUndo();
+        dragState = {
+          mode: handleType,
+          shape: s,
+          startX: s.x,
+          startY: s.y,
+        };
+      }
+
+      /* ========================================================================
+         5. LIVE SIMULATION CLICK HANDLER
+         ======================================================================== */
+      function onShapeClick(e, shapeId) {
+        if (appMode !== "sim") return;
+        e.stopPropagation();
+        const floor = getActiveFloor();
+        const s = floor.shapes.find((x) => x.id === shapeId);
+        if (!s || !s.link || s.link.type === "none") return;
+
+        const { type, targetId, targetName } = s.link;
+
+        if (type === "shortcut") {
+          simSwitchStates[s.id] = !simSwitchStates[s.id];
+          const isOn = simSwitchStates[s.id];
+          document.getElementById("simStatusText").textContent =
+            `Shortcut "${targetName || s.label}" toggled ${isOn ? "ON" : "OFF"}!`;
+          showToast(`${targetName || s.label}: ${isOn ? "ON" : "OFF"}`);
+          renderCanvas();
+          return;
+        }
+
+        const typeLabels = {
+          device: "ESP32 / ESP8266 Device",
+          group: "Room Group Section",
+          favorite: "Pinned Favorite Bundle",
+        };
+
+        document.getElementById("simModalTitle").textContent =
+          `${typeLabels[type] || "Connected Item"}`;
+        document.getElementById("simModalBody").innerHTML = `
+          <div style="padding:12px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px">
+            <div style="font-size:0.74rem;color:var(--text-muted)">Clicked Blueprint Element</div>
+            <div style="font-size:0.95rem;font-weight:700;color:var(--accent)">${escapeHtml(s.label || s.id)}</div>
+          </div>
+          <div style="padding:12px;background:var(--card);border:1px solid var(--border);border-radius:10px">
+            <div style="font-size:0.74rem;color:var(--text-muted)">Bound Hub Target (${escapeHtml(type.toUpperCase())})</div>
+            <div style="font-size:0.95rem;font-weight:700">${escapeHtml(targetName || targetId)}</div>
+            <div style="font-size:0.75rem;color:var(--ok);margin-top:4px">● Ready for Hub Integration (ID: ${escapeHtml(targetId || "custom")})</div>
+          </div>
+        `;
+        document.getElementById("simActionModal").classList.add("open");
+      }
+
+      function closeSimModal() {
+        document.getElementById("simActionModal").classList.remove("open");
+      }
+
+      /* ========================================================================
+         6. RIGHT PANEL INSPECTOR & SMART HUB LINKING
+         ======================================================================== */
+      function getSelectedShape() {
+        const floor = getActiveFloor();
+        return floor?.shapes.find((s) => s.id === selectedShapeId) || null;
+      }
+
+      function updateInspector() {
+        const s = getSelectedShape();
+        const emptyCard = document.getElementById("noSelectionCard");
+        const content = document.getElementById("inspectorContent");
+
+        if (!s || appMode === "sim") {
+          emptyCard.style.display = "block";
+          content.style.display = "none";
+          return;
+        }
+
+        emptyCard.style.display = "none";
+        content.style.display = "flex";
+
+        const typeNames = {
+          rect: "Room / Box (SVG Rect)",
+          line: "Wall / Straight Line",
+          circle: "Circle / Smart Node",
+          door: "Door Swing Arc",
+          text: "Text Label",
+        };
+        document.getElementById("inspTypeTitle").textContent =
+          typeNames[s.type] || "Shape";
+        document.getElementById("inspIdBadge").textContent =
+          s.type.toUpperCase();
+        document.getElementById("inspLabel").value = s.label || "";
+        document.getElementById("inspStrokeWidth").value = s.strokeWidth ?? 2;
+        document.getElementById("inspFillOpacity").value = String(
+          s.fillOpacity ?? 0.12,
+        );
+        document.getElementById("inspDash").value = s.dashed ? "1" : "0";
+        document.getElementById("inspFontSize").value = s.fontSize || 13;
+
+        syncInspectorGeometryInputs();
+        renderInspectorSwatches(s.color || "#38bdf8");
+        populateLinkControls(s);
+      }
+
+      function syncInspectorGeometryInputs() {
+        const s = getSelectedShape();
+        if (!s) return;
+        const sizeRow = document.getElementById("geomSizeRow");
+        const hWrap = document.getElementById("geomHWrap");
+
+        if (["rect", "door", "stair", "cut"].includes(s.type)) {
+          document.getElementById("lblX1").textContent = "X Pos";
+          document.getElementById("lblY1").textContent = "Y Pos";
+          document.getElementById("lblW").textContent = "Width";
+          document.getElementById("lblH").textContent = "Height";
+          sizeRow.style.display = "grid";
+          hWrap.style.display = "flex";
+          document.getElementById("inspX").value = s.x;
+          document.getElementById("inspY").value = s.y;
+          document.getElementById("inspW").value = s.w;
+          document.getElementById("inspH").value = s.h;
+        } else if (s.type === "line") {
+          document.getElementById("lblX1").textContent = "Start X1";
+          document.getElementById("lblY1").textContent = "Start Y1";
+          document.getElementById("lblW").textContent = "End X2";
+          document.getElementById("lblH").textContent = "End Y2";
+          sizeRow.style.display = "grid";
+          hWrap.style.display = "flex";
+          document.getElementById("inspX").value = s.x1;
+          document.getElementById("inspY").value = s.y1;
+          document.getElementById("inspW").value = s.x2;
+          document.getElementById("inspH").value = s.y2;
+        } else if (s.type === "circle") {
+          document.getElementById("lblX1").textContent = "Center X";
+          document.getElementById("lblY1").textContent = "Center Y";
+          document.getElementById("lblW").textContent = "Radius (R)";
+          sizeRow.style.display = "grid";
+          hWrap.style.display = "none";
+          document.getElementById("inspX").value = s.x;
+          document.getElementById("inspY").value = s.y;
+          document.getElementById("inspW").value = s.r;
+        } else if (s.type === "text") {
+          document.getElementById("lblX1").textContent = "Text X";
+          document.getElementById("lblY1").textContent = "Text Y";
+          sizeRow.style.display = "none";
+          document.getElementById("inspX").value = s.x;
+          document.getElementById("inspY").value = s.y;
+        }
+      }
+
+      function renderInspectorSwatches(activeColor) {
+        const box = document.getElementById("inspColorSwatches");
+        box.innerHTML =
+          SWATCHES.map(
+            (c) => `
+            <div class="swatch ${activeColor.toLowerCase() === c.toLowerCase() ? "selected" : ""}"
+                 style="background:${c}"
+                 onclick="updateSelectedProp('color', '${c}'); renderInspectorSwatches('${c}')"></div>
+          `,
+          ).join("") +
+          `<input type="color" value="${activeColor}" style="width:26px;height:26px;border:none;background:none;cursor:pointer"
+             onchange="updateSelectedProp('color', this.value); renderInspectorSwatches(this.value)" />`;
+      }
+
+      function updateSelectedProp(key, val) {
+        const s = getSelectedShape();
+        if (!s) return;
+        s[key] = val;
+        renderCanvas();
+      }
+
+      function updateSelectedGeom() {
+        const s = getSelectedShape();
+        if (!s) return;
+        const vX = Number(document.getElementById("inspX").value) || 0;
+        const vY = Number(document.getElementById("inspY").value) || 0;
+        const vW = Number(document.getElementById("inspW").value) || 10;
+        const vH = Number(document.getElementById("inspH").value) || 10;
+
+        if (["rect", "door", "stair", "cut"].includes(s.type)) {
+          s.x = vX;
+          s.y = vY;
+          s.w = Math.max(10, vW);
+          s.h = s.type === "door" ? s.w : Math.max(10, vH);
+        } else if (s.type === "line") {
+          s.x1 = vX;
+          s.y1 = vY;
+          s.x2 = vW;
+          s.y2 = vH;
+        } else if (s.type === "circle") {
+          s.x = vX;
+          s.y = vY;
+          s.r = Math.max(6, vW);
+        } else if (s.type === "text") {
+          s.x = vX;
+          s.y = vY;
+        }
+        renderCanvas();
+      }
+
+      function getAvailableHubTargets(type) {
+        let hubCfg = null;
+        try {
+          hubCfg = JSON.parse(localStorage.getItem(HUB_CONFIG_KEY));
+        } catch (_) {}
+
+        const map = {
+          shortcut: hubCfg?.shortcuts,
+          device: hubCfg?.devices,
+          group: hubCfg?.groups,
+          favorite: hubCfg?.favorites,
+        };
+        const liveList = map[type];
+        if (Array.isArray(liveList) && liveList.length) {
+          return liveList.map((item) => ({ id: item.id, name: item.name }));
+        }
+        return DEMO_TARGETS[type] || [];
+      }
+
+      function populateLinkControls(s) {
+        const link = s.link || { type: "none", targetId: "", targetName: "" };
+        document.getElementById("inspLinkType").value = link.type || "none";
+        const targetWrap = document.getElementById("linkTargetWrap");
+        const nameWrap = document.getElementById("linkCustomNameWrap");
+
+        if (!link.type || link.type === "none") {
+          targetWrap.style.display = "none";
+          nameWrap.style.display = "none";
+          return;
+        }
+
+        targetWrap.style.display = "flex";
+        nameWrap.style.display = "flex";
+
+        const list = getAvailableHubTargets(link.type);
+        const sel = document.getElementById("inspLinkTarget");
+        sel.innerHTML = list
+          .map(
+            (item) =>
+              `<option value="${escapeHtml(item.id)}" data-name="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`,
+          )
+          .join("");
+
+        if (link.targetId && list.some((x) => x.id === link.targetId)) {
+          sel.value = link.targetId;
+        } else if (list.length) {
+          s.link.targetId = list[0].id;
+          s.link.targetName = s.link.targetName || list[0].name;
+          sel.value = list[0].id;
+        }
+        document.getElementById("inspLinkTitle").value =
+          s.link.targetName || "";
+      }
+
+      function onLinkTypeChange(newType) {
+        const s = getSelectedShape();
+        if (!s) return;
+        pushUndo();
+        if (newType === "none") {
+          s.link = { type: "none", targetId: "", targetName: "" };
+        } else {
+          const list = getAvailableHubTargets(newType);
+          const first = list[0] || {
+            id: "custom_1",
+            name: s.label || "Target",
+          };
+          s.link = {
+            type: newType,
+            targetId: first.id,
+            targetName: first.name,
+          };
+        }
+        populateLinkControls(s);
+        renderFloorList();
+        renderCanvas();
+      }
+
+      function onLinkTargetChange(targetId) {
+        const s = getSelectedShape();
+        if (!s || !s.link) return;
+        const sel = document.getElementById("inspLinkTarget");
+        const optName =
+          sel.options[sel.selectedIndex]?.dataset?.name || targetId;
+        s.link.targetId = targetId;
+        s.link.targetName = optName;
+        document.getElementById("inspLinkTitle").value = optName;
+        renderCanvas();
+      }
+
+      function updateSelectedLink(key, val) {
+        const s = getSelectedShape();
+        if (!s || !s.link) return;
+        s.link[key] = val;
+        renderCanvas();
+      }
+
+      function reorderSelected(dir) {
+        const floor = getActiveFloor();
+        const idx = floor.shapes.findIndex((s) => s.id === selectedShapeId);
+        if (idx === -1) return;
+        const target = idx + dir;
+        if (target < 0 || target >= floor.shapes.length) return;
+        pushUndo();
+        [floor.shapes[idx], floor.shapes[target]] = [
+          floor.shapes[target],
+          floor.shapes[idx],
+        ];
+        renderCanvas();
+      }
+
+      function duplicateSelected() {
+        const s = getSelectedShape();
+        if (!s) return;
+        pushUndo();
+        const copy = JSON.parse(JSON.stringify(s));
+        copy.id = "sh_" + Date.now().toString(36);
+        if (copy.type === "line") {
+          copy.x1 += 20;
+          copy.y1 += 20;
+          copy.x2 += 20;
+          copy.y2 += 20;
+        } else {
+          copy.x += 20;
+          copy.y += 20;
+        }
+        getActiveFloor().shapes.push(copy);
+        selectedShapeId = copy.id;
+        renderFloorList();
+        renderCanvas();
+        updateInspector();
+        showToast("Shape cloned");
+      }
+
+      function deleteSelected() {
+        if (!selectedShapeId) return;
+        pushUndo();
+        const floor = getActiveFloor();
+        floor.shapes = floor.shapes.filter((s) => s.id !== selectedShapeId);
+        selectedShapeId = null;
+        renderFloorList();
+        renderCanvas();
+        updateInspector();
+        showToast("Shape deleted");
+      }
+
+      /* ========================================================================
+         7. ZOOM, SAVE & EXPORT UTILITIES
+         ======================================================================== */
+      function adjustZoom(delta) {
+        zoomLevel = Math.max(
+          0.5,
+          Math.min(1.8, +(zoomLevel + delta).toFixed(2)),
+        );
+        applyZoom();
+      }
+
+      function resetZoom() {
+        zoomLevel = 1;
+        applyZoom();
+      }
+
+      function applyZoom() {
+        svgEl.style.width = `${Math.round(920 * zoomLevel)}px`;
+        svgEl.style.height = `${Math.round(600 * zoomLevel)}px`;
+        document.getElementById("zoomLabel").textContent =
+          `${Math.round(zoomLevel * 100)}%`;
+      }
+
+      function saveBuildingDesign() {
+        localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(building));
+        showToast("Building 2D blueprint saved to storage!");
+      }
+
+      function exportDesignJson() {
+        const blob = new Blob([JSON.stringify(building, null, 2)], {
+          type: "application/json",
+        });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${(building.name || "home-building").toLowerCase().replace(/\s+/g, "-")}-2d-svg.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showToast("Exported 2D SVG Building JSON!");
+      }
+
+      function escapeHtml(str) {
+        return String(str || "").replace(
+          /[&<>"']/g,
+          (m) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[m],
+        );
+      }
+
+      function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.classList.add("show");
+        clearTimeout(t._timer);
+        t._timer = setTimeout(() => t.classList.remove("show"), 2200);
+      }
+
+      init();
+    </script>
+  </body>
+</html>
