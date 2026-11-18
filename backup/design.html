@@ -253,18 +253,34 @@
          3. MAIN 3-COLUMN WORKSPACE
          ========================================================================== */
       .workspace {
+        --left-w: 295px;
+        --right-w: 320px;
         flex: 1;
         display: grid;
-        grid-template-columns: 295px 1fr 320px;
+        grid-template-columns: var(--left-w) 1fr var(--right-w);
         min-height: 0;
         overflow: hidden;
       }
 
-      .workspace.sim-active {
-        grid-template-columns: 260px 1fr 0px;
+      .workspace.hide-left {
+        grid-template-columns: 1fr var(--right-w);
       }
+      .workspace.hide-left #leftPanel {
+        display: none;
+      }
+
+      .workspace.hide-right,
+      .workspace.sim-active {
+        grid-template-columns: var(--left-w) 1fr;
+      }
+      .workspace.hide-right #rightPanel,
       .workspace.sim-active .right-panel {
         display: none;
+      }
+
+      .workspace.hide-left.hide-right,
+      .workspace.hide-left.sim-active {
+        grid-template-columns: 1fr;
       }
 
       .side-panel {
@@ -337,8 +353,8 @@
 
       .floor-item {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
+        flex-direction: column;
+        align-items: stretch;
         gap: 6px;
         padding: 8px 10px;
         border-radius: 8px;
@@ -394,7 +410,10 @@
 
       .floor-actions {
         display: flex;
-        gap: 3px;
+        justify-content: flex-end;
+        gap: 6px;
+        padding-top: 5px;
+        border-top: 1px solid var(--border);
       }
 
       .icon-action {
@@ -792,13 +811,32 @@
 
       @media (max-width: 1024px) {
         .workspace {
-          grid-template-columns: 255px 1fr 280px;
+          --left-w: 255px;
+          --right-w: 280px;
         }
       }
       @media (max-width: 820px) {
         body {
           overflow: auto;
           height: auto;
+        }
+        .workspace {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+        .canvas-stage {
+          height: 62vh;
+        }
+      }
+      @media (max-width: 820px) {
+        body {
+          overflow: auto;
+          height: auto;
+        }
+        .topbar-right {
+          width: 100%;
+          justify-content: center;
+          flex-wrap: wrap;
         }
         .workspace {
           grid-template-columns: 1fr;
@@ -889,7 +927,6 @@
           title="Lock / Unlock Selected (Shortcut: L)"
         >
           <span id="topLockIcon">&#128275;</span>
-          <span id="topLockText">Lock</span>
         </button>
         <button
           class="btn"
@@ -933,7 +970,7 @@
          ======================================================================== -->
     <div class="workspace" id="workspace">
       <!-- LEFT PANEL: STEP 1 (BUILDING), STEP 2 (FLOORS), STEP 3 (DRAWING TOOLS) -->
-      <aside class="side-panel">
+      <aside class="side-panel" id="leftPanel">
         <!-- STEP 1: BUILDING SETUP -->
         <div class="panel-card">
           <div class="panel-title">
@@ -1233,6 +1270,14 @@
       <main class="canvas-stage">
         <div class="canvas-hud-top">
           <div class="hud-pill">
+            <button
+              class="btn btn-sm"
+              id="toggleLeftPanelBtn"
+              onclick="toggleSidePanel('left')"
+              title="Hide / Show Left Panel"
+            >
+              &#9664;
+            </button>
             <span id="hudFloorTitle" style="color: var(--accent)">
               Ground Floor
             </span>
@@ -1262,6 +1307,14 @@
             </span>
             <button class="btn btn-sm" onclick="adjustZoom(0.1)">+</button>
             <button class="btn btn-sm" onclick="resetZoom()">Reset</button>
+            <button
+              class="btn btn-sm"
+              id="toggleRightPanelBtn"
+              onclick="toggleSidePanel('right')"
+              title="Hide / Show Right Panel"
+            >
+              &#9654;
+            </button>
           </div>
         </div>
 
@@ -1330,7 +1383,7 @@
       </main>
 
       <!-- RIGHT PANEL: SHAPE INSPECTOR & CLICKABLE IOT BINDING -->
-      <aside class="side-panel right-panel">
+      <aside class="side-panel right-panel" id="rightPanel">
         <!-- Empty Selection State -->
         <div class="panel-card" id="noSelectionCard">
           <div class="panel-title">
@@ -3383,11 +3436,36 @@
           );
         });
 
-        // If the erase box only cut a line and doesn't mask any room box, we don't even need the mask rect
         if (trimmedAnyLine && !overlapsOtherShapes) {
           floor.shapes = updatedShapes.filter((s) => s.id !== cutShape.id);
         } else {
-          floor.shapes = updatedShapes;
+          // Place the cut mask immediately after the topmost overlapping shape (and its existing cuts)
+          const withoutCut = updatedShapes.filter((s) => s.id !== cutShape.id);
+          let insertIdx = -1;
+          withoutCut.forEach((s, i) => {
+            if (s.type === "cut" || s.type === "line") return;
+            const b = getShapeBounds(s);
+            if (
+              b.x <= rx2 &&
+              b.x + b.w >= rx1 &&
+              b.y <= ry2 &&
+              b.y + b.h >= ry1
+            ) {
+              insertIdx = i;
+            }
+          });
+          if (insertIdx !== -1) {
+            while (
+              insertIdx + 1 < withoutCut.length &&
+              withoutCut[insertIdx + 1].type === "cut"
+            ) {
+              insertIdx++;
+            }
+            withoutCut.splice(insertIdx + 1, 0, cutShape);
+            floor.shapes = withoutCut;
+          } else {
+            floor.shapes = updatedShapes;
+          }
         }
       }
 
@@ -4018,17 +4096,14 @@
         const list = getSelectedShapesList();
         const btn = document.getElementById("topLockBtn");
         const icon = document.getElementById("topLockIcon");
-        const txt = document.getElementById("topLockText");
         if (!list.length) {
           btn.className = "btn";
           icon.innerHTML = "&#128275;";
-          txt.textContent = "Lock";
           return;
         }
         const allLocked = list.every((s) => s.locked);
         btn.className = allLocked ? "btn btn-warn" : "btn";
         icon.innerHTML = allLocked ? "&#128274;" : "&#128275;";
-        txt.textContent = allLocked ? "Unlock" : "Lock";
       }
 
       function toggleLockSelected() {
@@ -4206,9 +4281,7 @@
 
         // Lock button state
         const lockBtn = document.getElementById("inspLockToggleBtn");
-        lockBtn.innerHTML = s.locked
-          ? "&#128274; Locked"
-          : "&#128275; Unlocked";
+        lockBtn.innerHTML = s.locked ? "&#128274;" : "&#128275;";
         lockBtn.className = s.locked ? "btn btn-sm btn-warn" : "btn btn-sm";
 
         document.getElementById("inspLabel").value = s.label || "";
@@ -4517,17 +4590,55 @@
         renderCanvas();
       }
 
+      function shapesOverlap(a, b) {
+        const ba = getShapeBounds(a);
+        const bb = getShapeBounds(b);
+        return (
+          ba.x <= bb.x + bb.w &&
+          ba.x + ba.w >= bb.x &&
+          ba.y <= bb.y + bb.h &&
+          ba.y + ba.h >= bb.y
+        );
+      }
+
       function reorderSelected(dir) {
         const floor = getActiveFloor();
+        if (!floor || !selectedShapeId) return;
         const idx = floor.shapes.findIndex((s) => s.id === selectedShapeId);
         if (idx === -1) return;
-        const target = idx + dir;
-        if (target < 0 || target >= floor.shapes.length) return;
+
+        const current = floor.shapes[idx];
+        let targetIdx = -1;
+
+        if (dir > 0) {
+          // Bring Front: jump in front of the next overlapping shape or 'cut' erase mask
+          for (let i = idx + 1; i < floor.shapes.length; i++) {
+            if (shapesOverlap(current, floor.shapes[i])) {
+              targetIdx = i;
+              break;
+            }
+          }
+          if (targetIdx === -1 && idx + 1 < floor.shapes.length) {
+            targetIdx = idx + 1;
+          }
+        } else {
+          // Send Back: jump behind the previous overlapping shape or 'cut' erase mask
+          for (let i = idx - 1; i >= 0; i--) {
+            if (shapesOverlap(current, floor.shapes[i])) {
+              targetIdx = i;
+              break;
+            }
+          }
+          if (targetIdx === -1 && idx - 1 >= 0) {
+            targetIdx = idx - 1;
+          }
+        }
+
+        if (targetIdx === -1) return;
+
         pushUndo();
-        [floor.shapes[idx], floor.shapes[target]] = [
-          floor.shapes[target],
-          floor.shapes[idx],
-        ];
+        const [moved] = floor.shapes.splice(idx, 1);
+        floor.shapes.splice(targetIdx, 0, moved);
         renderCanvas();
       }
 
@@ -4596,6 +4707,21 @@
           Math.min(1.8, +(zoomLevel + delta).toFixed(2)),
         );
         applyZoom();
+      }
+
+      function toggleSidePanel(side) {
+        const ws = document.getElementById("workspace");
+        if (side === "left") {
+          const hidden = ws.classList.toggle("hide-left");
+          document.getElementById("toggleLeftPanelBtn").innerHTML = hidden
+            ? "&#9654;"
+            : "&#9664;";
+        } else {
+          const hidden = ws.classList.toggle("hide-right");
+          document.getElementById("toggleRightPanelBtn").innerHTML = hidden
+            ? "&#9664;"
+            : "&#9654;";
+        }
       }
 
       function resetZoom() {
