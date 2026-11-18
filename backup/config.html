@@ -2095,22 +2095,38 @@
             <button class="btn btn-primary" onclick="exportBackup()">
               Export JSON
             </button>
-            <label class="btn" style="cursor: pointer">
+            <button class="btn" type="button" onclick="triggerImportBackup()">
               Import JSON
-              <input
-                type="file"
-                accept=".json"
-                style="display: none"
-                onchange="importBackup(event)"
-              />
-            </label>
+            </button>
+            <input
+              type="file"
+              id="importBackupInput"
+              accept=".json,application/json"
+              style="display: none"
+              onchange="importBackup(event)"
+            />
           </div>
         </div>
 
         <div class="card-box" style="border-color: rgba(239, 68, 68, 0.35)">
           <h3 style="color: var(--err)">Danger Zone</h3>
+          <p
+            style="
+              font-size: 0.8rem;
+              color: var(--text-muted);
+              margin-bottom: 12px;
+            "
+          >
+            All reset actions require Administrator verification.
+          </p>
           <div style="display: flex; gap: 10px; flex-wrap: wrap">
-            <button class="btn" onclick="rebootHub()">Restart</button>
+            <button class="btn" onclick="rebootHub()">Restart Hub</button>
+            <button class="btn btn-danger" onclick="resetDataOnly()">
+              Reset Data
+            </button>
+            <button class="btn btn-danger" onclick="resetSettingsOnly()">
+              Reset Settings
+            </button>
             <button class="btn btn-danger" onclick="factoryReset()">
               Factory Reset
             </button>
@@ -2528,23 +2544,41 @@
         matrix:
           '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="8" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="12" r="1"/><circle cx="8" cy="16" r="1"/><circle cx="12" cy="16" r="1"/><circle cx="16" cy="16" r="1"/>',
         plug: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
+        switch:
+          '<rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/>',
+        power:
+          '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>',
+        zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+        fan: '<path d="M12 12c0-3 2.5-5 5-5 2.8 0 5 2.2 5 5s-2.2 5-5 5h-5"/><path d="M12 12c3 0 5 2.5 5 5 0 2.8-2.2 5-5 5s-5-2.2-5-5v-5"/><path d="M12 12c0 3-2.5 5-5 5-2.8 0-5-2.2-5-5s2.2-5 5-5h5"/><path d="M12 12c-3 0-5-2.5-5-5 0-2.8 2.2-5 5-5s5 2.2 5 5v5"/>',
+        ac: '<path d="M2 12h20"/><path d="M20 16l-4-4 4-4"/><path d="M4 8l4 4-4 4"/><path d="M16 4l-4 4-4-4"/><path d="M8 20l4-4 4 4"/>',
+        tv: '<rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/>',
+        pc: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+        solar:
+          '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+        battery:
+          '<rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="13" x2="23" y2="11"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/>',
         sensor: '<path d="M2 12h3l2-7 4 14 3-9 2 4h6"/>',
         thermo:
           '<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>',
-        camera:
-          '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
-        fan: '<path d="M12 12c0-3 2.5-5 5-5 2.8 0 5 2.2 5 5s-2.2 5-5 5h-5"/><path d="M12 12c3 0 5 2.5 5 5 0 2.8-2.2 5-5 5s-5-2.2-5-5v-5"/><path d="M12 12c0 3-2.5 5-5 5-2.8 0-5-2.2-5-5s2.2-5 5-5h5"/><path d="M12 12c-3 0-5-2.5-5-5 0-2.8 2.2-5 5-5s5 2.2 5 5v5"/>',
-        switch:
-          '<rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/>',
-        audio:
-          '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
         weather:
           '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+        pump: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
+        camera:
+          '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+        audio:
+          '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
         router:
           '<rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6.01 18H6"/><path d="M10.01 18H10"/><path d="M15 10v4"/><path d="M17.84 7.17a4 4 0 0 0-5.66 0"/>',
+        wifi: '<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>',
+        home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+        door: '<path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14"/><path d="M2 20h20"/><path d="M14 12v.01"/>',
         lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
-        solar:
-          '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+        bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+        clock:
+          '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+        flame:
+          '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+        star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
       };
 
       const TIMEZONES = [
@@ -5518,13 +5552,28 @@
         syncModalScrollLock();
       }
 
+      // Helper to let the browser paint the "Please Wait..." modal before heavy work
+      function waitForNextPaint() {
+        return new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        );
+      }
+
       async function exportBackup() {
+        const verified = await promptVerification(
+          "admin",
+          "Admin Auth: Export JSON Backup",
+        );
+        if (!verified) return;
+
         setBackupLoadingModal(
           true,
-          "Exporting JSON Backup...",
-          "Preparing configuration...",
+          "Please Wait...",
+          "Preparing and exporting configuration backup...",
         );
-        await new Promise((r) => setTimeout(r, 600));
+        await waitForNextPaint();
+        await new Promise((r) => setTimeout(r, 450));
+
         try {
           const blob = new Blob([JSON.stringify(config, null, 2)], {
             type: "application/json",
@@ -5540,26 +5589,44 @@
         }
       }
 
-      function importBackup(event) {
-        const file = event.target.files[0];
+      async function triggerImportBackup() {
+        const verified = await promptVerification(
+          "admin",
+          "Admin Auth: Import JSON Backup",
+        );
+        if (!verified) return;
+
+        const fileInput = document.getElementById("importBackupInput");
+        fileInput.value = "";
+        fileInput.click();
+      }
+
+      async function importBackup(event) {
+        const file = event.target.files?.[0];
         if (!file) return;
+
+        // Show "Please Wait..." modal immediately and force browser paint before parsing
         setBackupLoadingModal(
           true,
-          "Importing JSON Backup...",
-          "Validating configuration...",
+          "Please Wait...",
+          "Reading and restoring JSON backup...",
         );
+        await waitForNextPaint();
+
         const reader = new FileReader();
         reader.onload = async (e) => {
-          await new Promise((r) => setTimeout(r, 600));
           try {
+            await new Promise((r) => setTimeout(r, 350));
             const parsed = JSON.parse(e.target.result);
-            if (!parsed.devices || !parsed.groups || !parsed.settings)
-              throw new Error();
+            if (!parsed.devices || !parsed.groups || !parsed.settings) {
+              throw new Error("Invalid schema");
+            }
             config = sanitizeConfig(parsed);
             markDirty();
             applyTheme();
+            await waitForNextPaint();
             renderAll();
-            showToast("Backup imported! Click Save to write to NVS.");
+            showToast("Backup restored! Click Save to ESP32 to write to NVS.");
           } catch {
             showToast("Invalid backup JSON file");
           } finally {
@@ -5583,17 +5650,93 @@
         setTimeout(() => (location.href = "index.html"), 4000);
       }
 
-      async function factoryReset() {
-        if (!(await verifyAction("reset", "Factory Reset NVS"))) return;
-        if (!confirm("Erase all saved devices and reset NVS to defaults?"))
+      // 1. Reset Data Only (Clears Devices, Shortcuts, Groups & Favorites; keeps Settings/Network/Admin)
+      async function resetDataOnly() {
+        const verified = await promptVerification(
+          "admin",
+          "Admin Auth: Reset All Device & Group Data",
+        );
+        if (!verified) return;
+        if (
+          !confirm(
+            "Reset Data?\n\nThis will remove all saved Devices, Shortcut Buttons, Groups, and Favorites, while keeping your Network, Admin, and UI Settings intact.",
+          )
+        )
           return;
+
+        config.devices = [];
+        config.shortcuts = [];
+        config.groups = [{ id: "g1", name: "General", color: "#38bdf8" }];
+        config.favorites = [];
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        if (!isOfflinePreview) {
+          await fetch("/api/config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(config),
+          }).catch(() => {});
+        }
+        isDirty = false;
+        renderAll();
+        showToast("All device, shortcut, group & favorite data reset!");
+      }
+
+      // 2. Reset Settings Only (Resets Preferences, Network & Admin; keeps Devices/Shortcuts/Groups/Favorites)
+      async function resetSettingsOnly() {
+        const verified = await promptVerification(
+          "admin",
+          "Admin Auth: Reset All Hub Settings",
+        );
+        if (!verified) return;
+        if (
+          !confirm(
+            "Reset Settings?\n\nThis will reset Preferences, Network configuration, and Administrator settings to defaults, while keeping your saved Devices, Shortcuts, Groups, and Favorites.",
+          )
+        )
+          return;
+
+        const defaults = sanitizeConfig(null);
+        config.settings = defaults.settings;
+        config.network = defaults.network;
+        config.admin = defaults.admin;
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        clearLockoutData();
+        if (!isOfflinePreview) {
+          await fetch("/api/config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(config),
+          }).catch(() => {});
+        }
+        isDirty = false;
+        applyTheme();
+        renderAll();
+        showToast("Hub settings reset to default (Devices kept)!");
+      }
+
+      // 3. Factory Reset (Erases Everything)
+      async function factoryReset() {
+        const verified = await promptVerification(
+          "admin",
+          "Admin Auth: Factory Reset NVS",
+        );
+        if (!verified) return;
+        if (
+          !confirm(
+            "Factory Reset?\n\nErase ALL saved devices, shortcuts, groups, favorites, and settings back to factory defaults?",
+          )
+        )
+          return;
+
         localStorage.removeItem(STORAGE_KEY);
         clearLockoutData();
         sessionStorage.clear();
         isDirty = false;
         if (!isOfflinePreview)
           await fetch("/api/reset", { method: "POST" }).catch(() => {});
-        showToast("NVS reset complete");
+        showToast("Factory reset complete");
         setTimeout(() => location.reload(), 800);
       }
 
