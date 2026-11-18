@@ -7,7 +7,7 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <meta name="theme-color" content="#0b1120" />
-    <title>2D Home Building Designer — ACCESS POINT</title>
+    <title>Design My Home</title>
     <style>
       /* ==========================================================================
          1. THEME VARIABLES & GLOBAL RESET (MATCHES HUB THEME)
@@ -647,8 +647,8 @@
 
       /* Active ON state during live simulation */
       .svg-shape-group.sim-on .shape-prim {
-        stroke: var(--ok) !important;
-        filter: drop-shadow(0 0 12px rgba(34, 197, 94, 0.65));
+        stroke: var(--on-color, var(--ok)) !important;
+        filter: drop-shadow(0 0 12px var(--on-color, rgba(34, 197, 94, 0.65)));
       }
 
       .svg-shape-group.sim-on rect.shape-prim,
@@ -880,7 +880,7 @@
         </div>
       </div>
 
-      <!-- Actions: Rotate, Lock, Sample Home, Undo, Export, Save -->
+      <!-- Actions: Lock, Sample Home, Undo, Import, Export, Save -->
       <div class="topbar-right">
         <button
           class="btn"
@@ -900,6 +900,20 @@
         </button>
         <button class="btn" id="undoBtn" onclick="undo()" title="Undo (Ctrl+Z)">
           Undo
+        </button>
+        <input
+          type="file"
+          id="importJsonInput"
+          accept=".json,application/json"
+          style="display: none"
+          onchange="importDesignJson(event)"
+        />
+        <button
+          class="btn"
+          onclick="triggerImportDesignJson()"
+          title="Import JSON"
+        >
+          Import
         </button>
         <button class="btn" onclick="exportDesignJson()" title="Download JSON">
           Export
@@ -1141,7 +1155,7 @@
               class="tool-btn"
               data-tool="cut"
               onclick="selectTool('cut')"
-              title="Click a wall line to split a gap, or drag a box to erase part of a shape"
+              title="Click a wall line to split a gap, or drag a box to erase walls/shapes cleanly"
             >
               <svg
                 width="16"
@@ -1206,11 +1220,11 @@
           </div>
 
           <div class="shortcut-hint">
-            <strong>Shortcuts:</strong> Hold <strong>Shift</strong> for straight
-            line / square / circle &bull; Press <strong>R</strong> to rotate
-            +90° &bull; Press <strong>L</strong> to Lock/Unlock &bull;
-            <strong>Ctrl+Click</strong> or <strong>Drag Empty Space</strong> to
-            multi-select.
+            <strong>Shortcuts:</strong> <strong>Ctrl+C / Ctrl+V</strong> Copy
+            &amp; Paste &bull; <strong>Arrow Keys</strong> Move selected &bull;
+            Hold <strong>Shift</strong> for straight line / square / circle
+            &bull; <strong>R</strong> Rotate +90° &bull;
+            <strong>L</strong> Lock/Unlock.
           </div>
         </div>
       </aside>
@@ -1358,6 +1372,15 @@
           </div>
 
           <div
+            class="field"
+            id="multiOnColorWrap"
+            style="margin-top: 8px; display: none"
+          >
+            <label>Batch Turn On Color (Accessories)</label>
+            <div class="swatch-row" id="multiOnColorSwatches"></div>
+          </div>
+
+          <div
             style="
               display: grid;
               grid-template-columns: 1fr 1fr;
@@ -1391,7 +1414,7 @@
         >
           <div class="panel-card">
             <div class="panel-title">
-              <span id="inspTypeTitle">Room / Shape</span>
+              <span id="inspTypeTitle">ROOM/BOX</span>
               <div style="display: flex; align-items: center; gap: 5px">
                 <button
                   type="button"
@@ -1516,6 +1539,16 @@
             <div class="field" style="margin-top: 8px">
               <label>Stroke Color</label>
               <div class="swatch-row" id="inspColorSwatches"></div>
+            </div>
+
+            <!-- Turn On Color for all Accessories -->
+            <div
+              class="field"
+              id="inspOnColorWrap"
+              style="margin-top: 8px; display: none"
+            >
+              <label>Turn On Color</label>
+              <div class="swatch-row" id="inspOnColorSwatches"></div>
             </div>
 
             <div class="field-row" style="margin-top: 8px">
@@ -1775,76 +1808,90 @@
         "#ffffff",
       ];
 
-      // Expanded Home Accessories Palette (including PC, 3-Pin Socket, Printer & General Device)
+      // Expanded Home Accessories Palette (including default color and Turn On color)
       const ACCESSORY_ICONS = {
         plug: {
           label: "Plug",
           color: "#38bdf8",
+          onColor: "#22c55e",
           svg: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
         },
         socket3: {
           label: "Socket",
           color: "#38bdf8",
+          onColor: "#22c55e",
           svg: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="8" r="1.6"/><circle cx="8.5" cy="15" r="1.4"/><circle cx="15.5" cy="15" r="1.4"/>',
         },
         bulb: {
           label: "Bulb",
           color: "#fbbf24",
+          onColor: "#22c55e",
           svg: '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>',
         },
         fan: {
           label: "Fan",
           color: "#38bdf8",
+          onColor: "#22c55e",
           svg: '<path d="M12 12c0-3 2.5-5 5-5 2.8 0 5 2.2 5 5s-2.2 5-5 5h-5"/><path d="M12 12c3 0 5 2.5 5 5 0 2.8-2.2 5-5 5s-5-2.2-5-5v-5"/><path d="M12 12c0 3-2.5 5-5 5-2.8 0-5-2.2-5-5s2.2-5 5-5h5"/><path d="M12 12c-3 0-5-2.5-5-5 0-2.8 2.2-5 5-5s5 2.2 5 5v5"/>',
         },
         ac: {
           label: "AC",
           color: "#14b8a6",
+          onColor: "#22c55e",
           svg: '<rect x="2" y="5" width="20" height="9" rx="2"/><path d="M6 14v3"/><path d="M10 14v4"/><path d="M14 14v4"/><path d="M18 14v3"/>',
         },
         tv: {
           label: "TV",
           color: "#a855f7",
+          onColor: "#22c55e",
           svg: '<rect x="2" y="6" width="20" height="13" rx="2"/><line x1="8" y1="22" x2="16" y2="22"/><line x1="12" y1="19" x2="12" y2="22"/>',
         },
         pc: {
           label: "PC",
           color: "#38bdf8",
+          onColor: "#22c55e",
           svg: '<rect x="2" y="3" width="20" height="13" rx="2"/><line x1="6" y1="20" x2="18" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/>',
         },
         printer: {
           label: "Printer",
           color: "#94a3b8",
+          onColor: "#22c55e",
           svg: '<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
         },
         speaker: {
           label: "Speaker",
           color: "#f43f5e",
+          onColor: "#22c55e",
           svg: '<rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="14" r="4"/><line x1="12" y1="6" x2="12.01" y2="6"/>',
         },
         router: {
           label: "Router",
           color: "#22c55e",
+          onColor: "#38bdf8",
           svg: '<rect x="2" y="14" width="20" height="7" rx="2"/><path d="M6 17.5h.01"/><path d="M10 17.5h.01"/><path d="M15 10v4"/><path d="M18.5 7.5a5 5 0 0 0-7 0"/>',
         },
         oven: {
           label: "Oven",
           color: "#f59e0b",
+          onColor: "#22c55e",
           svg: '<rect x="3" y="4" width="18" height="16" rx="2"/><rect x="6" y="10" width="12" height="7" rx="1"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="11" y1="7" x2="11.01" y2="7"/>',
         },
         fridge: {
           label: "Fridge",
           color: "#6366f1",
+          onColor: "#22c55e",
           svg: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="5" y1="10" x2="19" y2="10"/><line x1="8" y1="6" x2="8" y2="8"/><line x1="8" y1="13" x2="8" y2="16"/>',
         },
         pump: {
           label: "Pump",
           color: "#0ea5e9",
+          onColor: "#22c55e",
           svg: '<circle cx="12" cy="12" r="6"/><path d="M12 6V2h6"/><path d="M6 12H2v4"/><circle cx="12" cy="12" r="2"/>',
         },
         device: {
           label: "Device",
           color: "#22c55e",
+          onColor: "#38bdf8",
           svg: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',
         },
       };
@@ -1855,31 +1902,37 @@
         sensor: {
           label: "Sensor / Telemetry",
           color: "#38bdf8",
+          onColor: "#22c55e",
           svg: '<path d="M2 12h3l2-7 4 14 3-9 2 4h6"/>',
         },
         camera: {
           label: "IP Camera",
           color: "#f43f5e",
+          onColor: "#22c55e",
           svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
         },
         solar: {
           label: "Solar / Inverter",
           color: "#fbbf24",
+          onColor: "#22c55e",
           svg: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
         },
         battery: {
           label: "Battery Bank",
           color: "#22c55e",
+          onColor: "#38bdf8",
           svg: '<rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="13" x2="23" y2="11"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/>',
         },
         matrix: {
           label: "LED Matrix Display",
           color: "#a855f7",
+          onColor: "#22c55e",
           svg: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="8" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="12" r="1"/><circle cx="8" cy="16" r="1"/><circle cx="12" cy="16" r="1"/><circle cx="16" cy="16" r="1"/>',
         },
         lock: {
           label: "Smart Door Lock",
           color: "#f59e0b",
+          onColor: "#22c55e",
           svg: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
         },
       };
@@ -1937,6 +1990,10 @@
       let dragState = null;
       let undoStack = [];
       let editingFloorModalId = null;
+
+      // Copy / Paste Clipboard State
+      let clipboardShapes = [];
+      let pasteOffsetStep = 0;
 
       // Simulation Runtime State (stores live ON/OFF state per shape ID)
       let simSwitchStates = {};
@@ -2135,6 +2192,7 @@
                   r: 22,
                   label: "BLDC Fan",
                   color: "#38bdf8",
+                  onColor: "#22c55e",
                   strokeWidth: 2,
                   fillOpacity: 0.22,
                   dashed: false,
@@ -2157,6 +2215,7 @@
                   r: 20,
                   label: "Chandelier",
                   color: "#fbbf24",
+                  onColor: "#22c55e",
                   strokeWidth: 2,
                   fillOpacity: 0.22,
                   dashed: false,
@@ -2310,6 +2369,7 @@
                   r: 22,
                   label: "Workstation PC",
                   color: "#38bdf8",
+                  onColor: "#22c55e",
                   strokeWidth: 2,
                   fillOpacity: 0.22,
                   dashed: false,
@@ -2332,6 +2392,7 @@
                   r: 22,
                   label: "ESP LED Studio",
                   color: "#f43f5e",
+                  onColor: "#22c55e",
                   strokeWidth: 2,
                   fillOpacity: 0.22,
                   dashed: false,
@@ -2832,6 +2893,7 @@
         const isSimOn = !!simSwitchStates[s.id];
         const dashAttr = s.dashed ? `stroke-dasharray="7 5"` : "";
         const color = s.color || "#38bdf8";
+        const onColor = s.onColor || "#22c55e";
         const sw = s.strokeWidth ?? 2;
         const fo = s.fillOpacity ?? 0.14;
         const fs = s.fontSize || 13;
@@ -2908,15 +2970,19 @@
             }
           `;
         } else if (s.type === "cut") {
-          const showCutOutline =
-            appMode === "design" && selectedShapeIds.has(s.id);
+          // Only show outline while actively dragging the erase rectangle; no dotted border after erased
+          const isActivelyErasing =
+            appMode === "design" &&
+            dragState &&
+            dragState.shape &&
+            dragState.shape.id === s.id;
           primHtml = `
             <rect class="shape-prim" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"
               fill="var(--canvas-bg)" stroke="${
-                appMode === "design"
-                  ? "rgba(239,68,68,0.55)"
-                  : "var(--canvas-bg)"
-              }" stroke-width="${showCutOutline ? 2 : 1}" stroke-dasharray="4 3" />
+                isActivelyErasing ? "rgba(239,68,68,0.75)" : "none"
+              }" stroke-width="${isActivelyErasing ? 1.5 : 0}" ${
+                isActivelyErasing ? 'stroke-dasharray="4 3"' : ""
+              } />
           `;
         } else if (s.type === "icon") {
           const acc =
@@ -2925,11 +2991,12 @@
             ACCESSORY_ICONS.bulb;
           const r = s.r || 20;
           const iconScale = (r / 18).toFixed(2);
+          const activeAccColor = isSimOn ? onColor : color;
           primHtml = `
             <circle class="shape-prim" cx="${s.x}" cy="${s.y}" r="${r}"
-              fill="${color}" fill-opacity="${fo}" stroke="${isSimOn ? "var(--ok)" : color}" stroke-width="${sw}" />
+              fill="${activeAccColor}" fill-opacity="${isSimOn ? Math.max(fo, 0.35) : fo}" stroke="${activeAccColor}" stroke-width="${sw}" />
             <g transform="translate(${s.x - 12 * iconScale}, ${s.y - 12 * iconScale}) scale(${iconScale})"
-               stroke="${isSimOn ? "var(--ok)" : color}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"
+               stroke="${activeAccColor}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"
                style="pointer-events:none">
               ${acc.svg}
             </g>
@@ -2942,7 +3009,7 @@
             ${
               hasLink && s.link.type === "shortcut"
                 ? `<text class="shape-sublabel" x="${s.x}" y="${s.y - r - 5}"
-                    text-anchor="middle" fill="${isSimOn ? "var(--ok)" : color}">${isSimOn ? "● ON" : "○ OFF"}</text>`
+                    text-anchor="middle" fill="${activeAccColor}">${isSimOn ? "● ON" : "○ OFF"}</text>`
                 : ""
             }
           `;
@@ -3012,9 +3079,13 @@
           `;
         }
 
+        const customOnVar =
+          s.type === "icon" ? `style="--on-color: ${onColor}"` : "";
+
         return `
           <g class="svg-shape-group ${hasLink ? "is-clickable" : ""} ${isSimOn ? "sim-on" : ""} ${s.locked ? "is-locked" : ""}"
              data-shape-id="${s.id}"
+             ${customOnVar}
              ${rotAttr}
              onmousedown="onShapeMouseDown(event, '${s.id}')"
              onclick="onShapeClick(event, '${s.id}')">
@@ -3155,7 +3226,7 @@
       }
 
       /* ========================================================================
-         4. MOUSE, SHIFT-CONSTRAINTS, MULTI-SELECT & MARQUEE INTERACTION
+         4. MOUSE, SHIFT-CONSTRAINTS, MULTI-SELECT, ERASE & KEYBOARD INTERACTION
          ======================================================================== */
       function getSvgPoint(evt) {
         const rect = svgEl.getBoundingClientRect();
@@ -3181,7 +3252,7 @@
         };
       }
 
-      // Splits a wall line into two segments with a 40px gap if clicked with the Cut tool
+      // Splits a wall line into two segments with a 40px gap if clicked with the Erase tool
       function trySplitWallLineAtPoint(floor, px, py) {
         const GAP_HALF = 20;
         for (let i = floor.shapes.length - 1; i >= 0; i--) {
@@ -3212,6 +3283,112 @@
           }
         }
         return false;
+      }
+
+      // Trims or splits unlocked lines intersecting a dragged erase rectangle (Liang-Barsky clipping)
+      function applyEraseBoxToFloor(floor, cutShape) {
+        const rx1 = cutShape.x;
+        const ry1 = cutShape.y;
+        const rx2 = cutShape.x + cutShape.w;
+        const ry2 = cutShape.y + cutShape.h;
+
+        let trimmedAnyLine = false;
+        const updatedShapes = [];
+
+        floor.shapes.forEach((s) => {
+          if (s.id === cutShape.id) {
+            updatedShapes.push(s);
+            return;
+          }
+          if (s.locked || s.type !== "line") {
+            updatedShapes.push(s);
+            return;
+          }
+
+          const dx = s.x2 - s.x1;
+          const dy = s.y2 - s.y1;
+          let t0 = 0;
+          let t1 = 1;
+          const p = [-dx, dx, -dy, dy];
+          const q = [s.x1 - rx1, rx2 - s.x1, s.y1 - ry1, ry2 - s.y1];
+          let intersects = true;
+
+          for (let i = 0; i < 4; i++) {
+            if (p[i] === 0) {
+              if (q[i] < 0) {
+                intersects = false;
+                break;
+              }
+            } else {
+              const t = q[i] / p[i];
+              if (p[i] < 0) {
+                if (t > t1) {
+                  intersects = false;
+                  break;
+                }
+                if (t > t0) t0 = t;
+              } else {
+                if (t < t0) {
+                  intersects = false;
+                  break;
+                }
+                if (t < t1) t1 = t;
+              }
+            }
+          }
+
+          if (!intersects || t0 >= t1) {
+            updatedShapes.push(s);
+            return;
+          }
+
+          trimmedAnyLine = true;
+          // Keep first segment outside erase box
+          if (t0 > 0.05) {
+            const seg1 = {
+              ...JSON.parse(JSON.stringify(s)),
+              x2: Math.round(s.x1 + t0 * dx),
+              y2: Math.round(s.y1 + t0 * dy),
+            };
+            if (Math.hypot(seg1.x2 - seg1.x1, seg1.y2 - seg1.y1) >= 6) {
+              updatedShapes.push(seg1);
+            }
+          }
+          // Keep second segment outside erase box
+          if (t1 < 0.95) {
+            const seg2 = {
+              ...JSON.parse(JSON.stringify(s)),
+              id:
+                "sh_" +
+                Date.now().toString(36) +
+                "_trim_" +
+                Math.random().toString(36).slice(2, 5),
+              x1: Math.round(s.x1 + t1 * dx),
+              y1: Math.round(s.y1 + t1 * dy),
+            };
+            if (Math.hypot(seg2.x2 - seg2.x1, seg2.y2 - seg2.y1) >= 6) {
+              updatedShapes.push(seg2);
+            }
+          }
+        });
+
+        // Check if cutShape overlaps any non-line shapes (like room boxes/circles) to act as a clean mask
+        const overlapsOtherShapes = updatedShapes.some((s) => {
+          if (s.id === cutShape.id || s.type === "cut" || s.type === "line") {
+            return false;
+          }
+          const b = getShapeBounds(s);
+          return (
+            b.x <= rx2 && b.x + b.w >= rx1 && b.y <= ry2 && b.y + b.h >= ry1
+          );
+        });
+
+        // If the erase box only cut a line and doesn't mask any room box, we don't even need the mask rect
+        if (trimmedAnyLine && !overlapsOtherShapes) {
+          floor.shapes = updatedShapes.filter((s) => s.id !== cutShape.id);
+        } else {
+          floor.shapes = updatedShapes;
+        }
       }
 
       function setupCanvasEvents() {
@@ -3371,7 +3548,9 @@
             };
           } else if (activeTool === "cut") {
             if (trySplitWallLineAtPoint(floor, pt.x, pt.y)) {
+              clearSelection();
               renderCanvas();
+              updateInspector();
               showToast("Wall line split! Gap created.");
               return;
             }
@@ -3384,9 +3563,9 @@
               h: 20,
               label: "",
               color: "#ef4444",
-              strokeWidth: 1,
+              strokeWidth: 0,
               fillOpacity: 1,
-              dashed: true,
+              dashed: false,
               fontSize: 10,
               fontWeight: "400",
               rotation: 0,
@@ -3394,7 +3573,7 @@
               link: { type: "none", targetId: "", targetName: "" },
             };
             floor.shapes.push(newShape);
-            selectSingleShape(newId);
+            clearSelection();
             dragState = {
               mode: "draw-rect",
               shape: newShape,
@@ -3416,6 +3595,7 @@
               r: 20,
               label: acc.label,
               color: acc.color,
+              onColor: acc.onColor || "#22c55e",
               strokeWidth: 2,
               fillOpacity: 0.22,
               dashed: false,
@@ -3488,6 +3668,7 @@
             selectedShapeIds = new Set(dragState.initialSet);
             const floor = getActiveFloor();
             floor.shapes.forEach((sh) => {
+              if (sh.type === "cut") return;
               const b = getShapeBounds(sh);
               const overlaps =
                 b.x <= mx2 &&
@@ -3592,10 +3773,20 @@
 
         window.addEventListener("mouseup", () => {
           if (dragState) {
-            if (dragState.mode.startsWith("draw-")) {
+            const finishedShape = dragState.shape;
+            const wasDraw = dragState.mode.startsWith("draw-");
+            dragState = null;
+
+            if (wasDraw && finishedShape && finishedShape.type === "cut") {
+              const floor = getActiveFloor();
+              applyEraseBoxToFloor(floor, finishedShape);
+              clearSelection();
+              selectTool("select");
+              showToast("Erased area cleanly");
+            } else if (wasDraw) {
               selectTool("select");
             }
-            dragState = null;
+
             renderFloorList();
             renderCanvas();
             updateInspector();
@@ -3609,6 +3800,68 @@
             )
           )
             return;
+
+          // Arrow Keys: Move selected shapes & text
+          if (
+            ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
+              e.key,
+            ) &&
+            selectedShapeIds.size &&
+            appMode === "design"
+          ) {
+            e.preventDefault();
+            const unlocked = getSelectedShapesList().filter((s) => !s.locked);
+            if (!unlocked.length) {
+              showToast("Item is locked (Click Unlock or press L to move)");
+              return;
+            }
+            if (!e.repeat) pushUndo();
+            const step = e.shiftKey ? 1 : snapSize || 20;
+            let dx = 0;
+            let dy = 0;
+            if (e.key === "ArrowLeft") dx = -step;
+            if (e.key === "ArrowRight") dx = step;
+            if (e.key === "ArrowUp") dy = -step;
+            if (e.key === "ArrowDown") dy = step;
+
+            unlocked.forEach((s) => {
+              if (s.type === "line") {
+                s.x1 += dx;
+                s.y1 += dy;
+                s.x2 += dx;
+                s.y2 += dy;
+              } else {
+                s.x += dx;
+                s.y += dy;
+              }
+            });
+            renderCanvas();
+            syncInspectorGeometryInputs();
+            return;
+          }
+
+          // Ctrl+C: Copy selected shapes and text
+          if (
+            (e.ctrlKey || e.metaKey) &&
+            e.key.toLowerCase() === "c" &&
+            selectedShapeIds.size &&
+            appMode === "design"
+          ) {
+            e.preventDefault();
+            copySelectedShapes();
+            return;
+          }
+
+          // Ctrl+V: Paste copied shapes and text
+          if (
+            (e.ctrlKey || e.metaKey) &&
+            e.key.toLowerCase() === "v" &&
+            appMode === "design"
+          ) {
+            e.preventDefault();
+            pasteClipboardShapes();
+            return;
+          }
 
           if (
             (e.key === "Delete" || e.key === "Backspace") &&
@@ -3640,6 +3893,52 @@
             duplicateSelected();
           }
         });
+      }
+
+      function copySelectedShapes() {
+        const list = getSelectedShapesList();
+        if (!list.length) return;
+        clipboardShapes = JSON.parse(JSON.stringify(list));
+        pasteOffsetStep = 0;
+        showToast(`Copied ${clipboardShapes.length} item(s)`);
+      }
+
+      function pasteClipboardShapes() {
+        if (!clipboardShapes.length) {
+          return showToast(
+            "Clipboard is empty (Select items and press Ctrl+C)",
+          );
+        }
+        pushUndo();
+        pasteOffsetStep += 1;
+        const offset = 20 * pasteOffsetStep;
+        const floor = getActiveFloor();
+        const newIds = new Set();
+
+        clipboardShapes.forEach((s, idx) => {
+          const copy = JSON.parse(JSON.stringify(s));
+          copy.id = "sh_" + Date.now().toString(36) + "_p" + idx;
+          copy.locked = false;
+          if (copy.type === "line") {
+            copy.x1 += offset;
+            copy.y1 += offset;
+            copy.x2 += offset;
+            copy.y2 += offset;
+          } else {
+            copy.x += offset;
+            copy.y += offset;
+          }
+          floor.shapes.push(copy);
+          newIds.add(copy.id);
+        });
+
+        selectedShapeIds = newIds;
+        const arr = [...newIds];
+        selectedShapeId = arr[arr.length - 1] || null;
+        renderFloorList();
+        renderCanvas();
+        updateInspector();
+        showToast(`Pasted ${clipboardShapes.length} item(s)`);
       }
 
       function onShapeMouseDown(e, shapeId) {
@@ -3861,6 +4160,19 @@
               (c) =>
                 `<div class="swatch" style="background:${c}" onclick="updateBatchColor('${c}')"></div>`,
             ).join("");
+
+          const hasAccessories = list.some((s) => s.type === "icon");
+          const multiOnWrap = document.getElementById("multiOnColorWrap");
+          if (hasAccessories) {
+            multiOnWrap.style.display = "flex";
+            document.getElementById("multiOnColorSwatches").innerHTML =
+              SWATCHES.map(
+                (c) =>
+                  `<div class="swatch" style="background:${c}" onclick="updateBatchOnColor('${c}')"></div>`,
+              ).join("");
+          } else {
+            multiOnWrap.style.display = "none";
+          }
           return;
         }
 
@@ -3878,17 +4190,17 @@
         content.style.display = "flex";
 
         const typeNames = {
-          rect: "Room / Box (SVG Rect)",
-          line: "Wall / Straight Line",
-          circle: "Circle / Oval Node",
-          door: "Door Swing Arc",
-          stair: "Staircase",
-          cut: "Cut / Erase Mask",
-          icon: "Home Accessory / Device",
-          text: "Text Label",
+          rect: "ROOM/BOX",
+          line: "WALL/LINE",
+          circle: "CIRCLE/OVAL",
+          door: "DOOR",
+          stair: "STAIR",
+          cut: "ERASE",
+          icon: "ACCESSORY",
+          text: "TEXT",
         };
         document.getElementById("inspTypeTitle").textContent =
-          typeNames[s.type] || "Shape";
+          typeNames[s.type] || "ROOM/BOX";
         document.getElementById("inspIdBadge").textContent =
           s.type.toUpperCase();
 
@@ -3909,10 +4221,12 @@
         document.getElementById("inspFontSize").value = s.fontSize || 13;
         document.getElementById("inspFontWeight").value = s.fontWeight || "700";
 
-        // General Device / Accessory Icon Selector
+        // General Device / Accessory Icon Selector & Turn On Color
         const devKindWrap = document.getElementById("inspDeviceKindWrap");
+        const onColorWrap = document.getElementById("inspOnColorWrap");
         if (s.type === "icon") {
           devKindWrap.style.display = "flex";
+          onColorWrap.style.display = "flex";
           const sel = document.getElementById("inspDeviceKindSelect");
           sel.innerHTML = Object.entries(EXTRA_DEVICE_ICONS)
             .map(
@@ -3920,8 +4234,10 @@
                 `<option value="${k}" ${s.icon === k ? "selected" : ""}>${escapeHtml(v.label)}</option>`,
             )
             .join("");
+          renderInspectorOnColorSwatches(s.onColor || "#22c55e");
         } else {
           devKindWrap.style.display = "none";
+          onColorWrap.style.display = "none";
         }
 
         // Disable geometry/rotation inputs when shape is locked
@@ -3947,7 +4263,9 @@
           document.getElementById("inspLabel").value = s.label;
         }
         s.color = meta.color;
+        if (!s.onColor) s.onColor = meta.onColor || "#22c55e";
         renderInspectorSwatches(s.color);
+        renderInspectorOnColorSwatches(s.onColor);
         renderCanvas();
       }
 
@@ -3957,6 +4275,17 @@
         pushUndo();
         list.forEach((s) => (s.color = color));
         renderCanvas();
+      }
+
+      function updateBatchOnColor(onColor) {
+        const list = getSelectedShapesList().filter(
+          (s) => !s.locked && s.type === "icon",
+        );
+        if (!list.length) return showToast("Selected accessories are locked");
+        pushUndo();
+        list.forEach((s) => (s.onColor = onColor));
+        renderCanvas();
+        showToast("Updated Turn On Color for selected accessories");
       }
 
       function syncInspectorGeometryInputs() {
@@ -4029,6 +4358,21 @@
           ).join("") +
           `<input type="color" value="${activeColor}" style="width:26px;height:26px;border:none;background:none;cursor:pointer"
              onchange="updateSelectedProp('color', this.value); renderInspectorSwatches(this.value)" />`;
+      }
+
+      function renderInspectorOnColorSwatches(activeOnColor) {
+        const box = document.getElementById("inspOnColorSwatches");
+        if (!box) return;
+        box.innerHTML =
+          SWATCHES.map(
+            (c) => `
+            <div class="swatch ${activeOnColor.toLowerCase() === c.toLowerCase() ? "selected" : ""}"
+                 style="background:${c}"
+                 onclick="updateSelectedProp('onColor', '${c}'); renderInspectorOnColorSwatches('${c}')"></div>
+          `,
+          ).join("") +
+          `<input type="color" value="${activeOnColor}" style="width:26px;height:26px;border:none;background:none;cursor:pointer"
+             onchange="updateSelectedProp('onColor', this.value); renderInspectorOnColorSwatches(this.value)" />`;
       }
 
       function updateSelectedProp(key, val) {
@@ -4244,7 +4588,7 @@
       }
 
       /* ========================================================================
-         8. ZOOM, SAVE & EXPORT UTILITIES
+         8. ZOOM, SAVE, IMPORT & EXPORT UTILITIES
          ======================================================================== */
       function adjustZoom(delta) {
         zoomLevel = Math.max(
@@ -4269,6 +4613,76 @@
       function saveBuildingDesign() {
         localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(building));
         showToast("Building 2D blueprint saved to storage!");
+      }
+
+      function triggerImportDesignJson() {
+        const fileInput = document.getElementById("importJsonInput");
+        if (fileInput) fileInput.click();
+      }
+
+      function importDesignJson(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const parsed = JSON.parse(e.target.result);
+            if (
+              !parsed ||
+              !Array.isArray(parsed.floors) ||
+              !parsed.floors.length
+            ) {
+              showToast("Invalid building JSON file");
+              return;
+            }
+            pushUndo();
+            building = {
+              name: parsed.name || "Imported Smart Home",
+              unit: parsed.unit || "ft",
+              width: parsed.width || 920,
+              height: parsed.height || 600,
+              floors: parsed.floors.map((fl, fIdx) => ({
+                id: fl.id || "fl_" + Date.now().toString(36) + "_" + fIdx,
+                name: fl.name || `Floor ${fIdx}`,
+                code: fl.code || (fIdx === 0 ? "G" : `${fIdx}F`),
+                shapes: Array.isArray(fl.shapes)
+                  ? fl.shapes.map((s, sIdx) => ({
+                      ...s,
+                      id:
+                        s.id ||
+                        "sh_" +
+                          Date.now().toString(36) +
+                          "_" +
+                          fIdx +
+                          "_" +
+                          sIdx,
+                      onColor:
+                        s.type === "icon" ? s.onColor || "#22c55e" : s.onColor,
+                      rotation: Number(s.rotation) || 0,
+                      locked: !!s.locked,
+                      link: s.link || {
+                        type: "none",
+                        targetId: "",
+                        targetName: "",
+                      },
+                    }))
+                  : [],
+              })),
+            };
+            activeFloorId = building.floors[0].id;
+            clearSelection();
+            syncBuildingInputs();
+            renderFloorList();
+            renderCanvas();
+            updateInspector();
+            showToast("Imported 2D SVG Building JSON!");
+          } catch (_) {
+            showToast("Failed to parse JSON file");
+          } finally {
+            event.target.value = "";
+          }
+        };
+        reader.readAsText(file);
       }
 
       function exportDesignJson() {
