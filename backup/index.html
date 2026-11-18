@@ -1797,7 +1797,7 @@
             actions: {
               devices: "admin", // Devices Management -> Admin
               shortcuts: "admin", // Shortcut -> Admin
-              homeToggle: "none", // Shortcut Toggling -> None (Off by default on Home UI)
+              homeToggle: "admin", // Shortcut Toggling -> Admin
               groups: "admin", // Group Management -> Admin
               favorites: "admin", // Favorites Management -> Admin
               network: "admin", // Network Configuration -> Admin
@@ -2353,10 +2353,15 @@
 
       async function triggerShortcut(id, event) {
         if (event) event.stopPropagation();
-        if (!(await verifyAction("homeToggle", "Toggle Shortcut Switch")))
-          return;
         const sc = config.shortcuts.find((s) => s.id === id);
         if (!sc || shortcutBusy[id]) return;
+        if (sc.locked) {
+          const ok = await promptVerification(
+            sc.lockRole || "admin",
+            `Unlock Switch: ${sc.name}`,
+          );
+          if (!ok) return;
+        }
 
         const cleanH = cleanHostInput(sc.host);
         if (!cleanH) return showToast("Invalid shortcut host");
@@ -2749,18 +2754,15 @@
       function renderFavorites() {
         const sec = document.getElementById("favSection");
         const strip = document.getElementById("favStrip");
+        const visibleFavs = (config.favorites || []).filter((f) => !f.hidden);
 
-        if (
-          config.settings.enableFavorites === false ||
-          !Array.isArray(config.favorites) ||
-          !config.favorites.length
-        ) {
+        if (config.settings.enableFavorites === false || !visibleFavs.length) {
           sec.style.display = "none";
           return;
         }
 
         sec.style.display = "block";
-        strip.innerHTML = config.favorites
+        strip.innerHTML = visibleFavs
           .map((fav) => {
             const fIdSafe = escapeHtml(fav.id);
             const colorSafe = escapeHtml(fav.color || "#38bdf8");
@@ -2939,6 +2941,7 @@
         }
 
         const filtered = config.shortcuts.filter((s) => {
+          if (s.hidden) return false;
           if (!query) return true;
           return (
             (s.name && s.name.toLowerCase().includes(query)) ||
@@ -2990,9 +2993,11 @@
         let html = "";
 
         config.groups.forEach((g) => {
+          if (g.hidden) return;
           const groupDevs = visibleDevices.filter((d) => d.group === g.id);
           const groupShortcuts = (config.shortcuts || []).filter(
             (s) =>
+              !s.hidden &&
               s.group === g.id &&
               (!query ||
                 (s.name && s.name.toLowerCase().includes(query)) ||
