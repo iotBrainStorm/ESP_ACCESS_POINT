@@ -224,6 +224,15 @@
         color: #031525;
         filter: brightness(1.08);
       }
+      .btn-warn {
+        border-color: rgba(245, 158, 11, 0.45);
+        color: var(--warn);
+      }
+      .btn-warn:hover:not(:disabled) {
+        background: rgba(245, 158, 11, 0.12);
+        border-color: var(--warn);
+        color: var(--warn);
+      }
       .btn-danger {
         border-color: rgba(239, 68, 68, 0.4);
         color: var(--err);
@@ -246,7 +255,7 @@
       .workspace {
         flex: 1;
         display: grid;
-        grid-template-columns: 290px 1fr 310px;
+        grid-template-columns: 295px 1fr 320px;
         min-height: 0;
         overflow: hidden;
       }
@@ -443,9 +452,10 @@
       .tool-btn svg {
         flex-shrink: 0;
       }
+
       .acc-grid {
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 6px;
         margin-top: 6px;
       }
@@ -460,10 +470,11 @@
         border: 1px solid var(--border);
         background: var(--bg);
         color: var(--text-muted);
-        font-size: 0.64rem;
+        font-size: 0.63rem;
         font-weight: 600;
         cursor: pointer;
         transition: 0.15s;
+        text-align: center;
       }
       .acc-btn:hover {
         border-color: var(--accent);
@@ -511,6 +522,11 @@
       .select:focus {
         border-color: var(--accent);
       }
+      .input:disabled,
+      .select:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
 
       .swatch-row {
         display: flex;
@@ -529,6 +545,20 @@
       .swatch.selected {
         border-color: #ffffff;
         transform: scale(1.14);
+      }
+
+      .shortcut-hint {
+        font-size: 0.69rem;
+        color: var(--text-muted);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        line-height: 1.5;
+        margin-top: 10px;
+      }
+      .shortcut-hint strong {
+        color: var(--accent);
       }
 
       /* ==========================================================================
@@ -552,6 +582,8 @@
         align-items: center;
         pointer-events: none;
         z-index: 10;
+        gap: 8px;
+        flex-wrap: wrap;
       }
 
       .hud-pill {
@@ -584,10 +616,6 @@
         cursor: default;
       }
 
-      .canvas-viewport.panning {
-        cursor: grabbing !important;
-      }
-
       svg#floorSvg {
         background: var(--canvas-bg);
         border: 1px solid var(--border);
@@ -600,6 +628,9 @@
       /* SVG Shape Styling */
       .svg-shape-group {
         cursor: move;
+      }
+      .svg-shape-group.is-locked {
+        cursor: pointer;
       }
 
       .workspace.sim-active .svg-shape-group {
@@ -621,14 +652,14 @@
       }
 
       .svg-shape-group.sim-on rect.shape-prim,
-      .svg-shape-group.sim-on circle.shape-prim {
+      .svg-shape-group.sim-on circle.shape-prim,
+      .svg-shape-group.sim-on ellipse.shape-prim {
         fill-opacity: 0.38 !important;
       }
 
       .shape-label {
         font-family:
           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-weight: 700;
         pointer-events: none;
         user-select: none;
       }
@@ -646,6 +677,17 @@
         stroke: var(--accent);
         stroke-width: 1.5;
         stroke-dasharray: 4 3;
+        pointer-events: none;
+      }
+      .selection-box.locked-box {
+        stroke: var(--warn);
+      }
+
+      .marquee-box {
+        fill: rgba(56, 189, 248, 0.12);
+        stroke: var(--accent);
+        stroke-width: 1.5;
+        stroke-dasharray: 5 3;
         pointer-events: none;
       }
 
@@ -750,7 +792,7 @@
 
       @media (max-width: 1024px) {
         .workspace {
-          grid-template-columns: 250px 1fr 270px;
+          grid-template-columns: 255px 1fr 280px;
         }
       }
       @media (max-width: 820px) {
@@ -816,7 +858,7 @@
                 d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
               />
             </svg>
-            Design Blueprint
+            Blueprint
           </button>
           <button
             class="mode-btn sim-btn"
@@ -833,19 +875,28 @@
             >
               <polygon points="5 3 19 12 5 21 5 3" />
             </svg>
-            Live Simulation
+            Simulation
           </button>
         </div>
       </div>
 
-      <!-- Actions: Sample Home, Undo, Export, Save -->
+      <!-- Actions: Rotate, Lock, Sample Home, Undo, Export, Save -->
       <div class="topbar-right">
+        <button
+          class="btn"
+          id="topLockBtn"
+          onclick="toggleLockSelected()"
+          title="Lock / Unlock Selected (Shortcut: L)"
+        >
+          <span id="topLockIcon">&#128275;</span>
+          <span id="topLockText">Lock</span>
+        </button>
         <button
           class="btn"
           onclick="loadDemoSmartHome()"
           title="Load a complete 2-Floor Smart Home sample drawing"
         >
-          Load Sample Home
+          Sample Home
         </button>
         <button class="btn" id="undoBtn" onclick="undo()" title="Undo (Ctrl+Z)">
           Undo
@@ -877,7 +928,7 @@
           </div>
 
           <div class="field">
-            <label>Building / House Name</label>
+            <label>House Name</label>
             <input
               type="text"
               id="bldgNameInput"
@@ -889,17 +940,17 @@
 
           <div class="field-row">
             <div class="field">
-              <label>Quick Total Floors</label>
+              <label>Total Floors</label>
               <select
                 id="quickFloorCount"
                 class="select"
                 onchange="syncFloorCount(Number(this.value))"
               >
                 <option value="1">1 Floor (G)</option>
-                <option value="2" selected>2 Floors (G + 1)</option>
-                <option value="3">3 Floors (G + 2)</option>
-                <option value="4">4 Floors (G + 3)</option>
-                <option value="5">5 Floors (G + 4)</option>
+                <option value="2" selected>2 Floors</option>
+                <option value="3">3 Floors</option>
+                <option value="4">4 Floors</option>
+                <option value="5">5 Floors</option>
               </select>
             </div>
             <div class="field">
@@ -909,8 +960,8 @@
                 class="select"
                 onchange="updateBuildingMeta()"
               >
-                <option value="ft">Feet (1 sq = 2 ft)</option>
-                <option value="m">Meters (1 sq = 0.5 m)</option>
+                <option value="ft">Feet</option>
+                <option value="m">Meters</option>
               </select>
             </div>
           </div>
@@ -957,6 +1008,7 @@
               class="tool-btn active"
               data-tool="select"
               onclick="selectTool('select')"
+              title="Click or drag a marquee box on empty space to select multiple shapes"
             >
               <svg
                 width="16"
@@ -975,6 +1027,7 @@
               class="tool-btn"
               data-tool="rect"
               onclick="selectTool('rect')"
+              title="Draw Room / Box (Hold Shift for Square)"
             >
               <svg
                 width="16"
@@ -993,6 +1046,7 @@
               class="tool-btn"
               data-tool="line"
               onclick="selectTool('line')"
+              title="Draw Wall / Line (Hold Shift for straight H/V/45° line)"
             >
               <svg
                 width="16"
@@ -1004,13 +1058,14 @@
               >
                 <line x1="4" y1="20" x2="20" y2="4" />
               </svg>
-              <span>line</span>
+              <span>Line</span>
             </button>
 
             <button
               class="tool-btn"
               data-tool="circle"
               onclick="selectTool('circle')"
+              title="Draw Oval / Circle (Hold Shift for Perfect Circle)"
             >
               <svg
                 width="16"
@@ -1062,6 +1117,7 @@
               </svg>
               <span>Text</span>
             </button>
+
             <button
               class="tool-btn"
               data-tool="stair"
@@ -1115,7 +1171,7 @@
                 display: block;
               "
             >
-              Home Accessories (Click &amp; Place in Room)
+              Home Accessories
             </label>
             <div class="acc-grid" id="accessoryPalette"></div>
           </div>
@@ -1128,9 +1184,9 @@
                 class="select"
                 onchange="snapSize = Number(this.value)"
               >
-                <option value="20" selected>20px (Standard)</option>
-                <option value="10">10px (Fine)</option>
-                <option value="1">Off (Freehand)</option>
+                <option value="20" selected>Standard</option>
+                <option value="10">Fine</option>
+                <option value="1">Freehand</option>
               </select>
             </div>
             <div class="field">
@@ -1148,6 +1204,14 @@
               </select>
             </div>
           </div>
+
+          <div class="shortcut-hint">
+            <strong>Shortcuts:</strong> Hold <strong>Shift</strong> for straight
+            line / square / circle &bull; Press <strong>R</strong> to rotate
+            +90° &bull; Press <strong>L</strong> to Lock/Unlock &bull;
+            <strong>Ctrl+Click</strong> or <strong>Drag Empty Space</strong> to
+            multi-select.
+          </div>
         </div>
       </aside>
 
@@ -1161,6 +1225,12 @@
             <span>&bull;</span>
             <span id="hudCursorPos" style="font-family: monospace">
               X: 0, Y: 0
+            </span>
+            <span
+              id="hudSelectionCount"
+              style="color: var(--warn); display: none"
+            >
+              &bull; 0 Selected
             </span>
           </div>
 
@@ -1230,12 +1300,12 @@
             <!-- Drawn Shapes Layer -->
             <g id="shapesLayer"></g>
 
-            <!-- Active Selection & Resize Handles Layer -->
+            <!-- Active Selection, Lock Badges, Marquee & Resize Handles Layer -->
             <g id="handlesLayer"></g>
           </svg>
         </div>
 
-        <!-- Live Simulation Status Pill -->
+        <!-- Live Simulation Floating Status Bar -->
         <div class="sim-banner">
           <span class="pulse-dot"></span>
           <span id="simStatusText">
@@ -1247,6 +1317,7 @@
 
       <!-- RIGHT PANEL: SHAPE INSPECTOR & CLICKABLE IOT BINDING -->
       <aside class="side-panel right-panel">
+        <!-- Empty Selection State -->
         <div class="panel-card" id="noSelectionCard">
           <div class="panel-title">
             <span>Shape Inspector</span>
@@ -1258,14 +1329,62 @@
               line-height: 1.5;
             "
           >
-            Select any <strong>Room Rectangle</strong>,
-            <strong>Wall Line</strong>, <strong>Circle Node</strong>, or
-            <strong>Text Label</strong> on the canvas to customize its geometry,
-            colors, and clickable Smart Hub connection.
+            Select any shape on the canvas, <strong>Ctrl+Click</strong> multiple
+            shapes, or <strong>drag a selection box</strong> from empty space to
+            lock/unlock, rotate, style, or link them to your Smart Hub.
           </p>
         </div>
 
-        <!-- Active Element Properties -->
+        <!-- Multi-Selection Batch Inspector Card -->
+        <div class="panel-card" id="multiSelectionCard" style="display: none">
+          <div class="panel-title">
+            <span>Multi-Selection</span>
+            <span class="step-tag" id="multiCountBadge">0 ITEMS</span>
+          </div>
+          <p
+            style="
+              font-size: 0.76rem;
+              color: var(--text-muted);
+              margin-bottom: 12px;
+            "
+          >
+            Move all selected unlocked shapes together on the canvas, or apply
+            batch actions below:
+          </p>
+
+          <div class="field">
+            <label>Batch Accent Color</label>
+            <div class="swatch-row" id="multiColorSwatches"></div>
+          </div>
+
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 7px;
+              margin-top: 12px;
+            "
+          >
+            <button
+              class="btn btn-sm"
+              id="multiLockBtn"
+              onclick="toggleLockSelected()"
+            >
+              &#128274; Lock / Unlock All
+            </button>
+            <button class="btn btn-sm" onclick="rotateSelectedBy(90)">
+              &#8635; Rotate All +90°
+            </button>
+            <button class="btn btn-sm" onclick="duplicateSelected()">
+              Clone All
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="deleteSelected()">
+              Delete Unlocked
+            </button>
+          </div>
+        </div>
+
+        <!-- Single Element Active Properties -->
         <div
           id="inspectorContent"
           style="display: none; flex-direction: column; gap: 14px"
@@ -1273,11 +1392,22 @@
           <div class="panel-card">
             <div class="panel-title">
               <span id="inspTypeTitle">Room / Shape</span>
-              <span class="step-tag" id="inspIdBadge">#id</span>
+              <div style="display: flex; align-items: center; gap: 5px">
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  id="inspLockToggleBtn"
+                  onclick="toggleLockSelected()"
+                  title="Lock / Unlock this item (Shortcut: L)"
+                >
+                  &#128275; Unlocked
+                </button>
+                <span class="step-tag" id="inspIdBadge">#id</span>
+              </div>
             </div>
 
             <div class="field">
-              <label>Label / Room Name</label>
+              <label>Label Name</label>
               <input
                 type="text"
                 id="inspLabel"
@@ -1285,6 +1415,16 @@
                 placeholder="e.g. Living Room, Ceiling Fan"
                 oninput="updateSelectedProp('label', this.value)"
               />
+            </div>
+
+            <!-- General Device Sub-Icon Picker (Shown when Accessory/Device is selected) -->
+            <div class="field" id="inspDeviceKindWrap" style="display: none">
+              <label>Accessory Icon Type</label>
+              <select
+                id="inspDeviceKindSelect"
+                class="select"
+                onchange="onChangeAccessoryKind(this.value)"
+              ></select>
             </div>
 
             <!-- Dynamic Geometry Fields -->
@@ -1330,14 +1470,57 @@
               </div>
             </div>
 
+            <!-- Rotation Field & Quick +90° Button -->
+            <div class="field-row" style="margin-top: 8px">
+              <div class="field">
+                <label>Rotate Angle (0°–360°)</label>
+                <input
+                  type="number"
+                  id="inspRotation"
+                  class="input"
+                  min="0"
+                  max="360"
+                  step="15"
+                  value="0"
+                  oninput="
+                    updateSelectedProp(
+                      'rotation',
+                      ((Number(this.value) % 360) + 360) % 360,
+                    )
+                  "
+                />
+              </div>
+              <div class="field">
+                <label>Quick Rotate</label>
+                <div style="display: flex; gap: 5px">
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    style="flex: 1; height: 34px"
+                    onclick="rotateSelectedBy(45)"
+                  >
+                    +45°
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    style="flex: 1; height: 34px"
+                    onclick="rotateSelectedBy(90)"
+                  >
+                    +90°
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div class="field" style="margin-top: 8px">
-              <label>Accent / Stroke Color</label>
+              <label>Stroke Color</label>
               <div class="swatch-row" id="inspColorSwatches"></div>
             </div>
 
             <div class="field-row" style="margin-top: 8px">
               <div class="field">
-                <label>Wall / Line Width</label>
+                <label>Line Width</label>
                 <input
                   type="number"
                   id="inspStrokeWidth"
@@ -1359,39 +1542,53 @@
                     updateSelectedProp('fillOpacity', Number(this.value))
                   "
                 >
-                  <option value="0">0% (Transparent)</option>
-                  <option value="0.12">12% (Subtle Room)</option>
-                  <option value="0.22">22% (Standard)</option>
-                  <option value="0.4">40% (Solid Glow)</option>
-                  <option value="0.85">85% (Opaque)</option>
+                  <option value="0">0%</option>
+                  <option value="0.12">12%</option>
+                  <option value="0.22">22%</option>
+                  <option value="0.4">40%</option>
+                  <option value="0.85">85%</option>
                 </select>
               </div>
             </div>
 
+            <!-- Text Size & Text Weight (Bold / Regular / Thin) -->
             <div class="field-row" style="margin-top: 8px">
               <div class="field">
-                <label>Line Style</label>
-                <select
-                  id="inspDash"
-                  class="select"
-                  onchange="updateSelectedProp('dashed', this.value === '1')"
-                >
-                  <option value="0">Solid Line</option>
-                  <option value="1">Dashed Line</option>
-                </select>
-              </div>
-              <div class="field">
-                <label>Label Size (px)</label>
+                <label>Label Size</label>
                 <input
                   type="number"
                   id="inspFontSize"
                   class="input"
                   min="9"
-                  max="36"
+                  max="48"
                   value="13"
                   oninput="updateSelectedProp('fontSize', Number(this.value))"
                 />
               </div>
+              <div class="field">
+                <label>Text Weight</label>
+                <select
+                  id="inspFontWeight"
+                  class="select"
+                  onchange="updateSelectedProp('fontWeight', this.value)"
+                >
+                  <option value="700">Bold</option>
+                  <option value="400">Regular</option>
+                  <option value="300">Thin</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field" style="margin-top: 8px">
+              <label>Line Style</label>
+              <select
+                id="inspDash"
+                class="select"
+                onchange="updateSelectedProp('dashed', this.value === '1')"
+              >
+                <option value="0">Solid Line</option>
+                <option value="1">Dashed Line</option>
+              </select>
             </div>
 
             <div
@@ -1436,7 +1633,7 @@
           <!-- CLICKABLE IOT HUB LINKER -->
           <div class="panel-card">
             <div class="panel-title">
-              <span>Clickable Hub Link</span>
+              <span>Clickable Link</span>
               <span class="step-tag">INTERACTIVE</span>
             </div>
 
@@ -1447,13 +1644,11 @@
                 class="select"
                 onchange="onLinkTypeChange(this.value)"
               >
-                <option value="none">None (Static Drawing Only)</option>
-                <option value="shortcut">
-                  Shortcut Button (Toggle ON/OFF)
-                </option>
-                <option value="device">ESP Device (Open Web UI)</option>
-                <option value="group">Group (Room Category)</option>
-                <option value="favorite">Favorites Bundle</option>
+                <option value="none">None</option>
+                <option value="shortcut">Shortcut Buttons</option>
+                <option value="device">Devices</option>
+                <option value="group">Groups</option>
+                <option value="favorite">Favorites</option>
               </select>
             </div>
 
@@ -1467,7 +1662,7 @@
             </div>
 
             <div class="field" id="linkCustomNameWrap" style="display: none">
-              <label>Display Badge / Action Tag</label>
+              <label>Display Badge</label>
               <input
                 type="text"
                 id="inspLinkTitle"
@@ -1580,11 +1775,17 @@
         "#ffffff",
       ];
 
+      // Expanded Home Accessories Palette (including PC, 3-Pin Socket, Printer & General Device)
       const ACCESSORY_ICONS = {
         plug: {
           label: "Plug",
           color: "#38bdf8",
           svg: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
+        },
+        socket3: {
+          label: "Socket",
+          color: "#38bdf8",
+          svg: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="8" r="1.6"/><circle cx="8.5" cy="15" r="1.4"/><circle cx="15.5" cy="15" r="1.4"/>',
         },
         bulb: {
           label: "Bulb",
@@ -1605,6 +1806,16 @@
           label: "TV",
           color: "#a855f7",
           svg: '<rect x="2" y="6" width="20" height="13" rx="2"/><line x1="8" y1="22" x2="16" y2="22"/><line x1="12" y1="19" x2="12" y2="22"/>',
+        },
+        pc: {
+          label: "PC",
+          color: "#38bdf8",
+          svg: '<rect x="2" y="3" width="20" height="13" rx="2"/><line x1="6" y1="20" x2="18" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/>',
+        },
+        printer: {
+          label: "Printer",
+          color: "#94a3b8",
+          svg: '<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
         },
         speaker: {
           label: "Speaker",
@@ -1630,6 +1841,46 @@
           label: "Pump",
           color: "#0ea5e9",
           svg: '<circle cx="12" cy="12" r="6"/><path d="M12 6V2h6"/><path d="M6 12H2v4"/><circle cx="12" cy="12" r="2"/>',
+        },
+        device: {
+          label: "Device",
+          color: "#22c55e",
+          svg: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',
+        },
+      };
+
+      // Extra General Device Sub-Icons (selectable when placing or editing a general Device)
+      const EXTRA_DEVICE_ICONS = {
+        ...ACCESSORY_ICONS,
+        sensor: {
+          label: "Sensor / Telemetry",
+          color: "#38bdf8",
+          svg: '<path d="M2 12h3l2-7 4 14 3-9 2 4h6"/>',
+        },
+        camera: {
+          label: "IP Camera",
+          color: "#f43f5e",
+          svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+        },
+        solar: {
+          label: "Solar / Inverter",
+          color: "#fbbf24",
+          svg: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+        },
+        battery: {
+          label: "Battery Bank",
+          color: "#22c55e",
+          svg: '<rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="13" x2="23" y2="11"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/>',
+        },
+        matrix: {
+          label: "LED Matrix Display",
+          color: "#a855f7",
+          svg: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="8" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="12" r="1"/><circle cx="8" cy="16" r="1"/><circle cx="12" cy="16" r="1"/><circle cx="16" cy="16" r="1"/>',
+        },
+        lock: {
+          label: "Smart Door Lock",
+          color: "#f59e0b",
+          svg: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
         },
       };
 
@@ -1674,8 +1925,9 @@
          ======================================================================== */
       let building = null;
       let activeFloorId = null;
-      let selectedShapeId = null;
-      let activeTool = "select"; // "select" | "rect" | "line" | "circle" | "door" | "text"
+      let selectedShapeId = null; // Primary selected shape ID
+      let selectedShapeIds = new Set(); // Multi-selection set
+      let activeTool = "select"; // "select" | "rect" | "line" | "circle" | "door" | "text" | "stair" | "cut" | "icon"
       let appMode = "design"; // "design" | "sim"
       let snapSize = 20;
       let showDimensions = true;
@@ -1734,6 +1986,9 @@
                   fillOpacity: 0,
                   dashed: false,
                   fontSize: 14,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: true,
                   link: { type: "none", targetId: "", targetName: "" },
                 },
                 // Living Room
@@ -1750,6 +2005,9 @@
                   fillOpacity: 0.12,
                   dashed: false,
                   fontSize: 15,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "group",
                     targetId: "grp_living",
@@ -1770,6 +2028,9 @@
                   fillOpacity: 0.12,
                   dashed: false,
                   fontSize: 14,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "shortcut",
                     targetId: "sc_kitchen_exhaust",
@@ -1790,6 +2051,9 @@
                   fillOpacity: 0.12,
                   dashed: false,
                   fontSize: 14,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "device",
                     targetId: "dev_switch_4ch",
@@ -1810,6 +2074,9 @@
                   fillOpacity: 0.12,
                   dashed: true,
                   fontSize: 13,
+                  fontWeight: "400",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "device",
                     targetId: "dev_cam_gate",
@@ -1830,6 +2097,9 @@
                   fillOpacity: 0.12,
                   dashed: false,
                   fontSize: 13,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "device",
                     targetId: "dev_solar_mon",
@@ -1850,21 +2120,28 @@
                   fillOpacity: 0.12,
                   dashed: false,
                   fontSize: 10,
+                  fontWeight: "400",
+                  rotation: 0,
+                  locked: false,
                   link: { type: "none", targetId: "", targetName: "" },
                 },
-                // Circular Smart Nodes (Ceiling Fan & Lights)
+                // Smart Accessory Nodes
                 {
                   id: "sh_node_fan",
-                  type: "circle",
+                  type: "icon",
+                  icon: "fan",
                   x: 300,
                   y: 200,
-                  r: 26,
+                  r: 22,
                   label: "BLDC Fan",
                   color: "#38bdf8",
-                  strokeWidth: 2.5,
+                  strokeWidth: 2,
                   fillOpacity: 0.22,
                   dashed: false,
                   fontSize: 11,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "shortcut",
                     targetId: "sc_ceiling_fan",
@@ -1873,16 +2150,20 @@
                 },
                 {
                   id: "sh_node_light",
-                  type: "circle",
+                  type: "icon",
+                  icon: "bulb",
                   x: 160,
                   y: 130,
                   r: 20,
                   label: "Chandelier",
-                  color: "#22c55e",
-                  strokeWidth: 2.5,
+                  color: "#fbbf24",
+                  strokeWidth: 2,
                   fillOpacity: 0.22,
                   dashed: false,
                   fontSize: 10,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "shortcut",
                     targetId: "sc_living_light",
@@ -1903,6 +2184,9 @@
                   fillOpacity: 0,
                   dashed: true,
                   fontSize: 11,
+                  fontWeight: "400",
+                  rotation: 0,
+                  locked: false,
                   link: { type: "none", targetId: "", targetName: "" },
                 },
                 // Clickable Text Label
@@ -1917,6 +2201,9 @@
                   fillOpacity: 1,
                   dashed: false,
                   fontSize: 14,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "favorite",
                     targetId: "fav_night_mode",
@@ -1943,6 +2230,9 @@
                   fillOpacity: 0,
                   dashed: false,
                   fontSize: 14,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: true,
                   link: { type: "none", targetId: "", targetName: "" },
                 },
                 {
@@ -1958,6 +2248,9 @@
                   fillOpacity: 0.12,
                   dashed: false,
                   fontSize: 15,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "group",
                     targetId: "grp_bedroom",
@@ -1977,6 +2270,9 @@
                   fillOpacity: 0.12,
                   dashed: false,
                   fontSize: 14,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "favorite",
                     targetId: "fav_work_desk",
@@ -1996,6 +2292,9 @@
                   fillOpacity: 0.12,
                   dashed: true,
                   fontSize: 14,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "device",
                     targetId: "dev_solar_mon",
@@ -2003,17 +2302,43 @@
                   },
                 },
                 {
-                  id: "sh_matrix_node",
-                  type: "circle",
-                  x: 660,
-                  y: 220,
-                  r: 28,
-                  label: "LED Matrix",
-                  color: "#f43f5e",
-                  strokeWidth: 2.5,
+                  id: "sh_pc_node",
+                  type: "icon",
+                  icon: "pc",
+                  x: 580,
+                  y: 160,
+                  r: 22,
+                  label: "Workstation PC",
+                  color: "#38bdf8",
+                  strokeWidth: 2,
                   fillOpacity: 0.22,
                   dashed: false,
                   fontSize: 11,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
+                  link: {
+                    type: "shortcut",
+                    targetId: "sc_living_light",
+                    targetName: "Desk Power",
+                  },
+                },
+                {
+                  id: "sh_matrix_node",
+                  type: "icon",
+                  icon: "device",
+                  x: 720,
+                  y: 160,
+                  r: 22,
+                  label: "ESP LED Studio",
+                  color: "#f43f5e",
+                  strokeWidth: 2,
+                  fillOpacity: 0.22,
+                  dashed: false,
+                  fontSize: 11,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: false,
                   link: {
                     type: "device",
                     targetId: "dev_led_matrix",
@@ -2043,11 +2368,33 @@
         renderAccessoryPalette();
         renderCanvas();
         setupCanvasEvents();
+        updateInspector();
+      }
+
+      function clearSelection() {
+        selectedShapeId = null;
+        selectedShapeIds.clear();
+      }
+
+      function selectSingleShape(id) {
+        selectedShapeIds.clear();
+        if (id) {
+          selectedShapeIds.add(id);
+          selectedShapeId = id;
+        } else {
+          selectedShapeId = null;
+        }
+      }
+
+      function getSelectedShapesList() {
+        const floor = getActiveFloor();
+        if (!floor) return [];
+        return floor.shapes.filter((s) => selectedShapeIds.has(s.id));
       }
 
       function pushUndo() {
         undoStack.push(JSON.stringify(building));
-        if (undoStack.length > 30) undoStack.shift();
+        if (undoStack.length > 35) undoStack.shift();
       }
 
       function undo() {
@@ -2056,7 +2403,7 @@
         if (!building.floors.some((f) => f.id === activeFloorId)) {
           activeFloorId = building.floors[0].id;
         }
-        selectedShapeId = null;
+        clearSelection();
         syncBuildingInputs();
         renderFloorList();
         renderCanvas();
@@ -2074,7 +2421,7 @@
         pushUndo();
         building = createDefaultSampleBuilding();
         activeFloorId = building.floors[0].id;
-        selectedShapeId = null;
+        clearSelection();
         syncBuildingInputs();
         renderFloorList();
         renderCanvas();
@@ -2138,6 +2485,9 @@
                 fillOpacity: 0,
                 dashed: false,
                 fontSize: 14,
+                fontWeight: "700",
+                rotation: 0,
+                locked: true,
                 link: { type: "none", targetId: "", targetName: "" },
               },
             ],
@@ -2173,7 +2523,7 @@
 
       function switchFloor(floorId) {
         activeFloorId = floorId;
-        selectedShapeId = null;
+        clearSelection();
         renderFloorList();
         renderCanvas();
         updateInspector();
@@ -2201,13 +2551,16 @@
               fillOpacity: 0,
               dashed: false,
               fontSize: 14,
+              fontWeight: "700",
+              rotation: 0,
+              locked: true,
               link: { type: "none", targetId: "", targetName: "" },
             },
           ],
         };
         building.floors.push(newFloor);
         activeFloorId = newFloor.id;
-        selectedShapeId = null;
+        clearSelection();
         syncBuildingInputs();
         renderFloorList();
         renderCanvas();
@@ -2236,7 +2589,7 @@
         };
         building.floors.push(newFloor);
         activeFloorId = newFloor.id;
-        selectedShapeId = null;
+        clearSelection();
         syncBuildingInputs();
         renderFloorList();
         renderCanvas();
@@ -2286,7 +2639,7 @@
         if (activeFloorId === floorId) {
           activeFloorId = building.floors[0].id;
         }
-        selectedShapeId = null;
+        clearSelection();
         syncBuildingInputs();
         renderFloorList();
         renderCanvas();
@@ -2333,7 +2686,7 @@
       }
 
       /* ========================================================================
-         3. STEP 3: 2D SVG CANVAS RENDERING & GEOMETRY
+         3. STEP 3: 2D SVG CANVAS RENDERING, ROTATION & GEOMETRY
          ======================================================================== */
       function snap(val) {
         return Math.round(val / snapSize) * snapSize;
@@ -2347,6 +2700,62 @@
         }
         const m = ((px / 20) * 0.5).toFixed(1);
         return `${m}m`;
+      }
+
+      function getShapeRxRy(s) {
+        const rx = s.rx !== undefined ? s.rx : s.r || 20;
+        const ry = s.ry !== undefined ? s.ry : s.r || 20;
+        return { rx, ry };
+      }
+
+      function getShapeCenter(s) {
+        if (["rect", "door", "stair", "cut"].includes(s.type)) {
+          const w = s.w || 40;
+          const h = s.type === "door" ? w : s.h || 40;
+          return { cx: s.x + w / 2, cy: s.y + h / 2 };
+        }
+        if (s.type === "line") {
+          return { cx: (s.x1 + s.x2) / 2, cy: (s.y1 + s.y2) / 2 };
+        }
+        return { cx: s.x || 0, cy: s.y || 0 };
+      }
+
+      function getShapeBounds(s) {
+        if (["rect", "door", "stair", "cut"].includes(s.type)) {
+          const w = s.w || 40;
+          const h = s.type === "door" ? w : s.h || 40;
+          return { x: s.x, y: s.y, w, h };
+        }
+        if (s.type === "circle") {
+          const { rx, ry } = getShapeRxRy(s);
+          return { x: s.x - rx, y: s.y - ry, w: rx * 2, h: ry * 2 };
+        }
+        if (s.type === "icon") {
+          const r = s.r || 20;
+          return { x: s.x - r, y: s.y - r, w: r * 2, h: r * 2 };
+        }
+        if (s.type === "line") {
+          const minX = Math.min(s.x1, s.x2);
+          const minY = Math.min(s.y1, s.y2);
+          return {
+            x: minX,
+            y: minY,
+            w: Math.max(8, Math.abs(s.x2 - s.x1)),
+            h: Math.max(8, Math.abs(s.y2 - s.y1)),
+          };
+        }
+        if (s.type === "text") {
+          const fs = s.fontSize || 14;
+          const approxW = Math.max(70, (s.label || "Label").length * fs * 0.62);
+          const approxH = fs + 16;
+          return {
+            x: s.x - approxW / 2,
+            y: s.y - approxH / 2,
+            w: approxW,
+            h: approxH,
+          };
+        }
+        return { x: 0, y: 0, w: 0, h: 0 };
       }
 
       function renderAccessoryPalette() {
@@ -2397,7 +2806,7 @@
           mode === "sim" ? "0.25" : "1";
 
         if (mode === "sim") {
-          selectedShapeId = null;
+          clearSelection();
           showToast(
             "Live Simulation Started! Click any glowing room or switch.",
           );
@@ -2415,6 +2824,7 @@
           .join("");
 
         renderSelectionHandles();
+        syncTopLockButton();
       }
 
       function renderShapeSvg(s) {
@@ -2425,6 +2835,10 @@
         const sw = s.strokeWidth ?? 2;
         const fo = s.fillOpacity ?? 0.14;
         const fs = s.fontSize || 13;
+        const fw = s.fontWeight || "700";
+        const rot = Number(s.rotation) || 0;
+        const { cx, cy } = getShapeCenter(s);
+        const rotAttr = rot ? `transform="rotate(${rot} ${cx} ${cy})"` : "";
 
         const linkBadgeText = hasLink
           ? `${s.link.type.toUpperCase()}: ${s.link.targetName || "Linked"}${
@@ -2435,8 +2849,6 @@
         let primHtml = "";
 
         if (s.type === "rect") {
-          const cx = s.x + s.w / 2;
-          const cy = s.y + s.h / 2;
           const dimText =
             showDimensions && s.w >= 60 && s.h >= 40
               ? `${formatDim(s.w)} × ${formatDim(s.h)}`
@@ -2448,7 +2860,7 @@
             ${
               s.label
                 ? `<text class="shape-label" x="${cx}" y="${cy - (dimText || linkBadgeText ? 6 : 0)}"
-                    text-anchor="middle" dominant-baseline="middle" fill="var(--text)" font-size="${fs}">${escapeHtml(s.label)}</text>`
+                    text-anchor="middle" dominant-baseline="middle" fill="var(--text)" font-size="${fs}" font-weight="${fw}">${escapeHtml(s.label)}</text>`
                 : ""
             }
             ${
@@ -2464,7 +2876,6 @@
             }
           `;
         } else if (s.type === "stair") {
-          // Architectural 2D Staircase (Auto-adjusts horizontal vs vertical steps)
           const isHoriz = s.w > s.h;
           const stepGap = 14;
           const count = Math.max(
@@ -2481,8 +2892,6 @@
               stepsSvg += `<line x1="${s.x}" y1="${sy}" x2="${s.x + s.w}" y2="${sy}" stroke="${color}" stroke-width="1.5" />`;
             }
           }
-          const cx = s.x + s.w / 2;
-          const cy = s.y + s.h / 2;
           const arrowLine = isHoriz
             ? `<line x1="${s.x + 8}" y1="${cy}" x2="${s.x + s.w - 8}" y2="${cy}" stroke="${color}" stroke-width="2" />`
             : `<line x1="${cx}" y1="${s.y + s.h - 8}" x2="${cx}" y2="${s.y + 8}" stroke="${color}" stroke-width="2" />`;
@@ -2494,14 +2903,13 @@
             ${arrowLine}
             ${
               s.label
-                ? `<text class="shape-sublabel" x="${cx}" y="${s.y + s.h + 13}" text-anchor="middle" fill="var(--text)">${escapeHtml(s.label)}</text>`
+                ? `<text class="shape-label" x="${cx}" y="${s.y + s.h + 13}" text-anchor="middle" fill="var(--text)" font-size="${fs}" font-weight="${fw}">${escapeHtml(s.label)}</text>`
                 : ""
             }
           `;
         } else if (s.type === "cut") {
-          // Cut / Erase Mask: Paints over underlying walls/shapes with canvas background
           const showCutOutline =
-            appMode === "design" && selectedShapeId === s.id;
+            appMode === "design" && selectedShapeIds.has(s.id);
           primHtml = `
             <rect class="shape-prim" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"
               fill="var(--canvas-bg)" stroke="${
@@ -2511,8 +2919,10 @@
               }" stroke-width="${showCutOutline ? 2 : 1}" stroke-dasharray="4 3" />
           `;
         } else if (s.type === "icon") {
-          // Home Accessory Stamp
-          const acc = ACCESSORY_ICONS[s.icon] || ACCESSORY_ICONS.bulb;
+          const acc =
+            EXTRA_DEVICE_ICONS[s.icon] ||
+            ACCESSORY_ICONS[s.icon] ||
+            ACCESSORY_ICONS.bulb;
           const r = s.r || 20;
           const iconScale = (r / 18).toFixed(2);
           primHtml = `
@@ -2526,7 +2936,7 @@
             ${
               s.label
                 ? `<text class="shape-label" x="${s.x}" y="${s.y + r + 13}"
-                    text-anchor="middle" fill="var(--text)" font-size="${fs}">${escapeHtml(s.label)}</text>`
+                    text-anchor="middle" fill="var(--text)" font-size="${fs}" font-weight="${fw}">${escapeHtml(s.label)}</text>`
                 : ""
             }
             ${
@@ -2537,19 +2947,20 @@
             }
           `;
         } else if (s.type === "circle") {
+          const { rx, ry } = getShapeRxRy(s);
           primHtml = `
-            <circle class="shape-prim" cx="${s.x}" cy="${s.y}" r="${s.r}"
+            <ellipse class="shape-prim" cx="${s.x}" cy="${s.y}" rx="${rx}" ry="${ry}"
               fill="${color}" fill-opacity="${fo}" stroke="${color}" stroke-width="${sw}" ${dashAttr} />
             <circle cx="${s.x}" cy="${s.y}" r="4" fill="${isSimOn ? "var(--ok)" : color}" />
             ${
               s.label
-                ? `<text class="shape-label" x="${s.x}" y="${s.y + s.r + 14}"
-                    text-anchor="middle" fill="var(--text)" font-size="${fs}">${escapeHtml(s.label)}</text>`
+                ? `<text class="shape-label" x="${s.x}" y="${s.y + ry + 14}"
+                    text-anchor="middle" fill="var(--text)" font-size="${fs}" font-weight="${fw}">${escapeHtml(s.label)}</text>`
                 : ""
             }
             ${
               hasLink && s.link.type === "shortcut"
-                ? `<text class="shape-sublabel" x="${s.x}" y="${s.y - s.r - 6}"
+                ? `<text class="shape-sublabel" x="${s.x}" y="${s.y - ry - 6}"
                     text-anchor="middle" fill="${isSimOn ? "var(--ok)" : color}">${isSimOn ? "● ON" : "○ OFF"}</text>`
                 : ""
             }
@@ -2565,8 +2976,10 @@
               stroke="${color}" stroke-width="${sw}" stroke-linecap="round" ${dashAttr} />
             ${
               s.label || (dimText && appMode === "design")
-                ? `<text class="shape-sublabel" x="${mx}" y="${my - 8}" text-anchor="middle" fill="var(--text)">${escapeHtml(
-                    s.label ? `${s.label} (${dimText})` : dimText,
+                ? `<text class="shape-label" x="${mx}" y="${my - 8}" text-anchor="middle" fill="var(--text)" font-size="${fs}" font-weight="${fw}">${escapeHtml(
+                    s.label
+                      ? `${s.label}${dimText ? ` (${dimText})` : ""}`
+                      : dimText,
                   )}</text>`
                 : ""
             }
@@ -2581,7 +2994,7 @@
             <line x1="${x}" y1="${y + w}" x2="${x}" y2="${y}" stroke="${color}" stroke-width="${sw + 1.5}" />
             ${
               s.label
-                ? `<text class="shape-sublabel" x="${x + w / 2}" y="${y + w + 12}" text-anchor="middle">${escapeHtml(s.label)}</text>`
+                ? `<text class="shape-label" x="${x + w / 2}" y="${y + w + 12}" text-anchor="middle" fill="var(--text-muted)" font-size="${fs}" font-weight="${fw}">${escapeHtml(s.label)}</text>`
                 : ""
             }
           `;
@@ -2592,7 +3005,7 @@
             <rect x="${s.x - approxW / 2}" y="${s.y - approxH / 2}" width="${approxW}" height="${approxH}"
               rx="4" fill="transparent" stroke="none" style="pointer-events:all" />
             <text class="shape-prim shape-label" x="${s.x}" y="${s.y}"
-              fill="${isSimOn ? "var(--ok)" : color}" font-size="${fs}"
+              fill="${isSimOn ? "var(--ok)" : color}" font-size="${fs}" font-weight="${fw}"
               style="pointer-events:all" text-anchor="middle" dominant-baseline="middle">
               ${escapeHtml(s.label || "Label")}
             </text>
@@ -2600,8 +3013,9 @@
         }
 
         return `
-          <g class="svg-shape-group ${hasLink ? "is-clickable" : ""} ${isSimOn ? "sim-on" : ""}"
+          <g class="svg-shape-group ${hasLink ? "is-clickable" : ""} ${isSimOn ? "sim-on" : ""} ${s.locked ? "is-locked" : ""}"
              data-shape-id="${s.id}"
+             ${rotAttr}
              onmousedown="onShapeMouseDown(event, '${s.id}')"
              onclick="onShapeClick(event, '${s.id}')">
             ${primHtml}
@@ -2610,53 +3024,138 @@
       }
 
       function renderSelectionHandles() {
-        if (appMode === "sim" || !selectedShapeId) {
-          handlesLayer.innerHTML = "";
-          return;
+        const hudCount = document.getElementById("hudSelectionCount");
+        if (selectedShapeIds.size > 1 && appMode === "design") {
+          hudCount.style.display = "inline";
+          hudCount.textContent = `• ${selectedShapeIds.size} Selected`;
+        } else {
+          hudCount.style.display = "none";
         }
-        const floor = getActiveFloor();
-        const s = floor.shapes.find((x) => x.id === selectedShapeId);
-        if (!s) {
+
+        if (appMode === "sim") {
           handlesLayer.innerHTML = "";
           return;
         }
 
-        if (["rect", "door", "stair", "cut"].includes(s.type)) {
-          const w = s.w || 40;
-          const h = s.type === "door" ? w : s.h;
-          handlesLayer.innerHTML = `
-            <rect class="selection-box" x="${s.x - 3}" y="${s.y - 3}" width="${w + 6}" height="${h + 6}" rx="5" />
-            <rect class="resize-handle" x="${s.x + w - 5}" y="${s.y + h - 5}" width="10" height="10" rx="2"
-              onmousedown="onHandleMouseDown(event, '${s.id}', 'se')" />
-          `;
-        } else if (s.type === "circle" || s.type === "icon") {
-          handlesLayer.innerHTML = `
-            <circle class="selection-box" cx="${s.x}" cy="${s.y}" r="${s.r + 4}" />
-            <circle class="resize-handle" cx="${s.x + s.r}" cy="${s.y}" r="5"
-              onmousedown="onHandleMouseDown(event, '${s.id}', 'radius')" />
-          `;
-        } else if (s.type === "line") {
-          handlesLayer.innerHTML = `
-            <circle class="resize-handle" cx="${s.x1}" cy="${s.y1}" r="5"
-              onmousedown="onHandleMouseDown(event, '${s.id}', 'p1')" />
-            <circle class="resize-handle" cx="${s.x2}" cy="${s.y2}" r="5"
-              onmousedown="onHandleMouseDown(event, '${s.id}', 'p2')" />
-          `;
-        } else if (s.type === "text") {
-          const fs = s.fontSize || 14;
-          const approxW = Math.max(70, (s.label || "Label").length * fs * 0.62);
-          const approxH = fs + 16;
-          handlesLayer.innerHTML = `
-            <rect class="selection-box" x="${s.x - approxW / 2}" y="${s.y - approxH / 2}" width="${approxW}" height="${approxH}" rx="4" />
-            <rect class="resize-handle" x="${s.x + approxW / 2 - 5}" y="${s.y + approxH / 2 - 5}" width="10" height="10" rx="2"
-              title="Drag to resize text"
-              onmousedown="onHandleMouseDown(event, '${s.id}', 'text-size')" />
-          `;
+        const floor = getActiveFloor();
+        let html = "";
+
+        // Render active drag marquee box if dragging on empty space
+        if (dragState && dragState.mode === "marquee") {
+          const mx = Math.min(dragState.startX, dragState.curX);
+          const my = Math.min(dragState.startY, dragState.curY);
+          const mw = Math.abs(dragState.curX - dragState.startX);
+          const mh = Math.abs(dragState.curY - dragState.startY);
+          html += `<rect class="marquee-box" x="${mx}" y="${my}" width="${mw}" height="${mh}" rx="3" />`;
         }
+
+        const selectedList = floor.shapes.filter((x) =>
+          selectedShapeIds.has(x.id),
+        );
+        if (!selectedList.length) {
+          handlesLayer.innerHTML = html;
+          return;
+        }
+
+        const isSingle = selectedList.length === 1;
+
+        selectedList.forEach((s) => {
+          const rot = Number(s.rotation) || 0;
+          const { cx, cy } = getShapeCenter(s);
+          const rotAttr = rot ? `transform="rotate(${rot} ${cx} ${cy})"` : "";
+          const lockClass = s.locked ? "locked-box" : "";
+          const b = getShapeBounds(s);
+          const lockBadge = s.locked
+            ? `<text x="${b.x + b.w}" y="${b.y - 6}" text-anchor="end" font-size="11" fill="var(--warn)" font-weight="700" style="pointer-events:none">🔒 Locked</text>`
+            : "";
+
+          if (["rect", "door", "stair", "cut"].includes(s.type)) {
+            const w = s.w || 40;
+            const h = s.type === "door" ? w : s.h;
+            html += `
+              <g ${rotAttr}>
+                <rect class="selection-box ${lockClass}" x="${s.x - 3}" y="${s.y - 3}" width="${w + 6}" height="${h + 6}" rx="5" />
+                ${lockBadge}
+                ${
+                  isSingle && !s.locked
+                    ? `<rect class="resize-handle" x="${s.x + w - 5}" y="${s.y + h - 5}" width="10" height="10" rx="2"
+                        onmousedown="onHandleMouseDown(event, '${s.id}', 'se')" />`
+                    : ""
+                }
+              </g>
+            `;
+          } else if (s.type === "circle") {
+            const { rx, ry } = getShapeRxRy(s);
+            html += `
+              <g ${rotAttr}>
+                <ellipse class="selection-box ${lockClass}" cx="${s.x}" cy="${s.y}" rx="${rx + 4}" ry="${ry + 4}" />
+                ${lockBadge}
+                ${
+                  isSingle && !s.locked
+                    ? `<rect class="resize-handle" x="${s.x + rx - 5}" y="${s.y + ry - 5}" width="10" height="10" rx="2"
+                        title="Drag to resize Oval (Hold Shift for Perfect Circle)"
+                        onmousedown="onHandleMouseDown(event, '${s.id}', 'radius')" />`
+                    : ""
+                }
+              </g>
+            `;
+          } else if (s.type === "icon") {
+            const r = s.r || 20;
+            html += `
+              <g ${rotAttr}>
+                <circle class="selection-box ${lockClass}" cx="${s.x}" cy="${s.y}" r="${r + 4}" />
+                ${lockBadge}
+                ${
+                  isSingle && !s.locked
+                    ? `<circle class="resize-handle" cx="${s.x + r}" cy="${s.y}" r="5"
+                        onmousedown="onHandleMouseDown(event, '${s.id}', 'icon-radius')" />`
+                    : ""
+                }
+              </g>
+            `;
+          } else if (s.type === "line") {
+            html += `
+              <g ${rotAttr}>
+                <line class="selection-box ${lockClass}" x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" />
+                ${lockBadge}
+                ${
+                  isSingle && !s.locked
+                    ? `<circle class="resize-handle" cx="${s.x1}" cy="${s.y1}" r="5"
+                        onmousedown="onHandleMouseDown(event, '${s.id}', 'p1')" />
+                       <circle class="resize-handle" cx="${s.x2}" cy="${s.y2}" r="5"
+                        onmousedown="onHandleMouseDown(event, '${s.id}', 'p2')" />`
+                    : ""
+                }
+              </g>
+            `;
+          } else if (s.type === "text") {
+            const fs = s.fontSize || 14;
+            const approxW = Math.max(
+              70,
+              (s.label || "Label").length * fs * 0.62,
+            );
+            const approxH = fs + 16;
+            html += `
+              <g ${rotAttr}>
+                <rect class="selection-box ${lockClass}" x="${s.x - approxW / 2}" y="${s.y - approxH / 2}" width="${approxW}" height="${approxH}" rx="4" />
+                ${lockBadge}
+                ${
+                  isSingle && !s.locked
+                    ? `<rect class="resize-handle" x="${s.x + approxW / 2 - 5}" y="${s.y + approxH / 2 - 5}" width="10" height="10" rx="2"
+                        title="Drag to resize text"
+                        onmousedown="onHandleMouseDown(event, '${s.id}', 'text-size')" />`
+                    : ""
+                }
+              </g>
+            `;
+          }
+        });
+
+        handlesLayer.innerHTML = html;
       }
 
       /* ========================================================================
-         4. MOUSE & TOUCH DRAWING / DRAGGING INTERACTION
+         4. MOUSE, SHIFT-CONSTRAINTS, MULTI-SELECT & MARQUEE INTERACTION
          ======================================================================== */
       function getSvgPoint(evt) {
         const rect = svgEl.getBoundingClientRect();
@@ -2668,18 +3167,31 @@
         };
       }
 
+      // Constrain line endpoint to 0°, 45°, 90° increments when holding Shift
+      function constrainLineShift(x1, y1, x2, y2) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy);
+        if (dist === 0) return { x: x2, y: y2 };
+        const angle = Math.atan2(dy, dx);
+        const snappedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+        return {
+          x: snap(x1 + Math.cos(snappedAngle) * dist),
+          y: snap(y1 + Math.sin(snappedAngle) * dist),
+        };
+      }
+
       // Splits a wall line into two segments with a 40px gap if clicked with the Cut tool
       function trySplitWallLineAtPoint(floor, px, py) {
         const GAP_HALF = 20;
         for (let i = floor.shapes.length - 1; i >= 0; i--) {
           const s = floor.shapes[i];
-          if (s.type !== "line") continue;
+          if (s.type !== "line" || s.locked) continue;
           const dx = s.x2 - s.x1;
           const dy = s.y2 - s.y1;
           const len = Math.hypot(dx, dy);
           if (len < GAP_HALF * 2.5) continue;
 
-          // Projection of point onto line segment
           const t = ((px - s.x1) * dx + (py - s.y1) * dy) / (len * len);
           if (t < 0.12 || t > 0.88) continue;
           const projX = s.x1 + t * dx;
@@ -2709,9 +3221,19 @@
           const sx = snap(pt.x);
           const sy = snap(pt.y);
 
+          // In Select Mode: clicking empty space starts Marquee Drag Selection
           if (activeTool === "select") {
             if (e.target === svgEl || e.target.id === "svgGridBg") {
-              selectedShapeId = null;
+              const additive = e.ctrlKey || e.metaKey;
+              if (!additive) clearSelection();
+              dragState = {
+                mode: "marquee",
+                startX: pt.x,
+                startY: pt.y,
+                curX: pt.x,
+                curY: pt.y,
+                initialSet: new Set(selectedShapeIds),
+              };
               renderSelectionHandles();
               updateInspector();
             }
@@ -2736,10 +3258,13 @@
               fillOpacity: 0.12,
               dashed: false,
               fontSize: 14,
+              fontWeight: "700",
+              rotation: 0,
+              locked: false,
               link: { type: "none", targetId: "", targetName: "" },
             };
             floor.shapes.push(newShape);
-            selectedShapeId = newId;
+            selectSingleShape(newId);
             dragState = {
               mode: "draw-rect",
               shape: newShape,
@@ -2760,10 +3285,13 @@
               fillOpacity: 0,
               dashed: false,
               fontSize: 12,
+              fontWeight: "700",
+              rotation: 0,
+              locked: false,
               link: { type: "none", targetId: "", targetName: "" },
             };
             floor.shapes.push(newShape);
-            selectedShapeId = newId;
+            selectSingleShape(newId);
             dragState = { mode: "draw-line", shape: newShape };
           } else if (activeTool === "circle") {
             const newShape = {
@@ -2772,12 +3300,17 @@
               x: sx,
               y: sy,
               r: 20,
+              rx: 20,
+              ry: 20,
               label: "Node",
               color: "#22c55e",
               strokeWidth: 2.5,
               fillOpacity: 0.22,
               dashed: false,
               fontSize: 11,
+              fontWeight: "700",
+              rotation: 0,
+              locked: false,
               link: {
                 type: "shortcut",
                 targetId: "sc_living_light",
@@ -2785,7 +3318,7 @@
               },
             };
             floor.shapes.push(newShape);
-            selectedShapeId = newId;
+            selectSingleShape(newId);
             dragState = { mode: "draw-circle", shape: newShape };
           } else if (activeTool === "door") {
             const newShape = {
@@ -2801,10 +3334,13 @@
               fillOpacity: 0.12,
               dashed: false,
               fontSize: 10,
+              fontWeight: "400",
+              rotation: 0,
+              locked: false,
               link: { type: "none", targetId: "", targetName: "" },
             };
             floor.shapes.push(newShape);
-            selectedShapeId = newId;
+            selectSingleShape(newId);
             selectTool("select");
           } else if (activeTool === "stair") {
             const newShape = {
@@ -2820,10 +3356,13 @@
               fillOpacity: 0.12,
               dashed: false,
               fontSize: 11,
+              fontWeight: "700",
+              rotation: 0,
+              locked: false,
               link: { type: "none", targetId: "", targetName: "" },
             };
             floor.shapes.push(newShape);
-            selectedShapeId = newId;
+            selectSingleShape(newId);
             dragState = {
               mode: "draw-rect",
               shape: newShape,
@@ -2831,13 +3370,11 @@
               startY: sy,
             };
           } else if (activeTool === "cut") {
-            // If clicked directly on a wall line, split a doorway/window gap into it
             if (trySplitWallLineAtPoint(floor, pt.x, pt.y)) {
               renderCanvas();
               showToast("Wall line split! Gap created.");
               return;
             }
-            // Otherwise drag a Cut / Erase box to erase any room wall or shape section
             const newShape = {
               id: newId,
               type: "cut",
@@ -2851,10 +3388,13 @@
               fillOpacity: 1,
               dashed: true,
               fontSize: 10,
+              fontWeight: "400",
+              rotation: 0,
+              locked: false,
               link: { type: "none", targetId: "", targetName: "" },
             };
             floor.shapes.push(newShape);
-            selectedShapeId = newId;
+            selectSingleShape(newId);
             dragState = {
               mode: "draw-rect",
               shape: newShape,
@@ -2863,7 +3403,10 @@
             };
           } else if (activeTool === "icon") {
             const acc =
-              ACCESSORY_ICONS[activeAccessoryKey] || ACCESSORY_ICONS.bulb;
+              EXTRA_DEVICE_ICONS[activeAccessoryKey] ||
+              ACCESSORY_ICONS[activeAccessoryKey] ||
+              ACCESSORY_ICONS.bulb;
+            const isGeneralDev = activeAccessoryKey === "device";
             const newShape = {
               id: newId,
               type: "icon",
@@ -2877,14 +3420,17 @@
               fillOpacity: 0.22,
               dashed: false,
               fontSize: 11,
+              fontWeight: "700",
+              rotation: 0,
+              locked: false,
               link: {
-                type: "shortcut",
-                targetId: "sc_living_light",
+                type: isGeneralDev ? "device" : "shortcut",
+                targetId: isGeneralDev ? "dev_switch_4ch" : "sc_living_light",
                 targetName: acc.label,
               },
             };
             floor.shapes.push(newShape);
-            selectedShapeId = newId;
+            selectSingleShape(newId);
             selectTool("select");
           } else if (activeTool === "text") {
             const newShape = {
@@ -2898,10 +3444,13 @@
               fillOpacity: 1,
               dashed: false,
               fontSize: 15,
+              fontWeight: "700",
+              rotation: 0,
+              locked: false,
               link: { type: "none", targetId: "", targetName: "" },
             };
             floor.shapes.push(newShape);
-            selectedShapeId = newId;
+            selectSingleShape(newId);
             selectTool("select");
             setTimeout(() => {
               const inp = document.getElementById("inspLabel");
@@ -2927,42 +3476,110 @@
           const sy = snap(pt.y);
           const s = dragState.shape;
 
+          // Marquee Box Selection from Empty Space
+          if (dragState.mode === "marquee") {
+            dragState.curX = pt.x;
+            dragState.curY = pt.y;
+            const mx1 = Math.min(dragState.startX, dragState.curX);
+            const my1 = Math.min(dragState.startY, dragState.curY);
+            const mx2 = Math.max(dragState.startX, dragState.curX);
+            const my2 = Math.max(dragState.startY, dragState.curY);
+
+            selectedShapeIds = new Set(dragState.initialSet);
+            const floor = getActiveFloor();
+            floor.shapes.forEach((sh) => {
+              const b = getShapeBounds(sh);
+              const overlaps =
+                b.x <= mx2 &&
+                b.x + b.w >= mx1 &&
+                b.y <= my2 &&
+                b.y + b.h >= my1;
+              if (overlaps) selectedShapeIds.add(sh.id);
+            });
+            const arr = [...selectedShapeIds];
+            selectedShapeId = arr.length ? arr[arr.length - 1] : null;
+            renderSelectionHandles();
+            return;
+          }
+
           if (dragState.mode === "move") {
             const dx = snap(pt.x - dragState.startMouseX);
             const dy = snap(pt.y - dragState.startMouseY);
-            if (s.type === "line") {
-              s.x1 = dragState.orig.x1 + dx;
-              s.y1 = dragState.orig.y1 + dy;
-              s.x2 = dragState.orig.x2 + dx;
-              s.y2 = dragState.orig.y2 + dy;
-            } else {
-              s.x = dragState.orig.x + dx;
-              s.y = dragState.orig.y + dy;
-            }
+            const floor = getActiveFloor();
+            floor.shapes.forEach((sh) => {
+              if (!selectedShapeIds.has(sh.id) || sh.locked) return;
+              const orig = dragState.origMap[sh.id];
+              if (!orig) return;
+              if (sh.type === "line") {
+                sh.x1 = orig.x1 + dx;
+                sh.y1 = orig.y1 + dy;
+                sh.x2 = orig.x2 + dx;
+                sh.y2 = orig.y2 + dy;
+              } else {
+                sh.x = orig.x + dx;
+                sh.y = orig.y + dy;
+              }
+            });
           } else if (
             dragState.mode === "draw-rect" ||
             dragState.mode === "se"
           ) {
             const baseX = dragState.startX ?? s.x;
             const baseY = dragState.startY ?? s.y;
-            s.x = Math.min(baseX, sx);
-            s.y = Math.min(baseY, sy);
-            s.w = Math.max(20, Math.abs(sx - baseX));
-            s.h = s.type === "door" ? s.w : Math.max(20, Math.abs(sy - baseY));
+            let rawW = Math.max(20, Math.abs(sx - baseX));
+            let rawH = Math.max(20, Math.abs(sy - baseY));
+
+            // Hold Shift -> Perfect Square (or Door which is always square)
+            if (e.shiftKey || s.type === "door") {
+              const side = Math.max(rawW, rawH);
+              rawW = side;
+              rawH = side;
+            }
+            s.x = sx < baseX ? baseX - rawW : baseX;
+            s.y = sy < baseY ? baseY - rawH : baseY;
+            s.w = rawW;
+            s.h = rawH;
           } else if (
             dragState.mode === "draw-line" ||
             dragState.mode === "p2"
           ) {
-            s.x2 = sx;
-            s.y2 = sy;
+            if (e.shiftKey) {
+              const c = constrainLineShift(s.x1, s.y1, sx, sy);
+              s.x2 = c.x;
+              s.y2 = c.y;
+            } else {
+              s.x2 = sx;
+              s.y2 = sy;
+            }
           } else if (dragState.mode === "p1") {
-            s.x1 = sx;
-            s.y1 = sy;
+            if (e.shiftKey) {
+              const c = constrainLineShift(s.x2, s.y2, sx, sy);
+              s.x1 = c.x;
+              s.y1 = c.y;
+            } else {
+              s.x1 = sx;
+              s.y1 = sy;
+            }
           } else if (
             dragState.mode === "draw-circle" ||
             dragState.mode === "radius"
           ) {
-            s.r = Math.max(10, Math.round(Math.hypot(sx - s.x, sy - s.y)));
+            const dx = Math.max(10, Math.abs(sx - s.x));
+            const dy = Math.max(10, Math.abs(sy - s.y));
+            if (e.shiftKey) {
+              // Hold Shift -> Perfect Circle
+              const rad = Math.max(10, Math.round(Math.hypot(dx, dy)));
+              s.rx = rad;
+              s.ry = rad;
+              s.r = rad;
+            } else {
+              // Default -> Oval / Ellipse
+              s.rx = dx;
+              s.ry = dy;
+              s.r = Math.round((dx + dy) / 2);
+            }
+          } else if (dragState.mode === "icon-radius") {
+            s.r = Math.max(12, Math.round(Math.hypot(sx - s.x, sy - s.y)));
           } else if (dragState.mode === "text-size") {
             const dist = Math.max(18, Math.hypot(pt.x - s.x, pt.y - s.y));
             s.fontSize = Math.min(48, Math.max(10, Math.round(dist / 3)));
@@ -2980,6 +3597,7 @@
             }
             dragState = null;
             renderFloorList();
+            renderCanvas();
             updateInspector();
           }
         });
@@ -2991,12 +3609,29 @@
             )
           )
             return;
+
           if (
             (e.key === "Delete" || e.key === "Backspace") &&
-            selectedShapeId
+            selectedShapeIds.size
           ) {
             e.preventDefault();
             deleteSelected();
+          } else if (
+            !e.ctrlKey &&
+            !e.metaKey &&
+            e.key.toLowerCase() === "r" &&
+            selectedShapeIds.size
+          ) {
+            e.preventDefault();
+            rotateSelectedBy(e.shiftKey ? 45 : 90);
+          } else if (
+            !e.ctrlKey &&
+            !e.metaKey &&
+            e.key.toLowerCase() === "l" &&
+            selectedShapeIds.size
+          ) {
+            e.preventDefault();
+            toggleLockSelected();
           } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
             e.preventDefault();
             undo();
@@ -3013,29 +3648,61 @@
         if (activeTool !== "select") return;
 
         e.stopPropagation();
-        selectedShapeId = shapeId;
         const floor = getActiveFloor();
         const s = floor.shapes.find((x) => x.id === shapeId);
         if (!s) return;
 
+        // Ctrl+Click or Cmd+Click toggles shape in multi-selection
+        if (e.ctrlKey || e.metaKey) {
+          if (selectedShapeIds.has(shapeId)) {
+            selectedShapeIds.delete(shapeId);
+          } else {
+            selectedShapeIds.add(shapeId);
+          }
+          const arr = [...selectedShapeIds];
+          selectedShapeId = arr.length ? arr[arr.length - 1] : null;
+          renderCanvas();
+          updateInspector();
+          return;
+        }
+
+        if (!selectedShapeIds.has(shapeId)) {
+          selectSingleShape(shapeId);
+        } else {
+          selectedShapeId = shapeId;
+        }
+
+        renderCanvas();
+        updateInspector();
+
+        // Check if all selected shapes are locked
+        const selectedList = getSelectedShapesList();
+        if (selectedList.every((item) => item.locked)) {
+          showToast("Item is locked (Click Unlock or press L to move)");
+          return;
+        }
+
         pushUndo();
         const pt = getSvgPoint(e);
+        const origMap = {};
+        selectedList.forEach((item) => {
+          origMap[item.id] = { ...item };
+        });
+
         dragState = {
           mode: "move",
           shape: s,
           startMouseX: pt.x,
           startMouseY: pt.y,
-          orig: { ...s },
+          origMap,
         };
-        renderSelectionHandles();
-        updateInspector();
       }
 
       function onHandleMouseDown(e, shapeId, handleType) {
         e.stopPropagation();
         const floor = getActiveFloor();
         const s = floor.shapes.find((x) => x.id === shapeId);
-        if (!s) return;
+        if (!s || s.locked) return;
         pushUndo();
         dragState = {
           mode: handleType,
@@ -3046,7 +3713,67 @@
       }
 
       /* ========================================================================
-         5. LIVE SIMULATION CLICK HANDLER
+         5. LOCK / UNLOCK & ROTATE ACTIONS
+         ======================================================================== */
+      function syncTopLockButton() {
+        const list = getSelectedShapesList();
+        const btn = document.getElementById("topLockBtn");
+        const icon = document.getElementById("topLockIcon");
+        const txt = document.getElementById("topLockText");
+        if (!list.length) {
+          btn.className = "btn";
+          icon.innerHTML = "&#128275;";
+          txt.textContent = "Lock";
+          return;
+        }
+        const allLocked = list.every((s) => s.locked);
+        btn.className = allLocked ? "btn btn-warn" : "btn";
+        icon.innerHTML = allLocked ? "&#128274;" : "&#128275;";
+        txt.textContent = allLocked ? "Unlock" : "Lock";
+      }
+
+      function toggleLockSelected() {
+        const list = getSelectedShapesList();
+        if (!list.length)
+          return showToast("Select at least one shape to Lock / Unlock");
+        pushUndo();
+        const targetState = !list.every((s) => s.locked);
+        list.forEach((s) => {
+          s.locked = targetState;
+        });
+        renderCanvas();
+        updateInspector();
+        showToast(
+          targetState
+            ? `Locked ${list.length} item(s)`
+            : `Unlocked ${list.length} item(s)`,
+        );
+      }
+
+      function rotateSelectedBy(deltaDeg = 90) {
+        const list = getSelectedShapesList();
+        if (!list.length)
+          return showToast("Select a shape to rotate (Shortcut: R)");
+        const unlocked = list.filter((s) => !s.locked);
+        if (!unlocked.length)
+          return showToast("Selected shape is locked! Unlock it first.");
+
+        pushUndo();
+        unlocked.forEach((s) => {
+          const cur = Number(s.rotation) || 0;
+          s.rotation = (((cur + deltaDeg) % 360) + 360) % 360;
+        });
+        renderCanvas();
+        updateInspector();
+        showToast(
+          unlocked.length === 1
+            ? `Rotated to ${unlocked[0].rotation}°`
+            : `Rotated ${unlocked.length} items by +${deltaDeg}°`,
+        );
+      }
+
+      /* ========================================================================
+         6. LIVE SIMULATION CLICK HANDLER
          ======================================================================== */
       function onShapeClick(e, shapeId) {
         if (appMode !== "sim") return;
@@ -3094,7 +3821,7 @@
       }
 
       /* ========================================================================
-         6. RIGHT PANEL INSPECTOR & SMART HUB LINKING
+         7. RIGHT PANEL INSPECTOR & SMART HUB LINKING
          ======================================================================== */
       function getSelectedShape() {
         const floor = getActiveFloor();
@@ -3102,41 +3829,134 @@
       }
 
       function updateInspector() {
-        const s = getSelectedShape();
         const emptyCard = document.getElementById("noSelectionCard");
+        const multiCard = document.getElementById("multiSelectionCard");
         const content = document.getElementById("inspectorContent");
 
-        if (!s || appMode === "sim") {
+        if (appMode === "sim" || selectedShapeIds.size === 0) {
           emptyCard.style.display = "block";
+          multiCard.style.display = "none";
+          content.style.display = "none";
+          return;
+        }
+
+        // Multi-Selection Inspector View
+        if (selectedShapeIds.size > 1) {
+          emptyCard.style.display = "none";
+          content.style.display = "none";
+          multiCard.style.display = "block";
+          document.getElementById("multiCountBadge").textContent =
+            `${selectedShapeIds.size} ITEMS`;
+
+          const list = getSelectedShapesList();
+          const allLocked = list.every((s) => s.locked);
+          const lockBtn = document.getElementById("multiLockBtn");
+          lockBtn.innerHTML = allLocked
+            ? "&#128274; Unlock All"
+            : "&#128275; Lock All";
+          lockBtn.className = allLocked ? "btn btn-sm btn-warn" : "btn btn-sm";
+
+          document.getElementById("multiColorSwatches").innerHTML =
+            SWATCHES.map(
+              (c) =>
+                `<div class="swatch" style="background:${c}" onclick="updateBatchColor('${c}')"></div>`,
+            ).join("");
+          return;
+        }
+
+        // Single Shape Inspector View
+        const s = getSelectedShape();
+        if (!s) {
+          emptyCard.style.display = "block";
+          multiCard.style.display = "none";
           content.style.display = "none";
           return;
         }
 
         emptyCard.style.display = "none";
+        multiCard.style.display = "none";
         content.style.display = "flex";
 
         const typeNames = {
           rect: "Room / Box (SVG Rect)",
           line: "Wall / Straight Line",
-          circle: "Circle / Smart Node",
+          circle: "Circle / Oval Node",
           door: "Door Swing Arc",
+          stair: "Staircase",
+          cut: "Cut / Erase Mask",
+          icon: "Home Accessory / Device",
           text: "Text Label",
         };
         document.getElementById("inspTypeTitle").textContent =
           typeNames[s.type] || "Shape";
         document.getElementById("inspIdBadge").textContent =
           s.type.toUpperCase();
+
+        // Lock button state
+        const lockBtn = document.getElementById("inspLockToggleBtn");
+        lockBtn.innerHTML = s.locked
+          ? "&#128274; Locked"
+          : "&#128275; Unlocked";
+        lockBtn.className = s.locked ? "btn btn-sm btn-warn" : "btn btn-sm";
+
         document.getElementById("inspLabel").value = s.label || "";
+        document.getElementById("inspRotation").value = Number(s.rotation) || 0;
         document.getElementById("inspStrokeWidth").value = s.strokeWidth ?? 2;
         document.getElementById("inspFillOpacity").value = String(
           s.fillOpacity ?? 0.12,
         );
         document.getElementById("inspDash").value = s.dashed ? "1" : "0";
         document.getElementById("inspFontSize").value = s.fontSize || 13;
+        document.getElementById("inspFontWeight").value = s.fontWeight || "700";
+
+        // General Device / Accessory Icon Selector
+        const devKindWrap = document.getElementById("inspDeviceKindWrap");
+        if (s.type === "icon") {
+          devKindWrap.style.display = "flex";
+          const sel = document.getElementById("inspDeviceKindSelect");
+          sel.innerHTML = Object.entries(EXTRA_DEVICE_ICONS)
+            .map(
+              ([k, v]) =>
+                `<option value="${k}" ${s.icon === k ? "selected" : ""}>${escapeHtml(v.label)}</option>`,
+            )
+            .join("");
+        } else {
+          devKindWrap.style.display = "none";
+        }
+
+        // Disable geometry/rotation inputs when shape is locked
+        ["inspX", "inspY", "inspW", "inspH", "inspRotation"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = !!s.locked;
+        });
 
         syncInspectorGeometryInputs();
         renderInspectorSwatches(s.color || "#38bdf8");
         populateLinkControls(s);
+      }
+
+      function onChangeAccessoryKind(newKey) {
+        const s = getSelectedShape();
+        if (!s || s.type !== "icon") return;
+        const meta = EXTRA_DEVICE_ICONS[newKey];
+        if (!meta) return;
+        pushUndo();
+        s.icon = newKey;
+        if (!s.label || EXTRA_DEVICE_ICONS[s.icon]) {
+          s.label = meta.label;
+          document.getElementById("inspLabel").value = s.label;
+        }
+        s.color = meta.color;
+        renderInspectorSwatches(s.color);
+        renderCanvas();
+      }
+
+      function updateBatchColor(color) {
+        const list = getSelectedShapesList().filter((s) => !s.locked);
+        if (!list.length) return showToast("Selected items are locked");
+        pushUndo();
+        list.forEach((s) => (s.color = color));
+        renderCanvas();
       }
 
       function syncInspectorGeometryInputs() {
@@ -3168,14 +3988,26 @@
           document.getElementById("inspW").value = s.x2;
           document.getElementById("inspH").value = s.y2;
         } else if (s.type === "circle") {
+          const { rx, ry } = getShapeRxRy(s);
           document.getElementById("lblX1").textContent = "Center X";
           document.getElementById("lblY1").textContent = "Center Y";
-          document.getElementById("lblW").textContent = "Radius (R)";
+          document.getElementById("lblW").textContent = "Radius X (RX)";
+          document.getElementById("lblH").textContent = "Radius Y (RY)";
+          sizeRow.style.display = "grid";
+          hWrap.style.display = "flex";
+          document.getElementById("inspX").value = s.x;
+          document.getElementById("inspY").value = s.y;
+          document.getElementById("inspW").value = rx;
+          document.getElementById("inspH").value = ry;
+        } else if (s.type === "icon") {
+          document.getElementById("lblX1").textContent = "Center X";
+          document.getElementById("lblY1").textContent = "Center Y";
+          document.getElementById("lblW").textContent = "Icon Size (R)";
           sizeRow.style.display = "grid";
           hWrap.style.display = "none";
           document.getElementById("inspX").value = s.x;
           document.getElementById("inspY").value = s.y;
-          document.getElementById("inspW").value = s.r;
+          document.getElementById("inspW").value = s.r || 20;
         } else if (s.type === "text") {
           document.getElementById("lblX1").textContent = "Text X";
           document.getElementById("lblY1").textContent = "Text Y";
@@ -3202,13 +4034,17 @@
       function updateSelectedProp(key, val) {
         const s = getSelectedShape();
         if (!s) return;
+        if (s.locked && key === "rotation") {
+          showToast("Shape is locked! Unlock it to rotate.");
+          return;
+        }
         s[key] = val;
         renderCanvas();
       }
 
       function updateSelectedGeom() {
         const s = getSelectedShape();
-        if (!s) return;
+        if (!s || s.locked) return;
         const vX = Number(document.getElementById("inspX").value) || 0;
         const vY = Number(document.getElementById("inspY").value) || 0;
         const vW = Number(document.getElementById("inspW").value) || 10;
@@ -3227,7 +4063,13 @@
         } else if (s.type === "circle") {
           s.x = vX;
           s.y = vY;
-          s.r = Math.max(6, vW);
+          s.rx = Math.max(6, vW);
+          s.ry = Math.max(6, vH);
+          s.r = Math.round((s.rx + s.ry) / 2);
+        } else if (s.type === "icon") {
+          s.x = vX;
+          s.y = vY;
+          s.r = Math.max(10, vW);
         } else if (s.type === "text") {
           s.x = vX;
           s.y = vY;
@@ -3346,42 +4188,63 @@
       }
 
       function duplicateSelected() {
-        const s = getSelectedShape();
-        if (!s) return;
+        const list = getSelectedShapesList();
+        if (!list.length) return;
         pushUndo();
-        const copy = JSON.parse(JSON.stringify(s));
-        copy.id = "sh_" + Date.now().toString(36);
-        if (copy.type === "line") {
-          copy.x1 += 20;
-          copy.y1 += 20;
-          copy.x2 += 20;
-          copy.y2 += 20;
-        } else {
-          copy.x += 20;
-          copy.y += 20;
-        }
-        getActiveFloor().shapes.push(copy);
-        selectedShapeId = copy.id;
+        const floor = getActiveFloor();
+        const newIds = new Set();
+
+        list.forEach((s, idx) => {
+          const copy = JSON.parse(JSON.stringify(s));
+          copy.id = "sh_" + Date.now().toString(36) + "_" + idx;
+          copy.locked = false;
+          if (copy.type === "line") {
+            copy.x1 += 20;
+            copy.y1 += 20;
+            copy.x2 += 20;
+            copy.y2 += 20;
+          } else {
+            copy.x += 20;
+            copy.y += 20;
+          }
+          floor.shapes.push(copy);
+          newIds.add(copy.id);
+        });
+
+        selectedShapeIds = newIds;
+        const arr = [...newIds];
+        selectedShapeId = arr[arr.length - 1] || null;
         renderFloorList();
         renderCanvas();
         updateInspector();
-        showToast("Shape cloned");
+        showToast(`Cloned ${list.length} item(s)`);
       }
 
       function deleteSelected() {
-        if (!selectedShapeId) return;
+        const list = getSelectedShapesList();
+        if (!list.length) return;
+        const unlockedIds = new Set(
+          list.filter((s) => !s.locked).map((s) => s.id),
+        );
+        if (!unlockedIds.size) {
+          return showToast(
+            "Selected item(s) are locked! Unlock them first to delete.",
+          );
+        }
         pushUndo();
         const floor = getActiveFloor();
-        floor.shapes = floor.shapes.filter((s) => s.id !== selectedShapeId);
-        selectedShapeId = null;
+        floor.shapes = floor.shapes.filter((s) => !unlockedIds.has(s.id));
+        unlockedIds.forEach((id) => selectedShapeIds.delete(id));
+        const rem = [...selectedShapeIds];
+        selectedShapeId = rem.length ? rem[rem.length - 1] : null;
         renderFloorList();
         renderCanvas();
         updateInspector();
-        showToast("Shape deleted");
+        showToast(`Deleted ${unlockedIds.size} item(s)`);
       }
 
       /* ========================================================================
-         7. ZOOM, SAVE & EXPORT UTILITIES
+         8. ZOOM, SAVE & EXPORT UTILITIES
          ======================================================================== */
       function adjustZoom(delta) {
         zoomLevel = Math.max(
