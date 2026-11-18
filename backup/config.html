@@ -2649,7 +2649,7 @@
       const ACTION_LABELS = {
         devices: "Devices Management",
         shortcuts: "Shortcut",
-        homeToggle: "Shortcut Toggling",
+        design: "Design Management",
         groups: "Group Management",
         favorites: "Favorites Management",
         network: "Network Configuration",
@@ -2935,7 +2935,7 @@
             actions: {
               devices: "admin", // Devices Management -> Admin
               shortcuts: "admin", // Shortcut -> Admin
-              homeToggle: "admin", // Shortcut Toggling -> Admin
+              design: "admin", // Design Management -> Admin
               groups: "admin", // Group Management -> Admin
               favorites: "admin", // Favorites Management -> Admin
               network: "admin", // Network Configuration -> Admin
@@ -3834,7 +3834,7 @@
       }
 
       async function quickToggleShortcutLock(id) {
-        if (!(await verifyAction("homeToggle", "Toggle Shortcut Lock"))) return;
+        if (!(await verifyAction("shortcuts", "Toggle Shortcut Lock"))) return;
         const sc = config.shortcuts.find((s) => s.id === id);
         if (!sc) return;
         sc.locked = !sc.locked;
@@ -4023,16 +4023,6 @@
         if (!host) return showToast("IP / Hostname is required");
         if (!apiKey) return showToast("API Key is required");
 
-        const lockChanged = existingSc
-          ? !!existingSc.locked !== isLocked ||
-            (existingSc.lockRole || "admin") !== lockRole
-          : isLocked;
-        if (
-          lockChanged &&
-          !(await verifyAction("homeToggle", "Configure Shortcut Lock"))
-        )
-          return;
-
         const id = editingShortcutId || "s" + Date.now().toString(36);
         const existing = config.shortcuts.find((s) => s.id === id);
 
@@ -4113,9 +4103,10 @@
             ).length;
             const gIdSafe = escapeHtml(g.id);
             const colorSafe = escapeHtml(g.color || "#38bdf8");
+            const isHidden = !!g.hidden;
 
             return `
-              <div class="dev-row">
+              <div class="dev-row" style="${isHidden ? "opacity:0.55" : ""}">
                 <div class="dev-row-left">
                   <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">
                     <span style="width:14px;height:14px;border-radius:50%;background:${colorSafe};display:inline-block"></span>
@@ -4123,6 +4114,7 @@
                   <div>
                     <div class="dev-row-title">
                       ${escapeHtml(g.name)}
+                      ${isHidden ? '<span class="badge" style="color:var(--err)">Hidden</span>' : ""}
                       <span class="badge">${devCount} devices</span>
                       <span class="badge">${scCount} shortcuts</span>
                     </div>
@@ -4327,14 +4319,16 @@
             const dCount = (fav.deviceIds || []).length;
             const sCount = (fav.shortcutIds || []).length;
             const gCount = (fav.groupIds || []).length;
+            const isHidden = !!fav.hidden;
 
             return `
-              <div class="dev-row">
+              <div class="dev-row" style="${isHidden ? "opacity:0.55" : ""}">
                 <div class="dev-row-left">
                   <div class="icon-box" style="background:${colorSafe}22;color:${colorSafe}">${svgIcon(fav.icon || "chip", 20)}</div>
                   <div>
                     <div class="dev-row-title">
                       ${escapeHtml(fav.name)}
+                      ${isHidden ? '<span class="badge" style="color:var(--err)">Hidden</span>' : ""}
                       ${dCount ? `<span class="badge">${dCount} device${dCount > 1 ? "s" : ""}</span>` : ""}
                       ${sCount ? `<span class="badge">${sCount} shortcut${sCount > 1 ? "s" : ""}</span>` : ""}
                       ${gCount ? `<span class="badge">${gCount} group${gCount > 1 ? "s" : ""}</span>` : ""}
@@ -5850,6 +5844,21 @@
         if (isDirty) {
           e.preventDefault();
           e.returnValue = "";
+        }
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (
+          e.key === "Enter" &&
+          document.getElementById("authModal")?.classList.contains("open")
+        ) {
+          e.preventDefault();
+          submitAuthModal();
+        } else if (
+          e.key === "Escape" &&
+          document.getElementById("authModal")?.classList.contains("open")
+        ) {
+          closeAuthModal();
         }
       });
 

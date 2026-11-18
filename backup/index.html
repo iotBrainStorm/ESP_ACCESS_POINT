@@ -1797,7 +1797,7 @@
             actions: {
               devices: "admin", // Devices Management -> Admin
               shortcuts: "admin", // Shortcut -> Admin
-              homeToggle: "admin", // Shortcut Toggling -> Admin
+              design: "admin", // Design Management -> Admin
               groups: "admin", // Group Management -> Admin
               favorites: "admin", // Favorites Management -> Admin
               network: "admin", // Network Configuration -> Admin
@@ -3116,6 +3116,14 @@
       });
 
       document.addEventListener("keydown", (e) => {
+        if (
+          e.key === "Enter" &&
+          document.getElementById("authModal")?.classList.contains("open")
+        ) {
+          e.preventDefault();
+          submitAuthModal();
+          return;
+        }
         if (e.key === "/" && document.activeElement !== searchInput) {
           e.preventDefault();
           searchInput.focus();
