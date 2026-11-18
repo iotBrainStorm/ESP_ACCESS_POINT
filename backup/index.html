@@ -61,7 +61,9 @@
 
       html,
       body,
-      * {
+      *,
+      *::before,
+      *::after {
         box-sizing: border-box;
         margin: 0;
         padding: 0;
@@ -186,6 +188,8 @@
       }
 
       .dot {
+        display: inline-block;
+        vertical-align: middle;
         width: 8px;
         height: 8px;
         border-radius: 50%;
@@ -830,6 +834,40 @@
       }
 
       /* Auth Modal Controls */
+      .auth-status-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        margin-bottom: 14px;
+        font-size: 0.74rem;
+        font-weight: 600;
+      }
+      .auth-status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      main.container {
+        opacity: 0;
+        transform: translateY(4px);
+        transition:
+          opacity 0.25s ease,
+          transform 0.25s ease;
+      }
+      body.auth-ready main.container {
+        opacity: 1;
+        transform: translateY(0);
+      }
       .pin-overlay {
         position: fixed;
         inset: 0;
@@ -837,10 +875,21 @@
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         z-index: 90;
-        display: none;
+        display: flex;
         align-items: center;
         justify-content: center;
         padding: 16px;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition:
+          opacity 0.22s ease,
+          visibility 0.22s ease;
+      }
+      .pin-overlay.open {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
       }
       .pin-card {
         width: 100%;
@@ -849,6 +898,12 @@
         border: 1px solid var(--border);
         border-radius: 16px;
         padding: 22px;
+        text-align: left;
+        transform: scale(0.95) translateY(8px);
+        transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .pin-overlay.open .pin-card {
+        transform: scale(1) translateY(0);
       }
       .field {
         display: flex;
@@ -1069,15 +1124,7 @@
   </head>
   <body>
     <!-- Universal Auth & Verification Modal -->
-    <div
-      class="pin-overlay"
-      id="authModal"
-      style="
-        display: none;
-        background: rgba(0, 0, 0, 0.78);
-        backdrop-filter: blur(8px);
-      "
-    >
+    <div class="pin-overlay" id="authModal">
       <div class="pin-card" style="max-width: 370px; text-align: left">
         <div
           style="
@@ -1111,22 +1158,7 @@
         </p>
 
         <!-- Live Attempt & Lockout Status Banner -->
-        <div
-          id="authLiveStatus"
-          style="
-            display: block;
-            padding: 8px 10px;
-            border-radius: 9px;
-            border: 1px solid var(--border);
-            background: var(--bg);
-            font-size: 0.75rem;
-            font-family: monospace;
-            margin-bottom: 12px;
-            color: var(--text-muted);
-          "
-        >
-          Attempts left: 3/3 • Lockout: Restart / 1h
-        </div>
+        <div id="authLiveStatus" class="auth-status-bar"></div>
 
         <div class="field" style="margin-bottom: 10px">
           <label>Username</label>
@@ -1187,7 +1219,7 @@
             class="btn btn-sm btn-danger"
             onclick="triggerForgetUsers()"
           >
-            Forget?
+            Forget
           </button>
           <div style="display: flex; gap: 8px">
             <button
@@ -1572,8 +1604,9 @@
 
       function syncModalScrollLock() {
         const hasOpenModal = !!document.querySelector(".modal-backdrop.open");
-        const authOpen =
-          document.getElementById("authModal")?.style.display === "flex";
+        const authOpen = document
+          .getElementById("authModal")
+          ?.classList.contains("open");
         document.body.classList.toggle("modal-open", hasOpenModal || authOpen);
       }
 
@@ -1744,14 +1777,14 @@
             homePage: { mode: "session", role: "all" },
             configPage: { mode: "session", role: "admin" },
             actions: {
-              devices: "admin",
-              shortcuts: "admin",
-              homeToggle: "none",
-              groups: "admin",
-              favorites: "all",
-              network: "admin",
-              restart: "admin",
-              reset: "admin",
+              devices: "admin", // Devices Management -> Admin
+              shortcuts: "admin", // Shortcut -> Admin
+              homeToggle: "none", // Shortcut Toggling -> None (Off by default on Home UI)
+              groups: "admin", // Group Management -> Admin
+              favorites: "admin", // Favorites Management -> Admin
+              network: "admin", // Network Configuration -> Admin
+              restart: "admin", // Restart Hub -> Admin
+              reset: "admin", // All type of Reset -> Admin
             },
           },
         };
@@ -1883,6 +1916,7 @@
               actions: {
                 ...defAdmin.verification.actions,
                 ...(rawAdmin.verification?.actions || {}),
+                reset: "admin",
               },
             },
           },
@@ -1975,21 +2009,26 @@
         const st = checkLockoutState();
         if (st.locked) {
           banner.style.borderColor = "var(--err)";
-          banner.style.color = "var(--err)";
           banner.style.background = "rgba(239, 68, 68, 0.12)";
-          banner.textContent = st.msg;
+          banner.innerHTML = `<span style="color:var(--err);width:100%;text-align:center">${escapeHtml(st.msg)}</span>`;
           if (verifyBtn) verifyBtn.disabled = true;
           if (uInput) uInput.disabled = true;
           if (pInput) pInput.disabled = true;
         } else {
           const policyText =
-            st.policy === "restart_only"
-              ? "Lockout: Restart Only"
-              : "Lockout: Restart / 1h";
+            st.policy === "restart_only" ? "Restart Only" : "Restart / 1h";
+          const attColor =
+            st.remainingAttempts <= 1
+              ? "var(--err)"
+              : st.remainingAttempts === 2
+                ? "var(--warn)"
+                : "var(--ok)";
           banner.style.borderColor = "var(--border)";
-          banner.style.color = "var(--text-muted)";
           banner.style.background = "var(--bg)";
-          banner.textContent = `Attempts left: ${st.remainingAttempts}/${st.maxAttempts} • ${policyText}`;
+          banner.innerHTML = `
+      <span style="color:var(--text-muted)">Attempts: <strong style="color:${attColor}">${st.remainingAttempts}/${st.maxAttempts}</strong></span>
+      <span class="auth-status-pill">Lockout: ${policyText}</span>
+    `;
           if (verifyBtn) verifyBtn.disabled = false;
           if (uInput) uInput.disabled = false;
           if (pInput) pInput.disabled = false;
@@ -2006,10 +2045,7 @@
         );
         if (!user) return { ok: false, msg: "Invalid username or password" };
         if (roleRequirement === "admin" && user.role !== "admin") {
-          return { ok: false, msg: "Admin role required for this action" };
-        }
-        if (roleRequirement === "user" && user.role !== "user") {
-          return { ok: false, msg: "Normal User role required" };
+          return { ok: false, msg: "Admin permission required" };
         }
         return { ok: true, user };
       }
@@ -2019,12 +2055,7 @@
         return new Promise((resolve) => {
           requiredAuthRole = roleReq;
           authResolveCallback = resolve;
-          const roleLabel =
-            roleReq === "admin"
-              ? "Admin Only"
-              : roleReq === "user"
-                ? "Normal User"
-                : "Admin or Normal User";
+          const roleLabel = roleReq === "admin" ? "Admin" : "Everyone";
           document.getElementById("authModalTitle").textContent =
             titleText || "Verification Required";
           document.getElementById("authModalSub").textContent =
@@ -2036,7 +2067,7 @@
           document.getElementById("authCloseXBtn").style.display =
             "inline-flex";
           document.getElementById("forgetBootBox").style.display = "none";
-          document.getElementById("authModal").style.display = "flex";
+          document.getElementById("authModal").classList.add("open");
 
           refreshAuthModalLiveStatus();
           clearInterval(authStatusTimer);
@@ -2079,7 +2110,7 @@
 
         clearLockoutData();
         clearInterval(authStatusTimer);
-        document.getElementById("authModal").style.display = "none";
+        document.getElementById("authModal").classList.remove("open");
         syncModalScrollLock();
         if (authResolveCallback) authResolveCallback(res.user);
         authResolveCallback = null;
@@ -2088,7 +2119,7 @@
       function closeAuthModal() {
         clearInterval(forgetBootTimer);
         clearInterval(authStatusTimer);
-        document.getElementById("authModal").style.display = "none";
+        document.getElementById("authModal").classList.remove("open");
         syncModalScrollLock();
         if (authResolveCallback) authResolveCallback(false);
         authResolveCallback = null;
@@ -2291,7 +2322,6 @@
 
       async function openDeviceById(id, customPath = null, event = null) {
         if (event) event.stopPropagation();
-        if (!(await verifyAction("devices", "Open Device"))) return;
         const dev = config.devices.find((d) => d.id === id);
         if (!dev) return;
         const url = buildTargetUrl(dev, customPath);
@@ -2370,7 +2400,6 @@
 
       async function toggleFavorite(e, id) {
         e.stopPropagation();
-        if (!(await verifyAction("favorites", "Modify Favorites"))) return;
         const dev = config.devices.find((d) => d.id === id);
         if (!dev) return;
         dev.fav = !dev.fav;
@@ -3043,7 +3072,7 @@
     </div>`;
           return;
         }
-
+        document.body.classList.add("auth-ready");
         renderAll();
         if (config.settings.autoPing) pingAllDevices();
       }
