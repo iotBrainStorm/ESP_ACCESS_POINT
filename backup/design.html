@@ -580,6 +580,33 @@
         color: var(--accent);
       }
 
+      .ms-check-list {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        max-height: 150px;
+        overflow-y: auto;
+        padding: 6px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+      }
+      .ms-check-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        padding: 5px 7px;
+        border-radius: 6px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        font-size: 0.74rem;
+        cursor: pointer;
+      }
+      .ms-check-item input {
+        accent-color: var(--accent);
+      }
+
       /* ==========================================================================
          4. INTERACTIVE 2D SVG CANVAS AREA
          ========================================================================== */
@@ -930,6 +957,26 @@
         </button>
         <button
           class="btn"
+          id="topGroupBtn"
+          onclick="toggleGroupSelected()"
+          title="Group / Ungroup Selected Shapes (Shortcut: G)"
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+            <path d="M14 5h5v5M10 19H5v-5" />
+          </svg>
+          <span id="topGroupLabel">Group</span>
+        </button>
+        <button
+          class="btn"
           onclick="loadDemoSmartHome()"
           title="Load a complete 2-Floor Smart Home sample drawing"
         >
@@ -1014,6 +1061,69 @@
                 <option value="ft">Feet</option>
                 <option value="m">Meters</option>
               </select>
+            </div>
+          </div>
+
+          <div class="field-row" style="margin-top: 8px">
+            <div class="field">
+              <label>Canvas Width</label>
+              <div style="display: flex; gap: 4px">
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  onclick="adjustCanvasSize('width', -100)"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  id="bldgWidthInput"
+                  class="input"
+                  min="400"
+                  max="3000"
+                  step="20"
+                  value="920"
+                  style="text-align: center; padding: 0 4px"
+                  onchange="updateCanvasSizeFromInput()"
+                />
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  onclick="adjustCanvasSize('width', 100)"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Canvas Height</label>
+              <div style="display: flex; gap: 4px">
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  onclick="adjustCanvasSize('height', -100)"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  id="bldgHeightInput"
+                  class="input"
+                  min="300"
+                  max="2400"
+                  step="20"
+                  value="600"
+                  style="text-align: center; padding: 0 4px"
+                  onchange="updateCanvasSizeFromInput()"
+                />
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  onclick="adjustCanvasSize('height', 100)"
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1209,6 +1319,29 @@
                 <line x1="8.12" y1="8.12" x2="12" y2="12" />
               </svg>
               <span>Erase</span>
+            </button>
+
+            <button
+              class="tool-btn"
+              data-tool="mainswitch"
+              onclick="selectTool('mainswitch')"
+              style="grid-column: span 2; justify-content: center"
+              title="Place a Jumper MCB Main Switch to control multiple shortcut buttons together"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="4" y="2" width="16" height="20" rx="2" />
+                <line x1="8" y1="6" x2="16" y2="6" />
+                <rect x="7" y="9" width="10" height="6" rx="1" />
+                <line x1="8" y1="18" x2="16" y2="18" />
+              </svg>
+              <span>Main Switch</span>
             </button>
           </div>
 
@@ -1448,8 +1581,21 @@
             >
               &#128274; Lock / Unlock All
             </button>
+            <button
+              class="btn btn-sm"
+              id="multiGroupBtn"
+              onclick="toggleGroupSelected()"
+            >
+              Group Selected
+            </button>
             <button class="btn btn-sm" onclick="rotateSelectedBy(90)">
               &#8635; Rotate All +90°
+            </button>
+            <button class="btn btn-sm" onclick="flipSelected('h')">
+              &#8644; Flip H
+            </button>
+            <button class="btn btn-sm" onclick="flipSelected('v')">
+              &#8645; Flip V
             </button>
             <button class="btn btn-sm" onclick="duplicateSelected()">
               Clone All
@@ -1501,6 +1647,32 @@
                 class="select"
                 onchange="onChangeAccessoryKind(this.value)"
               ></select>
+            </div>
+
+            <!-- Editable ON / OFF Labels for Jumper MCB Main Switch -->
+            <div class="field-row" id="inspMcbLabelsWrap" style="display: none">
+              <div class="field">
+                <label>MCB ON Label</label>
+                <input
+                  type="text"
+                  id="inspOnLabel"
+                  class="input"
+                  maxlength="8"
+                  placeholder="ON"
+                  oninput="updateSelectedProp('onLabel', this.value)"
+                />
+              </div>
+              <div class="field">
+                <label>MCB OFF Label</label>
+                <input
+                  type="text"
+                  id="inspOffLabel"
+                  class="input"
+                  maxlength="8"
+                  placeholder="OFF"
+                  oninput="updateSelectedProp('offLabel', this.value)"
+                />
+              </div>
             </div>
 
             <!-- Dynamic Geometry Fields -->
@@ -1586,6 +1758,28 @@
                     +90°
                   </button>
                 </div>
+              </div>
+            </div>
+
+            <div class="field" style="margin-top: 8px">
+              <label>Flip Shape</label>
+              <div style="display: flex; gap: 6px">
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  style="flex: 1"
+                  onclick="flipSelected('h')"
+                >
+                  &#8644; Flip H
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  style="flex: 1"
+                  onclick="flipSelected('v')"
+                >
+                  &#8645; Flip V
+                </button>
               </div>
             </div>
 
@@ -1723,7 +1917,7 @@
               <span class="step-tag">INTERACTIVE</span>
             </div>
 
-            <div class="field">
+            <div class="field" id="linkTypeWrap">
               <label>Connection Category</label>
               <select
                 id="inspLinkType"
@@ -1747,15 +1941,64 @@
               ></select>
             </div>
 
-            <div class="field" id="linkCustomNameWrap" style="display: none">
-              <label>Display Badge</label>
-              <input
-                type="text"
-                id="inspLinkTitle"
-                class="input"
-                placeholder="e.g. Relay CH-1"
-                oninput="updateSelectedLink('targetName', this.value)"
-              />
+            <div
+              id="mainSwitchConfigWrap"
+              style="display: none; flex-direction: column; gap: 9px"
+            >
+              <div class="field">
+                <label>Connect Shortcut Buttons</label>
+                <div class="ms-check-list" id="msShortcutsCheckList"></div>
+              </div>
+
+              <div class="field-row">
+                <div class="field">
+                  <label>User Verification</label>
+                  <select
+                    id="msUnlockMode"
+                    class="select"
+                    onchange="onMainSwitchAuthFieldChange()"
+                  >
+                    <option value="locked">Locked</option>
+                    <option value="unlock">Unlock</option>
+                  </select>
+                </div>
+                <div class="field" id="msRoleWrap">
+                  <label>User Role</label>
+                  <select
+                    id="msLockRole"
+                    class="select"
+                    onchange="onMainSwitchAuthFieldChange()"
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="all">Everyone</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-row" id="msCredsWrap" style="display: none">
+                <div class="field">
+                  <label>Username</label>
+                  <input
+                    type="text"
+                    id="msAuthUser"
+                    class="input"
+                    placeholder="esp"
+                    autocomplete="off"
+                    oninput="onMainSwitchAuthFieldChange()"
+                  />
+                </div>
+                <div class="field">
+                  <label>Password</label>
+                  <input
+                    type="password"
+                    id="msAuthPass"
+                    class="input"
+                    placeholder="••••••"
+                    autocomplete="new-password"
+                    oninput="onMainSwitchAuthFieldChange()"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1848,6 +2091,80 @@
     <script>
       const HUB_CONFIG_KEY = "esp_iot_hub_config_v1";
       const DESIGN_STORAGE_KEY = "esp_iot_hub_building_design_v1";
+
+      const KEY_SALT = "esp32_nvs_hub_v1_secret";
+      let cachedHubConfig = null;
+
+      function cleanHostInput(h) {
+        return String(h || "")
+          .trim()
+          .replace(/^https?:\/\//i, "")
+          .replace(/\/+$/, "");
+      }
+
+      function hashCredential(username, password) {
+        const cleanUser = String(username || "")
+          .trim()
+          .toLowerCase();
+        const raw = `${cleanUser}:${String(password || "")}:${KEY_SALT}`;
+        let h1 = 0xdeadbeef ^ raw.length,
+          h2 = 0x41c6ce57 ^ raw.length;
+        for (let i = 0, ch; i < raw.length; i++) {
+          ch = raw.charCodeAt(i);
+          h1 = Math.imul(h1 ^ ch, 2654435761);
+          h2 = Math.imul(h2 ^ ch, 1597334677);
+        }
+        h1 =
+          Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
+          Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 =
+          Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
+          Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        return (
+          "sha:" +
+          (h2 >>> 0).toString(16).padStart(8, "0") +
+          (h1 >>> 0).toString(16).padStart(8, "0")
+        );
+      }
+
+      function revealApiKey(storedKey) {
+        const str = String(storedKey || "").trim();
+        if (!str.startsWith("enc:")) return str;
+        try {
+          const raw = atob(str.slice(4));
+          return Array.from(raw)
+            .map((ch, i) =>
+              String.fromCharCode(
+                ch.charCodeAt(0) ^ KEY_SALT.charCodeAt(i % KEY_SALT.length),
+              ),
+            )
+            .join("");
+        } catch {
+          return "";
+        }
+      }
+
+      function getHubConfig() {
+        if (cachedHubConfig) return cachedHubConfig;
+        try {
+          cachedHubConfig = JSON.parse(localStorage.getItem(HUB_CONFIG_KEY));
+        } catch (_) {}
+        return cachedHubConfig;
+      }
+
+      // Call once inside init() so design.html always has fresh shortcuts & users from ESP32
+      async function syncHubConfigFromBackend() {
+        try {
+          const res = await fetch("/api/config", { cache: "no-store" });
+          if (res.ok) {
+            cachedHubConfig = await res.json();
+            localStorage.setItem(
+              HUB_CONFIG_KEY,
+              JSON.stringify(cachedHubConfig),
+            );
+          }
+        } catch (_) {}
+      }
 
       const SWATCHES = [
         "#38bdf8",
@@ -2483,6 +2800,7 @@
         renderCanvas();
         setupCanvasEvents();
         updateInspector();
+        syncHubConfigFromBackend();
       }
 
       function clearSelection() {
@@ -2564,6 +2882,10 @@
         document.getElementById("quickFloorCount").value = String(
           Math.min(5, building.floors.length),
         );
+        document.getElementById("bldgWidthInput").value = building.width || 920;
+        document.getElementById("bldgHeightInput").value =
+          building.height || 600;
+        applyCanvasDimensions();
       }
 
       function updateBuildingMeta() {
@@ -2573,6 +2895,44 @@
         building.unit = document.getElementById("bldgUnitSelect").value;
         document.getElementById("topBuildingName").textContent =
           building.name.toUpperCase();
+        renderCanvas();
+      }
+
+      function applyCanvasDimensions() {
+        const w = Math.max(400, Math.min(3000, Number(building.width) || 920));
+        const h = Math.max(300, Math.min(2400, Number(building.height) || 600));
+        building.width = w;
+        building.height = h;
+
+        svgEl.setAttribute("width", w);
+        svgEl.setAttribute("height", h);
+        svgEl.setAttribute("viewBox", `0 0 ${w} ${h}`);
+
+        const gridBg = document.getElementById("svgGridBg");
+        if (gridBg) {
+          gridBg.setAttribute("width", w);
+          gridBg.setAttribute("height", h);
+        }
+        applyZoom();
+      }
+
+      function adjustCanvasSize(axis, delta) {
+        pushUndo();
+        const minVal = axis === "width" ? 400 : 300;
+        const maxVal = axis === "width" ? 3000 : 2400;
+        const cur = Number(building[axis]) || (axis === "width" ? 920 : 600);
+        building[axis] = Math.max(minVal, Math.min(maxVal, cur + delta));
+        syncBuildingInputs();
+        renderCanvas();
+      }
+
+      function updateCanvasSizeFromInput() {
+        pushUndo();
+        building.width =
+          Number(document.getElementById("bldgWidthInput").value) || 920;
+        building.height =
+          Number(document.getElementById("bldgHeightInput").value) || 600;
+        syncBuildingInputs();
         renderCanvas();
       }
 
@@ -2823,7 +3183,7 @@
       }
 
       function getShapeCenter(s) {
-        if (["rect", "door", "stair", "cut"].includes(s.type)) {
+        if (["rect", "door", "stair", "cut", "mainswitch"].includes(s.type)) {
           const w = s.w || 40;
           const h = s.type === "door" ? w : s.h || 40;
           return { cx: s.x + w / 2, cy: s.y + h / 2 };
@@ -2834,8 +3194,54 @@
         return { cx: s.x || 0, cy: s.y || 0 };
       }
 
+      function getShapeTransformAttr(s) {
+        const rot = Number(s.rotation) || 0;
+        const sx = s.flipX ? -1 : 1;
+        const sy = s.flipY ? -1 : 1;
+        if (!rot && sx === 1 && sy === 1) return "";
+        const { cx, cy } = getShapeCenter(s);
+        const parts = [];
+        if (rot) parts.push(`rotate(${rot} ${cx} ${cy})`);
+        if (sx !== 1 || sy !== 1) {
+          parts.push(
+            `translate(${cx} ${cy}) scale(${sx} ${sy}) translate(${-cx} ${-cy})`,
+          );
+        }
+        return `transform="${parts.join(" ")}"`;
+      }
+
+      // Counter-flips text labels so words never appear mirrored
+      function getTextUnflipAttr(tx, ty, s) {
+        const sx = s.flipX ? -1 : 1;
+        const sy = s.flipY ? -1 : 1;
+        if (sx === 1 && sy === 1) return "";
+        return `transform="translate(${tx} ${ty}) scale(${sx} ${sy}) translate(${-tx} ${-ty})"`;
+      }
+
+      function getCombinedBounds(list) {
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+        list.forEach((s) => {
+          const b = getShapeBounds(s);
+          minX = Math.min(minX, b.x);
+          minY = Math.min(minY, b.y);
+          maxX = Math.max(maxX, b.x + b.w);
+          maxY = Math.max(maxY, b.y + b.h);
+        });
+        return {
+          x: minX,
+          y: minY,
+          w: maxX - minX,
+          h: maxY - minY,
+          cx: (minX + maxX) / 2,
+          cy: (minY + maxY) / 2,
+        };
+      }
+
       function getShapeBounds(s) {
-        if (["rect", "door", "stair", "cut"].includes(s.type)) {
+        if (["rect", "door", "stair", "cut", "mainswitch"].includes(s.type)) {
           const w = s.w || 40;
           const h = s.type === "door" ? w : s.h || 40;
           return { x: s.x, y: s.y, w, h };
@@ -2939,6 +3345,7 @@
 
         renderSelectionHandles();
         syncTopLockButton();
+        syncTopGroupButton();
       }
 
       function renderShapeSvg(s) {
@@ -2953,13 +3360,7 @@
         const fw = s.fontWeight || "700";
         const rot = Number(s.rotation) || 0;
         const { cx, cy } = getShapeCenter(s);
-        const rotAttr = rot ? `transform="rotate(${rot} ${cx} ${cy})"` : "";
-
-        const linkBadgeText = hasLink
-          ? `${s.link.type.toUpperCase()}: ${s.link.targetName || "Linked"}${
-              s.link.type === "shortcut" ? (isSimOn ? " [ON]" : " [OFF]") : ""
-            }`
-          : "";
+        const rotAttr = getShapeTransformAttr(s);
 
         let primHtml = "";
 
@@ -2974,19 +3375,13 @@
               fill="${color}" fill-opacity="${fo}" stroke="${color}" stroke-width="${sw}" ${dashAttr} />
             ${
               s.label
-                ? `<text class="shape-label" x="${cx}" y="${cy - (dimText || linkBadgeText ? 6 : 0)}"
-                    text-anchor="middle" dominant-baseline="middle" fill="var(--text)" font-size="${fs}" font-weight="${fw}">${escapeHtml(s.label)}</text>`
+                ? `<text class="shape-label" x="${cx}" y="${cy - (dimText && appMode === "design" ? 6 : 0)}"
+        text-anchor="middle" dominant-baseline="middle" fill="var(--text)" font-size="${fs}" font-weight="${fw}">${escapeHtml(s.label)}</text>`
                 : ""
             }
             ${
               dimText && appMode === "design"
                 ? `<text class="shape-sublabel" x="${cx}" y="${cy + 12}" text-anchor="middle">${dimText}</text>`
-                : ""
-            }
-            ${
-              hasLink
-                ? `<text class="shape-sublabel" x="${cx}" y="${cy + (appMode === "design" && dimText ? 26 : 14)}"
-                    text-anchor="middle" fill="${isSimOn ? "var(--ok)" : color}">⚡ ${escapeHtml(linkBadgeText)}</text>`
                 : ""
             }
           `;
@@ -3130,10 +3525,89 @@
               ${escapeHtml(s.label || "Label")}
             </text>
           `;
+        } else if (s.type === "mainswitch") {
+          const x = s.x;
+          const y = s.y;
+          const w = Math.max(36, s.w || 60);
+          const h = Math.max(54, s.h || 100);
+          const th = h * 0.14; // Top & bottom terminal bars
+          const slotX = x + w * 0.16;
+          const slotW = w * 0.68;
+          const slotY = y + h * 0.35;
+          const slotH = h * 0.34;
+          const leverH = slotH * 0.48;
+          // Lever UP when ON, Lever DOWN when OFF
+          const leverY = isSimOn ? slotY + 2 : slotY + slotH - leverH - 2;
+          const shadowY = isSimOn ? leverY + leverH : slotY + 1;
+          const shadowH = slotH - leverH - 3;
+          const stateColor = isSimOn ? onColor : color;
+          const mcbFontSize = Math.max(8, Math.min(14, Math.round(h * 0.11)));
+          const onTxt = s.onLabel !== undefined ? s.onLabel : "ON";
+          const offTxt = s.offLabel !== undefined ? s.offLabel : "OFF";
+          const linkedCount = Array.isArray(s.link?.targetIds)
+            ? s.link.targetIds.length
+            : 0;
+
+          primHtml = `
+            <!-- MCB Outer DIN Body -->
+            <rect class="shape-prim" x="${x}" y="${y}" width="${w}" height="${h}" rx="5"
+              fill="${stateColor}" fill-opacity="${isSimOn ? Math.max(fo, 0.24) : fo}"
+              stroke="${stateColor}" stroke-width="${sw}" ${dashAttr} />
+
+            <!-- Top & Bottom Jumper Terminals + Bus Bridge -->
+            <line x1="${x + 2}" y1="${y + th}" x2="${x + w - 2}" y2="${y + th}" stroke="${stateColor}" stroke-width="1" stroke-opacity="0.6" />
+            <line x1="${x + 2}" y1="${y + h - th}" x2="${x + w - 2}" y2="${y + h - th}" stroke="${stateColor}" stroke-width="1" stroke-opacity="0.6" />
+            <line x1="${x + w * 0.3}" y1="${y + th * 0.5}" x2="${x + w * 0.7}" y2="${y + th * 0.5}" stroke="${stateColor}" stroke-width="2" />
+            <circle cx="${x + w * 0.3}" cy="${y + th * 0.5}" r="${Math.max(2, w * 0.055)}" fill="var(--bg)" stroke="${stateColor}" stroke-width="1.3" />
+            <circle cx="${x + w * 0.7}" cy="${y + th * 0.5}" r="${Math.max(2, w * 0.055)}" fill="var(--bg)" stroke="${stateColor}" stroke-width="1.3" />
+            <circle cx="${x + w * 0.3}" cy="${y + h - th * 0.5}" r="${Math.max(2, w * 0.055)}" fill="var(--bg)" stroke="${stateColor}" stroke-width="1.3" />
+            <circle cx="${x + w * 0.7}" cy="${y + h - th * 0.5}" r="${Math.max(2, w * 0.055)}" fill="var(--bg)" stroke="${stateColor}" stroke-width="1.3" />
+
+            <!-- Live Status Indicator Window (Green = ON, Red = OFF) -->
+            <rect x="${x + w * 0.28}" y="${y + h * 0.165}" width="${w * 0.44}" height="${Math.max(5, h * 0.05)}" rx="2"
+              fill="${isSimOn ? onColor : "#ef4444"}" />
+
+            <!-- ON Label -->
+            <text class="shape-label" x="${cx}" y="${y + h * 0.295}" text-anchor="middle" dominant-baseline="middle"
+              fill="${isSimOn ? onColor : "var(--text-muted)"}" fill-opacity="${isSimOn ? 1 : 0.45}"
+              font-size="${mcbFontSize}" font-weight="800">${escapeHtml(onTxt)}</text>
+
+            <!-- Recessed Toggle Slot & Depth Shadow -->
+            <rect x="${slotX}" y="${slotY}" width="${slotW}" height="${slotH}" rx="3"
+              fill="var(--canvas-bg)" stroke="${stateColor}" stroke-width="1.2" stroke-opacity="0.7" />
+            <rect x="${slotX + 1}" y="${shadowY}" width="${slotW - 2}" height="${Math.max(2, shadowH)}" rx="2"
+              fill="#000000" fill-opacity="0.38" />
+
+            <!-- Movable MCB Toggle Lever (UP = ON, DOWN = OFF) -->
+            <rect x="${slotX - 2}" y="${leverY}" width="${slotW + 4}" height="${leverH}" rx="2.5"
+              fill="${stateColor}" stroke="var(--bg)" stroke-width="1" />
+            <line x1="${slotX + 3}" y1="${leverY + leverH / 2}" x2="${slotX + slotW - 3}" y2="${leverY + leverH / 2}"
+              stroke="var(--bg)" stroke-width="1.6" stroke-linecap="round" />
+
+            <!-- OFF Label -->
+            <text class="shape-label" x="${cx}" y="${y + h * 0.77}" text-anchor="middle" dominant-baseline="middle"
+              fill="${!isSimOn ? color : "var(--text-muted)"}" fill-opacity="${!isSimOn ? 1 : 0.45}"
+              font-size="${mcbFontSize}" font-weight="800">${escapeHtml(offTxt)}</text>
+
+            <!-- Switch Title Below MCB -->
+            ${
+              s.label
+                ? `<text class="shape-label" x="${cx}" y="${y + h + 14}" text-anchor="middle"
+                    fill="var(--text)" font-size="${fs}" font-weight="${fw}">${escapeHtml(s.label)}</text>`
+                : ""
+            }
+            <!-- Top Badge: Linked Count in Blueprint Mode, Live ON/OFF in Simulation Mode -->
+            <text class="shape-sublabel" x="${cx}" y="${y - 6}" text-anchor="middle"
+              fill="${appMode === "sim" ? stateColor : "var(--text-muted)"}">
+              ${appMode === "sim" ? (isSimOn ? `● ${onTxt}` : `○ ${offTxt}`) : `${linkedCount} linked`}
+            </text>
+          `;
         }
 
         const customOnVar =
-          s.type === "icon" ? `style="--on-color: ${onColor}"` : "";
+          s.type === "icon" || s.type === "mainswitch"
+            ? `style="--on-color: ${onColor}"`
+            : "";
 
         return `
           <g class="svg-shape-group ${hasLink ? "is-clickable" : ""} ${isSimOn ? "sim-on" : ""} ${s.locked ? "is-locked" : ""}"
@@ -3186,14 +3660,14 @@
         selectedList.forEach((s) => {
           const rot = Number(s.rotation) || 0;
           const { cx, cy } = getShapeCenter(s);
-          const rotAttr = rot ? `transform="rotate(${rot} ${cx} ${cy})"` : "";
+          const rotAttr = getShapeTransformAttr(s);
           const lockClass = s.locked ? "locked-box" : "";
           const b = getShapeBounds(s);
           const lockBadge = s.locked
             ? `<text x="${b.x + b.w}" y="${b.y - 6}" text-anchor="end" font-size="11" fill="var(--warn)" font-weight="700" style="pointer-events:none">🔒 Locked</text>`
             : "";
 
-          if (["rect", "door", "stair", "cut"].includes(s.type)) {
+          if (["rect", "door", "stair", "cut", "mainswitch"].includes(s.type)) {
             const w = s.w || 40;
             const h = s.type === "door" ? w : s.h;
             html += `
@@ -3283,8 +3757,8 @@
          ======================================================================== */
       function getSvgPoint(evt) {
         const rect = svgEl.getBoundingClientRect();
-        const scaleX = 920 / rect.width;
-        const scaleY = 600 / rect.height;
+        const scaleX = (building.width || 920) / rect.width;
+        const scaleY = (building.height || 600) / rect.height;
         return {
           x: Math.round((evt.clientX - rect.left) * scaleX),
           y: Math.round((evt.clientY - rect.top) * scaleY),
@@ -3658,6 +4132,38 @@
               startX: sx,
               startY: sy,
             };
+          } else if (activeTool === "mainswitch") {
+            const newShape = {
+              id: newId,
+              type: "mainswitch",
+              x: sx,
+              y: sy,
+              w: 60,
+              h: 100,
+              label: "Main MCB",
+              onLabel: "ON",
+              offLabel: "OFF",
+              color: "#ef4444",
+              onColor: "#22c55e",
+              strokeWidth: 2,
+              fillOpacity: 0.14,
+              dashed: false,
+              fontSize: 12,
+              fontWeight: "700",
+              rotation: 0,
+              locked: false,
+              link: {
+                type: "mainswitch",
+                targetIds: [],
+                unlockLocked: false,
+                lockRole: "admin",
+                authUser: "",
+                authPassHash: "",
+              },
+            };
+            floor.shapes.push(newShape);
+            selectSingleShape(newId);
+            selectTool("select");
           } else if (activeTool === "icon") {
             const acc =
               EXTRA_DEVICE_ICONS[activeAccessoryKey] ||
@@ -3727,7 +4233,7 @@
         window.addEventListener("mousemove", (e) => {
           const pt = getSvgPoint(e);
           document.getElementById("hudCursorPos").textContent =
-            `X: ${Math.max(0, Math.min(920, pt.x))}, Y: ${Math.max(0, Math.min(600, pt.y))}`;
+            `X: ${Math.max(0, Math.min(building.width || 920, pt.x))}, Y: ${Math.max(0, Math.min(building.height || 600, pt.y))}`;
 
           if (!dragState) return;
           const sx = snap(pt.x);
@@ -3963,6 +4469,14 @@
           ) {
             e.preventDefault();
             toggleLockSelected();
+          } else if (
+            !e.ctrlKey &&
+            !e.metaKey &&
+            e.key.toLowerCase() === "g" &&
+            selectedShapeIds.size
+          ) {
+            e.preventDefault();
+            toggleGroupSelected();
           } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
             e.preventDefault();
             undo();
@@ -4030,12 +4544,16 @@
         if (!s) return;
 
         // Ctrl+Click or Cmd+Click toggles shape in multi-selection
+        const groupMembers = s.groupId
+          ? floor.shapes.filter((x) => x.groupId === s.groupId).map((x) => x.id)
+          : [shapeId];
+
         if (e.ctrlKey || e.metaKey) {
-          if (selectedShapeIds.has(shapeId)) {
-            selectedShapeIds.delete(shapeId);
-          } else {
-            selectedShapeIds.add(shapeId);
-          }
+          const allIn = groupMembers.every((id) => selectedShapeIds.has(id));
+          groupMembers.forEach((id) => {
+            if (allIn) selectedShapeIds.delete(id);
+            else selectedShapeIds.add(id);
+          });
           const arr = [...selectedShapeIds];
           selectedShapeId = arr.length ? arr[arr.length - 1] : null;
           renderCanvas();
@@ -4044,8 +4562,10 @@
         }
 
         if (!selectedShapeIds.has(shapeId)) {
-          selectSingleShape(shapeId);
+          selectedShapeIds = new Set(groupMembers);
+          selectedShapeId = shapeId;
         } else {
+          groupMembers.forEach((id) => selectedShapeIds.add(id));
           selectedShapeId = shapeId;
         }
 
@@ -4124,6 +4644,49 @@
         );
       }
 
+      function isSelectionGrouped(list = getSelectedShapesList()) {
+        return (
+          list.length > 1 &&
+          !!list[0].groupId &&
+          list.every((s) => s.groupId === list[0].groupId)
+        );
+      }
+
+      function syncTopGroupButton() {
+        const list = getSelectedShapesList();
+        const btn = document.getElementById("topGroupBtn");
+        const lbl = document.getElementById("topGroupLabel");
+        if (!btn || !lbl) return;
+
+        const grouped = isSelectionGrouped(list);
+        btn.disabled = list.length < 2 && !grouped;
+        btn.className = grouped ? "btn btn-warn" : "btn";
+        lbl.textContent = grouped ? "Ungroup" : "Group";
+      }
+
+      function toggleGroupSelected() {
+        const list = getSelectedShapesList();
+        if (list.length < 2) {
+          return showToast("Select 2 or more shapes to Group");
+        }
+        pushUndo();
+        if (isSelectionGrouped(list)) {
+          const gid = list[0].groupId;
+          getActiveFloor().shapes.forEach((s) => {
+            if (s.groupId === gid) s.groupId = null;
+          });
+          showToast("Ungrouped shapes");
+        } else {
+          const newGid = "grp_" + Date.now().toString(36);
+          list.forEach((s) => {
+            s.groupId = newGid;
+          });
+          showToast(`Grouped ${list.length} shapes`);
+        }
+        renderCanvas();
+        updateInspector();
+      }
+
       function rotateSelectedBy(deltaDeg = 90) {
         const list = getSelectedShapesList();
         if (!list.length)
@@ -4133,10 +4696,35 @@
           return showToast("Selected shape is locked! Unlock it first.");
 
         pushUndo();
+        const isMulti = unlocked.length > 1;
+        const groupBox = isMulti ? getCombinedBounds(unlocked) : null;
+        const rad = (deltaDeg * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
         unlocked.forEach((s) => {
+          if (isMulti) {
+            const { cx, cy } = getShapeCenter(s);
+            const ncx =
+              groupBox.cx + (cx - groupBox.cx) * cos - (cy - groupBox.cy) * sin;
+            const ncy =
+              groupBox.cy + (cx - groupBox.cx) * sin + (cy - groupBox.cy) * cos;
+            const dx = Math.round(ncx - cx);
+            const dy = Math.round(ncy - cy);
+            if (s.type === "line") {
+              s.x1 += dx;
+              s.y1 += dy;
+              s.x2 += dx;
+              s.y2 += dy;
+            } else {
+              s.x += dx;
+              s.y += dy;
+            }
+          }
           const cur = Number(s.rotation) || 0;
           s.rotation = (((cur + deltaDeg) % 360) + 360) % 360;
         });
+
         renderCanvas();
         updateInspector();
         showToast(
@@ -4144,6 +4732,61 @@
             ? `Rotated to ${unlocked[0].rotation}°`
             : `Rotated ${unlocked.length} items by +${deltaDeg}°`,
         );
+      }
+
+      function flipSelected(axis) {
+        const unlocked = getSelectedShapesList().filter((s) => !s.locked);
+        if (!unlocked.length)
+          return showToast("Select an unlocked shape to flip");
+
+        pushUndo();
+        const isMulti = unlocked.length > 1;
+        const groupBox = isMulti ? getCombinedBounds(unlocked) : null;
+
+        unlocked.forEach((s) => {
+          const { cx, cy } = getShapeCenter(s);
+          const pivotX = isMulti ? groupBox.cx : cx;
+          const pivotY = isMulti ? groupBox.cy : cy;
+
+          if (s.type === "line") {
+            if (axis === "h") {
+              s.x1 = Math.round(2 * pivotX - s.x1);
+              s.x2 = Math.round(2 * pivotX - s.x2);
+            } else {
+              s.y1 = Math.round(2 * pivotY - s.y1);
+              s.y2 = Math.round(2 * pivotY - s.y2);
+            }
+            if (s.rotation) {
+              s.rotation = ((-Number(s.rotation) % 360) + 360) % 360;
+            }
+            return;
+          }
+
+          if (isMulti) {
+            if (
+              ["rect", "door", "stair", "cut", "mainswitch"].includes(s.type)
+            ) {
+              const w = s.w || 40;
+              const h = s.type === "door" ? w : s.h || 40;
+              if (axis === "h") s.x = Math.round(2 * pivotX - (s.x + w));
+              else s.y = Math.round(2 * pivotY - (s.y + h));
+            } else {
+              if (axis === "h") s.x = Math.round(2 * pivotX - s.x);
+              else s.y = Math.round(2 * pivotY - s.y);
+            }
+          }
+
+          if (axis === "h") s.flipX = !s.flipX;
+          else s.flipY = !s.flipY;
+
+          if (s.rotation) {
+            s.rotation = ((-Number(s.rotation) % 360) + 360) % 360;
+          }
+        });
+
+        renderCanvas();
+        updateInspector();
+        showToast(`Flipped ${axis === "h" ? "Horizontally" : "Vertically"}`);
       }
 
       /* ========================================================================
@@ -4157,6 +4800,11 @@
         if (!s || !s.link || s.link.type === "none") return;
 
         const { type, targetId, targetName } = s.link;
+
+        if (type === "mainswitch") {
+          executeMainSwitch(s);
+          return;
+        }
 
         if (type === "shortcut") {
           simSwitchStates[s.id] = !simSwitchStates[s.id];
@@ -4188,6 +4836,136 @@
           </div>
         `;
         document.getElementById("simActionModal").classList.add("open");
+      }
+
+      function verifyMainSwitchCredentials(link, hubCfg) {
+        if (!link.unlockLocked || !link.authUser || !link.authPassHash) {
+          return { ok: false, role: null };
+        }
+        const uName = String(link.authUser).trim().toLowerCase();
+        const user = (hubCfg?.admin?.users || []).find(
+          (u) =>
+            u.username.toLowerCase() === uName &&
+            u.passHash === link.authPassHash,
+        );
+        if (!user) return { ok: false, role: null };
+        if (link.lockRole === "admin" && user.role !== "admin") {
+          return { ok: false, role: null };
+        }
+        return { ok: true, role: user.role };
+      }
+
+      async function executeMainSwitch(shape) {
+        const link = shape.link;
+        const targetIds = Array.isArray(link.targetIds) ? link.targetIds : [];
+
+        // Toggle ON/OFF visual state immediately when clicked
+        const targetOn = !simSwitchStates[shape.id];
+        simSwitchStates[shape.id] = targetOn;
+        renderCanvas();
+
+        if (!targetIds.length) {
+          const label = shape.label || "Main Switch";
+          document.getElementById("simStatusText").textContent =
+            `${label} switched ${targetOn ? "ON" : "OFF"} (no shortcuts linked yet)`;
+          return showToast(
+            `${label}: ${targetOn ? "ON" : "OFF"} (no shortcuts connected)`,
+          );
+        }
+
+        const hubCfg = getHubConfig();
+        const allShortcuts = hubCfg?.shortcuts || [];
+        const auth = verifyMainSwitchCredentials(link, hubCfg);
+
+        const allowed = [];
+        let skipped = 0;
+
+        // 1. Fast in-memory role/lock check (zero modals)
+        for (const id of targetIds) {
+          const sc = allShortcuts.find((x) => x.id === id);
+          if (!sc) continue;
+
+          if (sc.locked) {
+            const scRole = sc.lockRole || "admin"; // "admin" | "all"
+            const canUnlock =
+              auth.ok && (scRole === "all" || auth.role === "admin");
+            if (!canUnlock) {
+              skipped++;
+              continue;
+            }
+          }
+          allowed.push(sc);
+        }
+
+        // 2. Fire all allowed ESP32 switch requests simultaneously
+        const timeoutMs = hubCfg?.settings?.pingTimeoutMs || 1500;
+        const results = await Promise.allSettled(
+          allowed.map(async (sc) => {
+            const host = cleanHostInput(sc.host);
+            if (!host) throw new Error("Invalid host");
+            const portPart =
+              sc.port && Number(sc.port) !== 80 ? `:${sc.port}` : "";
+            const url = `http://${host}${portPart}/api/switch/toggle`;
+            const rawKey = revealApiKey(sc.apiKey);
+            // Sends explicit "on" / "off" so all switches align to the Main Switch
+            const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=${targetOn ? "on" : "off"}&key=${encodeURIComponent(rawKey)}`;
+
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+            try {
+              const res = await fetch(url, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: bodyStr,
+                cache: "no-store",
+                signal: ctrl.signal,
+              });
+              const data = await res.json();
+              if (!res.ok || data.ok === false)
+                throw new Error(data.error || "Failed");
+              sc.state = data.state !== undefined ? !!data.state : targetOn;
+              return sc.id;
+            } finally {
+              clearTimeout(timer);
+            }
+          }),
+        );
+
+        // 3. Sync individual shortcut shapes on all floors so icons glow ON/OFF together
+        const succeededIds = new Set(
+          results.filter((r) => r.status === "fulfilled").map((r) => r.value),
+        );
+        // Offline preview fallback: still toggle visual states if no live hub shortcuts exist
+        const visualIds = allShortcuts.length
+          ? succeededIds
+          : new Set(targetIds);
+
+        building.floors.forEach((fl) => {
+          fl.shapes.forEach((sh) => {
+            if (
+              sh.link?.type === "shortcut" &&
+              visualIds.has(sh.link.targetId)
+            ) {
+              simSwitchStates[sh.id] = targetOn;
+            }
+          });
+        });
+
+        if (hubCfg) {
+          localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+        }
+        renderCanvas();
+
+        const okCount = allShortcuts.length
+          ? succeededIds.size
+          : targetIds.length;
+        const label = shape.label || "Main Switch";
+        const skipMsg = skipped ? `, ${skipped} skipped (locked)` : "";
+        const statusMsg = `${label} ${targetOn ? "ON" : "OFF"}: ${okCount} switched${skipMsg}`;
+        document.getElementById("simStatusText").textContent = statusMsg;
+        showToast(statusMsg);
       }
 
       function closeSimModal() {
@@ -4223,6 +5001,12 @@
             `${selectedShapeIds.size} ITEMS`;
 
           const list = getSelectedShapesList();
+          const grpBtn = document.getElementById("multiGroupBtn");
+          if (grpBtn) {
+            const grouped = isSelectionGrouped(list);
+            grpBtn.textContent = grouped ? "Ungroup" : "Group Selected";
+            grpBtn.className = grouped ? "btn btn-sm btn-warn" : "btn btn-sm";
+          }
           const allLocked = list.every((s) => s.locked);
           const lockBtn = document.getElementById("multiLockBtn");
           lockBtn.innerHTML = allLocked
@@ -4272,6 +5056,7 @@
           stair: "STAIR",
           cut: "ERASE",
           icon: "ACCESSORY",
+          mainswitch: "MAIN SWITCH",
           text: "TEXT",
         };
         document.getElementById("inspTypeTitle").textContent =
@@ -4294,11 +5079,14 @@
         document.getElementById("inspFontSize").value = s.fontSize || 13;
         document.getElementById("inspFontWeight").value = s.fontWeight || "700";
 
-        // General Device / Accessory Icon Selector & Turn On Color
+        // General Device / Accessory Icon Selector, MCB Labels & Turn On Color
         const devKindWrap = document.getElementById("inspDeviceKindWrap");
+        const mcbLabelsWrap = document.getElementById("inspMcbLabelsWrap");
         const onColorWrap = document.getElementById("inspOnColorWrap");
+
         if (s.type === "icon") {
           devKindWrap.style.display = "flex";
+          mcbLabelsWrap.style.display = "none";
           onColorWrap.style.display = "flex";
           const sel = document.getElementById("inspDeviceKindSelect");
           sel.innerHTML = Object.entries(EXTRA_DEVICE_ICONS)
@@ -4308,8 +5096,18 @@
             )
             .join("");
           renderInspectorOnColorSwatches(s.onColor || "#22c55e");
+        } else if (s.type === "mainswitch") {
+          devKindWrap.style.display = "none";
+          mcbLabelsWrap.style.display = "grid";
+          onColorWrap.style.display = "flex";
+          document.getElementById("inspOnLabel").value =
+            s.onLabel !== undefined ? s.onLabel : "ON";
+          document.getElementById("inspOffLabel").value =
+            s.offLabel !== undefined ? s.offLabel : "OFF";
+          renderInspectorOnColorSwatches(s.onColor || "#22c55e");
         } else {
           devKindWrap.style.display = "none";
+          mcbLabelsWrap.style.display = "none";
           onColorWrap.style.display = "none";
         }
 
@@ -4367,7 +5165,7 @@
         const sizeRow = document.getElementById("geomSizeRow");
         const hWrap = document.getElementById("geomHWrap");
 
-        if (["rect", "door", "stair", "cut"].includes(s.type)) {
+        if (["rect", "door", "stair", "cut", "mainswitch"].includes(s.type)) {
           document.getElementById("lblX1").textContent = "X Pos";
           document.getElementById("lblY1").textContent = "Y Pos";
           document.getElementById("lblW").textContent = "Width";
@@ -4467,7 +5265,7 @@
         const vW = Number(document.getElementById("inspW").value) || 10;
         const vH = Number(document.getElementById("inspH").value) || 10;
 
-        if (["rect", "door", "stair", "cut"].includes(s.type)) {
+        if (["rect", "door", "stair", "cut", "mainswitch"].includes(s.type)) {
           s.x = vX;
           s.y = vY;
           s.w = Math.max(10, vW);
@@ -4514,20 +5312,41 @@
       }
 
       function populateLinkControls(s) {
+        const typeWrap = document.getElementById("linkTypeWrap");
+        const targetWrap = document.getElementById("linkTargetWrap");
+        const msWrap = document.getElementById("mainSwitchConfigWrap");
+
+        // Dedicated Main Switch MCB shape -> always show Shortcut Checklist + Lock/Unlock Auth
+        if (s.type === "mainswitch") {
+          if (!s.link || s.link.type !== "mainswitch") {
+            s.link = {
+              type: "mainswitch",
+              targetIds: [],
+              unlockLocked: false,
+              lockRole: "admin",
+              authUser: "",
+              authPassHash: "",
+            };
+          }
+          typeWrap.style.display = "none";
+          targetWrap.style.display = "none";
+          msWrap.style.display = "flex";
+          renderMainSwitchControls(s);
+          return;
+        }
+
+        typeWrap.style.display = "flex";
+        msWrap.style.display = "none";
+
         const link = s.link || { type: "none", targetId: "", targetName: "" };
         document.getElementById("inspLinkType").value = link.type || "none";
-        const targetWrap = document.getElementById("linkTargetWrap");
-        const nameWrap = document.getElementById("linkCustomNameWrap");
 
         if (!link.type || link.type === "none") {
           targetWrap.style.display = "none";
-          nameWrap.style.display = "none";
           return;
         }
 
         targetWrap.style.display = "flex";
-        nameWrap.style.display = "flex";
-
         const list = getAvailableHubTargets(link.type);
         const sel = document.getElementById("inspLinkTarget");
         sel.innerHTML = list
@@ -4541,11 +5360,92 @@
           sel.value = link.targetId;
         } else if (list.length) {
           s.link.targetId = list[0].id;
-          s.link.targetName = s.link.targetName || list[0].name;
+          s.link.targetName = list[0].name;
           sel.value = list[0].id;
         }
-        document.getElementById("inspLinkTitle").value =
-          s.link.targetName || "";
+      }
+
+      function renderMainSwitchControls(s) {
+        const link = s.link;
+        const selectedIds = new Set(link.targetIds || []);
+        const hubCfg = getHubConfig();
+        const shortcuts = hubCfg?.shortcuts?.length
+          ? hubCfg.shortcuts
+          : DEMO_TARGETS.shortcut;
+
+        const box = document.getElementById("msShortcutsCheckList");
+        box.innerHTML = shortcuts.length
+          ? shortcuts
+              .map((sc) => {
+                const lockTag = sc.locked
+                  ? `<span class="badge" style="color:var(--warn)">🔒 ${sc.lockRole === "all" ? "Everyone" : "Admin"}</span>`
+                  : "";
+                return `
+            <label class="ms-check-item">
+              <span style="display:flex;align-items:center;gap:6px;min-width:0">
+                <input type="checkbox" value="${escapeHtml(sc.id)}" ${selectedIds.has(sc.id) ? "checked" : ""}
+                  onchange="onMainSwitchCheckToggle('${escapeHtml(sc.id)}', this.checked)" />
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(sc.name)}</span>
+              </span>
+              ${lockTag}
+            </label>`;
+              })
+              .join("")
+          : `<span style="font-size:0.74rem;color:var(--text-muted)">No shortcuts found in Hub config</span>`;
+
+        const isUnlock = !!link.unlockLocked;
+        document.getElementById("msUnlockMode").value = isUnlock
+          ? "unlock"
+          : "locked";
+        document.getElementById("msLockRole").value = link.lockRole || "admin";
+        document.getElementById("msRoleWrap").style.display = isUnlock
+          ? "flex"
+          : "none";
+        document.getElementById("msCredsWrap").style.display = isUnlock
+          ? "grid"
+          : "none";
+        document.getElementById("msAuthUser").value = link.authUser || "";
+        const passEl = document.getElementById("msAuthPass");
+        passEl.value = "";
+        passEl.placeholder = link.authPassHash
+          ? "Saved (leave blank to keep)"
+          : "Enter password";
+      }
+
+      function onMainSwitchCheckToggle(scId, checked) {
+        const s = getSelectedShape();
+        if (!s || !s.link) return;
+        const set = new Set(s.link.targetIds || []);
+        if (checked) set.add(scId);
+        else set.delete(scId);
+        s.link.targetIds = [...set];
+        renderCanvas();
+      }
+
+      function onMainSwitchAuthFieldChange() {
+        const s = getSelectedShape();
+        if (!s || !s.link) return;
+        const isUnlock =
+          document.getElementById("msUnlockMode").value === "unlock";
+        s.link.unlockLocked = isUnlock;
+        s.link.lockRole =
+          document.getElementById("msLockRole").value || "admin";
+        document.getElementById("msRoleWrap").style.display = isUnlock
+          ? "flex"
+          : "none";
+        document.getElementById("msCredsWrap").style.display = isUnlock
+          ? "grid"
+          : "none";
+
+        const user = document.getElementById("msAuthUser").value.trim();
+        const pass = document.getElementById("msAuthPass").value;
+        s.link.authUser = user;
+        if (user && pass) {
+          // Store only the hash (matches config.admin.users[].passHash)
+          s.link.authPassHash = hashCredential(user, pass);
+        } else if (!isUnlock) {
+          s.link.authPassHash = "";
+        }
       }
 
       function onLinkTypeChange(newType) {
@@ -4579,14 +5479,6 @@
           sel.options[sel.selectedIndex]?.dataset?.name || targetId;
         s.link.targetId = targetId;
         s.link.targetName = optName;
-        document.getElementById("inspLinkTitle").value = optName;
-        renderCanvas();
-      }
-
-      function updateSelectedLink(key, val) {
-        const s = getSelectedShape();
-        if (!s || !s.link) return;
-        s.link[key] = val;
         renderCanvas();
       }
 
@@ -4703,8 +5595,8 @@
          ======================================================================== */
       function adjustZoom(delta) {
         zoomLevel = Math.max(
-          0.5,
-          Math.min(1.8, +(zoomLevel + delta).toFixed(2)),
+          0.25,
+          Math.min(4.0, +(zoomLevel + delta).toFixed(2)),
         );
         applyZoom();
       }
@@ -4730,8 +5622,10 @@
       }
 
       function applyZoom() {
-        svgEl.style.width = `${Math.round(920 * zoomLevel)}px`;
-        svgEl.style.height = `${Math.round(600 * zoomLevel)}px`;
+        const w = building?.width || 920;
+        const h = building?.height || 600;
+        svgEl.style.width = `${Math.round(w * zoomLevel)}px`;
+        svgEl.style.height = `${Math.round(h * zoomLevel)}px`;
         document.getElementById("zoomLabel").textContent =
           `${Math.round(zoomLevel * 100)}%`;
       }
