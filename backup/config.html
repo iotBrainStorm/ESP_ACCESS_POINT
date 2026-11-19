@@ -2040,6 +2040,25 @@
             />
           </div>
         </div>
+
+        <div class="card-box">
+          <div class="toggle-row" style="padding: 0">
+            <div>
+              <div class="toggle-title">2D Home Blueprint Designer</div>
+              <div class="toggle-desc">
+                Open the floor plan editor to draw rooms and link smart devices
+                &amp; switches
+              </div>
+            </div>
+            <a
+              href="design.html"
+              class="btn btn-primary"
+              style="text-decoration: none; white-space: nowrap"
+            >
+              Go to Design
+            </a>
+          </div>
+        </div>
       </section>
 
       <!-- TAB 9: NVS & BACKUP -->
@@ -2173,9 +2192,9 @@
               placeholder="e.g. Living Room"
             />
           </div>
-          <div class="field">
-            <label>Group (Default: None)</label>
-            <select id="devGroup" class="select"></select>
+          <div class="field" style="grid-column: 1 / -1">
+            <label>Groups (Select One or Multiple)</label>
+            <div class="check-list-box" id="devGroupsBox"></div>
           </div>
           <div class="field">
             <label>IPv4 Address</label>
@@ -2297,9 +2316,9 @@
               placeholder="e.g. COMPUTER"
             />
           </div>
-          <div class="field">
-            <label>Group (Optional)</label>
-            <select id="scGroup" class="select"></select>
+          <div class="field" style="grid-column: 1 / -1">
+            <label>Groups (Select One or Multiple)</label>
+            <div class="check-list-box" id="scGroupsBox"></div>
           </div>
           <div class="field">
             <label>IP / Hostname *</label>
@@ -2611,6 +2630,8 @@
           '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
         flame:
           '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+        terminal:
+          '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
         star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
       };
 
@@ -2828,31 +2849,57 @@
         );
       }
 
-      function populateGroupSelect(selectId, selectedVal = "none") {
-        const sel = document.getElementById(selectId);
-        let html = `<option value="none">None</option>`;
-        html += config.groups
+      // function populateGroupSelect(selectId, selectedVal = "none") {
+      //   const sel = document.getElementById(selectId);
+      //   let html = `<option value="none">None</option>`;
+      //   html += config.groups
+      //     .map(
+      //       (g) =>
+      //         `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`,
+      //     )
+      //     .join("");
+      //   sel.innerHTML = html;
+      //   sel.value =
+      //     selectedVal &&
+      //     (selectedVal === "none" ||
+      //       config.groups.some((g) => g.id === selectedVal))
+      //       ? selectedVal
+      //       : "none";
+      // }
+
+      function getItemGroups(item) {
+        if (!item) return [];
+        if (Array.isArray(item.groups)) {
+          return item.groups.filter((gid) => gid && gid !== "none");
+        }
+        return item.group && item.group !== "none" ? [item.group] : [];
+      }
+
+      function populateGroupCheckboxes(
+        containerId,
+        inputName,
+        selectedGroups = [],
+      ) {
+        const box = document.getElementById(containerId);
+        if (!box) return;
+        const selectedSet = new Set(selectedGroups);
+        if (!config.groups.length) {
+          box.innerHTML = `<span style="color:var(--text-muted);font-size:0.76rem">No groups created yet</span>`;
+          return;
+        }
+        box.innerHTML = config.groups
           .map(
             (g) =>
-              `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`,
+              `<label class="check-item"><input type="checkbox" name="${inputName}" value="${escapeHtml(g.id)}" ${selectedSet.has(g.id) ? "checked" : ""}/> <span>${escapeHtml(g.name)}</span></label>`,
           )
           .join("");
-        sel.innerHTML = html;
-        sel.value =
-          selectedVal &&
-          (selectedVal === "none" ||
-            config.groups.some((g) => g.id === selectedVal))
-            ? selectedVal
-            : "none";
       }
 
       /* ============================================================================
          4. CRYPTOGRAPHY, SANITIZATION & CONFIG STATE
          ============================================================================ */
       function hashCredential(username, password) {
-        const cleanUser = String(username || "")
-          .trim()
-          .toLowerCase();
+        const cleanUser = String(username || "").trim();
         const raw = `${cleanUser}:${String(password || "")}:${KEY_SALT}`;
         let h1 = 0xdeadbeef ^ raw.length,
           h2 = 0x41c6ce57 ^ raw.length;
@@ -3096,6 +3143,25 @@
         merged.shortcuts.forEach((s) => {
           if (s.apiKey) s.apiKey = encodeApiKey(s.apiKey);
         });
+        const validGroupIds = new Set(merged.groups.map((g) => g.id));
+        merged.devices.forEach((d) => {
+          const list = Array.isArray(d.groups)
+            ? d.groups
+            : d.group && d.group !== "none"
+              ? [d.group]
+              : [];
+          d.groups = [...new Set(list.filter((gid) => validGroupIds.has(gid)))];
+          d.group = d.groups[0] || "none";
+        });
+        merged.shortcuts.forEach((s) => {
+          const list = Array.isArray(s.groups)
+            ? s.groups
+            : s.group && s.group !== "none"
+              ? [s.group]
+              : [];
+          s.groups = [...new Set(list.filter((gid) => validGroupIds.has(gid)))];
+          s.group = s.groups[0] || "none";
+        });
         syncPinsToFavorites(merged);
         return merged;
       }
@@ -3317,12 +3383,10 @@
       }
 
       function verifyCredentials(username, password, roleRequirement) {
-        const uName = String(username || "")
-          .trim()
-          .toLowerCase();
+        const uName = String(username || "").trim();
         const hash = hashCredential(uName, password);
         const user = (config.admin?.users || []).find(
-          (u) => u.username.toLowerCase() === uName && u.passHash === hash,
+          (u) => u.username === uName && u.passHash === hash,
         );
         if (!user) return { ok: false, msg: "Invalid username or password" };
         if (roleRequirement === "admin" && user.role !== "admin") {
@@ -3534,10 +3598,39 @@
         list.innerHTML = filtered
           .map((dev) => {
             const idx = config.devices.indexOf(dev);
-            const g = config.groups.find((x) => x.id === dev.group);
-            const groupLabel = g ? g.name : "None (Hidden on Home)";
+            const assignedGroups = getItemGroups(dev)
+              .map((gid) => config.groups.find((x) => x.id === gid))
+              .filter(Boolean);
+            const groupBadges = assignedGroups.length
+              ? assignedGroups
+                  .map(
+                    (g) => `<span class="badge">${escapeHtml(g.name)}</span>`,
+                  )
+                  .join("")
+              : `<span class="badge">None (Hidden on Home)</span>`;
             const idSafe = escapeHtml(dev.id);
             const colorSafe = escapeHtml(dev.color || "#38bdf8");
+
+            const portPart =
+              dev.port && Number(dev.port) !== 80 ? `:${dev.port}` : "";
+            let pathPart = dev.path || "/";
+            if (!pathPart.startsWith("/") && !pathPart.startsWith(":")) {
+              pathPart = "/" + pathPart;
+            }
+            const makeHostLink = (host) => {
+              const h = cleanHost(host);
+              const href = pathPart.startsWith(":")
+                ? `http://${h}${pathPart}`
+                : `http://${h}${portPart}${pathPart}`;
+              return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${escapeHtml(h)}${escapeHtml(portPart)}</a>`;
+            };
+            const addrLinks = [];
+            if (dev.ip) addrLinks.push(makeHostLink(dev.ip));
+            if (dev.mdns) addrLinks.push(makeHostLink(dev.mdns));
+            const subHtml = addrLinks.length
+              ? addrLinks.join(" &bull; ")
+              : "No IP";
+
             return `
               <div class="dev-row">
                 <div class="dev-row-left">
@@ -3546,9 +3639,9 @@
                     <div class="dev-row-title">
                       ${escapeHtml(dev.name)}
                       ${dev.fav ? '<span style="color:#fbbf24">&#9733;</span>' : ""}
-                      <span class="badge">${escapeHtml(groupLabel)}</span>
+                      ${groupBadges}
                     </div>
-                    <div class="dev-row-sub">${escapeHtml(dev.ip || "No IP")} ${dev.mdns ? "• " + escapeHtml(dev.mdns) : ""}</div>
+                    <div class="dev-row-sub">${subHtml}</div>
                   </div>
                 </div>
                 <div class="row-actions">
@@ -3626,7 +3719,11 @@
         document.getElementById("devNote").value = dev?.note || "";
         document.getElementById("devFav").checked = !!dev?.fav;
 
-        populateGroupSelect("devGroup", dev?.group || "none");
+        populateGroupCheckboxes(
+          "devGroupsBox",
+          "devGroupCheck",
+          getItemGroups(dev),
+        );
 
         selectedIcon = dev?.icon || "chip";
         selectedColor = dev?.color || "#38bdf8";
@@ -3712,6 +3809,10 @@
         const id = editingDeviceId || "d" + Date.now().toString(36);
         const fav = document.getElementById("devFav").checked;
 
+        const devGroups = Array.from(
+          document.querySelectorAll('input[name="devGroupCheck"]:checked'),
+        ).map((el) => el.value);
+
         const payload = {
           id,
           name,
@@ -3722,7 +3823,8 @@
           altLabel: document.getElementById("devAltLabel").value.trim(),
           altPath: document.getElementById("devAltPath").value.trim(),
           note: document.getElementById("devNote").value.trim(),
-          group: document.getElementById("devGroup").value || "none",
+          groups: devGroups,
+          group: devGroups[0] || "none",
           icon: selectedIcon,
           color: selectedColor,
           fav,
@@ -3781,12 +3883,22 @@
         list.innerHTML = filtered
           .map((sc) => {
             const idx = config.shortcuts.indexOf(sc);
-            const g = config.groups.find((x) => x.id === sc.group);
+            const assignedGroups = getItemGroups(sc)
+              .map((gid) => config.groups.find((x) => x.id === gid))
+              .filter(Boolean);
+            const groupBadges = assignedGroups.length
+              ? assignedGroups
+                  .map(
+                    (g) => `<span class="badge">${escapeHtml(g.name)}</span>`,
+                  )
+                  .join("")
+              : `<span class="badge">None</span>`;
             const idSafe = escapeHtml(sc.id);
             const colorSafe = escapeHtml(sc.color || "#38bdf8");
             const isHidden = !!sc.hidden;
             const isLocked = !!sc.locked;
             const roleTxt = sc.lockRole === "all" ? "Everyone" : "Admin";
+
             return `
               <div class="dev-row" style="${isHidden ? "opacity:0.55" : ""}">
                 <div class="dev-row-left">
@@ -3797,7 +3909,7 @@
                       ${sc.fav ? '<span style="color:#fbbf24">&#9733;</span>' : ""}
                       <span class="badge" style="color:${isLocked ? "var(--warn)" : "var(--text-muted)"}">${isLocked ? `Locked (${roleTxt})` : "Unlocked"}</span>
                       ${isHidden ? '<span class="badge" style="color:var(--err)">Hidden</span>' : ""}
-                      <span class="badge">${escapeHtml(g ? g.name : "None")}</span>
+                      ${groupBadges}
                       <span class="badge">Index: ${sc.index ?? 0}</span>
                     </div>
                     <div class="dev-row-sub">${escapeHtml(sc.host)}:${sc.port || 80} • Key: ${escapeHtml(maskApiKey(sc.apiKey))}</div>
@@ -3913,7 +4025,11 @@
         document.getElementById("scLockRole").value = sc?.lockRole || "admin";
         toggleScLockRoleUI(isLocked);
 
-        populateGroupSelect("scGroup", sc?.group || "none");
+        populateGroupCheckboxes(
+          "scGroupsBox",
+          "scGroupCheck",
+          getItemGroups(sc),
+        );
 
         scSelectedIcon = sc?.icon || "switch";
         scSelectedColor = sc?.color || "#38bdf8";
@@ -3953,7 +4069,8 @@
       }
 
       async function testShortcutConnection() {
-        const name = document.getElementById("scName").value.trim() || "Switch";
+        const typedName =
+          document.getElementById("scName").value.trim() || "Switch";
         const host = cleanHost(document.getElementById("scHost").value);
         const port = Number(document.getElementById("scPort").value) || 80;
         const index = Number(document.getElementById("scIndex").value) || 0;
@@ -3973,12 +4090,12 @@
         btn.textContent = "Checking...";
 
         const portPart = port !== 80 ? `:${port}` : "";
-        const url = `http://${host}${portPart}/api/switch/toggle`;
+        const baseUrl = `http://${host}${portPart}`;
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), 2500);
 
         try {
-          const res = await fetch(url, {
+          const res = await fetch(`${baseUrl}/api/switch/toggle`, {
             method: "POST",
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
@@ -3991,8 +4108,45 @@
           if (!res.ok || data.ok === false) {
             throw new Error(data.error || "Auth Failed");
           }
+
+          // 1. Read actual switch name directly from /api/switch/toggle reply
+          let actualName =
+            data.name || data.switchName || data.label || data.title || "";
+
+          // 2. Fallback: fetch /api/switches if name wasn't included in toggle response
+          if (!actualName) {
+            try {
+              const swRes = await fetch(`${baseUrl}/api/switches`, {
+                cache: "no-store",
+                signal: ctrl.signal,
+              });
+              if (swRes.ok) {
+                const swData = await swRes.json();
+                if (Array.isArray(swData.names) && swData.names[index]) {
+                  actualName = String(swData.names[index]).trim();
+                } else if (
+                  Array.isArray(swData.switches) &&
+                  swData.switches[index]
+                ) {
+                  const swItem = swData.switches[index];
+                  actualName = String(
+                    typeof swItem === "string"
+                      ? swItem
+                      : swItem.name || swItem.label || "",
+                  ).trim();
+                }
+              }
+            } catch (_) {}
+          }
+
+          if (actualName) {
+            document.getElementById("scName").value = actualName;
+            showToast(`Fetched switch name: ${actualName}`);
+          }
+
+          const finalName = actualName || typedName;
           const stateStr = data.state ? "ON" : "OFF";
-          btn.textContent = `OK: ${name} is ${stateStr}`;
+          btn.textContent = `OK: ${finalName} is ${stateStr}`;
           btn.className = "btn btn-sm conn-ok";
         } catch (err) {
           btn.textContent = err.message || "Unreachable / Invalid Key";
@@ -4026,6 +4180,10 @@
         const id = editingShortcutId || "s" + Date.now().toString(36);
         const existing = config.shortcuts.find((s) => s.id === id);
 
+        const scGroups = Array.from(
+          document.querySelectorAll('input[name="scGroupCheck"]:checked'),
+        ).map((el) => el.value);
+
         const payload = {
           id,
           name,
@@ -4033,7 +4191,8 @@
           port,
           index,
           apiKey,
-          group: document.getElementById("scGroup").value || "none",
+          groups: scGroups,
+          group: scGroups[0] || "none",
           icon: scSelectedIcon,
           color: scSelectedColor,
           fav,
@@ -4095,11 +4254,11 @@
         list.innerHTML = filtered
           .map((g) => {
             const idx = config.groups.indexOf(g);
-            const devCount = config.devices.filter(
-              (d) => d.group === g.id,
+            const devCount = config.devices.filter((d) =>
+              getItemGroups(d).includes(g.id),
             ).length;
-            const scCount = config.shortcuts.filter(
-              (s) => s.group === g.id,
+            const scCount = config.shortcuts.filter((s) =>
+              getItemGroups(s).includes(g.id),
             ).length;
             const gIdSafe = escapeHtml(g.id);
             const colorSafe = escapeHtml(g.color || "#38bdf8");
@@ -4170,10 +4329,12 @@
           return;
         config.groups = config.groups.filter((g) => g.id !== id);
         config.devices.forEach((d) => {
-          if (d.group === id) d.group = "none";
+          d.groups = getItemGroups(d).filter((gid) => gid !== id);
+          d.group = d.groups[0] || "none";
         });
         config.shortcuts.forEach((s) => {
-          if (s.group === id) s.group = "none";
+          s.groups = getItemGroups(s).filter((gid) => gid !== id);
+          s.group = s.groups[0] || "none";
         });
         config.favorites.forEach((f) => {
           if (Array.isArray(f.groupIds)) {
@@ -4201,7 +4362,8 @@
         } else {
           devBox.innerHTML = config.devices
             .map((d) => {
-              const checked = id && d.group === id ? "checked" : "";
+              const checked =
+                id && getItemGroups(d).includes(id) ? "checked" : "";
               return `<label class="check-item"><input type="checkbox" name="grpDevCheck" value="${escapeHtml(d.id)}" ${checked}/> <span>${escapeHtml(d.name)}</span></label>`;
             })
             .join("");
@@ -4213,7 +4375,8 @@
         } else {
           scBox.innerHTML = config.shortcuts
             .map((s) => {
-              const checked = id && s.group === id ? "checked" : "";
+              const checked =
+                id && getItemGroups(s).includes(id) ? "checked" : "";
               return `<label class="check-item"><input type="checkbox" name="grpScCheck" value="${escapeHtml(s.id)}" ${checked}/> <span>${escapeHtml(s.name)}</span></label>`;
             })
             .join("");
@@ -4265,11 +4428,11 @@
           ).map((el) => el.value),
         );
         config.devices.forEach((d) => {
-          if (checkedDevs.has(d.id)) {
-            d.group = id;
-          } else if (editingGroupId && d.group === id) {
-            d.group = "none";
-          }
+          const gSet = new Set(getItemGroups(d));
+          if (checkedDevs.has(d.id)) gSet.add(id);
+          else if (editingGroupId) gSet.delete(id);
+          d.groups = [...gSet];
+          d.group = d.groups[0] || "none";
         });
 
         const checkedScs = new Set(
@@ -4278,11 +4441,11 @@
           ).map((el) => el.value),
         );
         config.shortcuts.forEach((s) => {
-          if (checkedScs.has(s.id)) {
-            s.group = id;
-          } else if (editingGroupId && s.group === id) {
-            s.group = "none";
-          }
+          const gSet = new Set(getItemGroups(s));
+          if (checkedScs.has(s.id)) gSet.add(id);
+          else if (editingGroupId) gSet.delete(id);
+          s.groups = [...gSet];
+          s.group = s.groups[0] || "none";
         });
 
         markDirty();
@@ -5400,11 +5563,7 @@
 
         if (!uName || !uPass)
           return showToast("Enter both username and password");
-        if (
-          config.admin.users.some(
-            (u) => u.username.toLowerCase() === uName.toLowerCase(),
-          )
-        ) {
+        if (config.admin.users.some((u) => u.username === uName)) {
           return showToast("Username already exists");
         }
 

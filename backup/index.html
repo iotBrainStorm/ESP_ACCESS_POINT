@@ -494,6 +494,24 @@
         text-overflow: ellipsis;
       }
 
+      .sc-right {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .sc-lock-ico {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        opacity: 0.65;
+      }
+      .sc-lock-ico.locked {
+        color: var(--warn);
+        opacity: 1;
+      }
+
       .sc-pill {
         font-size: 0.7rem;
         font-weight: 700;
@@ -1557,6 +1575,10 @@
         home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
         door: '<path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14"/><path d="M2 20h20"/><path d="M14 12v.01"/>',
         lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        unlock:
+          '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+        terminal:
+          '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
         bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
         clock:
           '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
@@ -1674,8 +1696,22 @@
         return `${cleanHost}${portPart}`;
       }
 
-      function getGroupName(id) {
-        const g = config.groups.find((x) => x.id === id);
+      function getItemGroups(item) {
+        if (!item) return [];
+        if (Array.isArray(item.groups)) {
+          return item.groups.filter((gid) => gid && gid !== "none");
+        }
+        return item.group && item.group !== "none" ? [item.group] : [];
+      }
+
+      function getGroupName(idOrItem) {
+        if (idOrItem && typeof idOrItem === "object") {
+          const names = getItemGroups(idOrItem)
+            .map((gid) => config.groups.find((x) => x.id === gid)?.name)
+            .filter(Boolean);
+          return names.length ? names.join(", ") : "None";
+        }
+        const g = config.groups.find((x) => x.id === idOrItem);
         return g ? g.name : "None";
       }
 
@@ -1709,9 +1745,7 @@
       }
 
       function hashCredential(username, password) {
-        const cleanUser = String(username || "")
-          .trim()
-          .toLowerCase();
+        const cleanUser = String(username || "").trim(); // Case-sensitive
         const raw = `${cleanUser}:${String(password || "")}:${KEY_SALT}`;
         let h1 = 0xdeadbeef ^ raw.length,
           h2 = 0x41c6ce57 ^ raw.length;
@@ -1942,6 +1976,25 @@
         merged.shortcuts.forEach((s) => {
           if (s.apiKey) s.apiKey = encodeApiKey(s.apiKey);
         });
+        const validGroupIds = new Set(merged.groups.map((g) => g.id));
+        merged.devices.forEach((d) => {
+          const list = Array.isArray(d.groups)
+            ? d.groups
+            : d.group && d.group !== "none"
+              ? [d.group]
+              : [];
+          d.groups = [...new Set(list.filter((gid) => validGroupIds.has(gid)))];
+          d.group = d.groups[0] || "none";
+        });
+        merged.shortcuts.forEach((s) => {
+          const list = Array.isArray(s.groups)
+            ? s.groups
+            : s.group && s.group !== "none"
+              ? [s.group]
+              : [];
+          s.groups = [...new Set(list.filter((gid) => validGroupIds.has(gid)))];
+          s.group = s.groups[0] || "none";
+        });
         syncPinsToFavorites(merged);
         return merged;
       }
@@ -2054,12 +2107,10 @@
       }
 
       function verifyCredentials(username, password, roleRequirement) {
-        const uName = String(username || "")
-          .trim()
-          .toLowerCase();
+        const uName = String(username || "").trim(); // Case-sensitive
         const hash = hashCredential(uName, password);
         const user = (config.admin?.users || []).find(
-          (u) => u.username.toLowerCase() === uName && u.passHash === hash,
+          (u) => u.username === uName && u.passHash === hash,
         );
         if (!user) return { ok: false, msg: "Invalid username or password" };
         if (roleRequirement === "admin" && user.role !== "admin") {
@@ -2702,6 +2753,7 @@
         const isBusy = !!shortcutBusy[sc.id];
         const isOn = !!sc.state;
         const st = shortcutStatus[sc.id] || "checking";
+        const isLocked = !!sc.locked;
 
         return `
           <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" data-sc-card-id="${idSafe}" style="--sc-color:${colorSafe}" onclick="triggerShortcut('${idSafe}', event)">
@@ -2714,7 +2766,12 @@
                 </div>
               </div>
             </div>
-            <span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>
+            <div class="sc-right">
+              <span class="sc-lock-ico ${isLocked ? "locked" : ""}" title="${isLocked ? "Locked" : "Unlocked"}">
+                ${svgIcon(isLocked ? "lock" : "unlock", 13)}
+              </span>
+              <span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>
+            </div>
           </div>
         `;
       }
@@ -2735,7 +2792,7 @@
                 <span class="dot ${st}" data-status-id="${idSafe}" title="Status: ${st}"></span>
                 <h2 class="dev-name">${escapeHtml(dev.name)}</h2>
               </div>
-              <div class="dev-meta">${escapeHtml(dev.note || getGroupName(dev.group))}</div>
+              <div class="dev-meta">${escapeHtml(dev.note || getGroupName(dev))}</div>
             </div>
             <button class="fav-btn ${dev.fav ? "active" : ""}" title="Pin to Favorites" onclick="toggleFavorite(event, '${idSafe}')">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="${dev.fav ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -2794,7 +2851,12 @@
                       </div>
                     </div>
                   </div>
-                  <span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>
+                  <div class="sc-right">
+                    <span class="sc-lock-ico ${sc.locked ? "locked" : ""}" title="${sc.locked ? "Locked" : "Unlocked"}">
+                      ${svgIcon(sc.locked ? "lock" : "unlock", 13)}
+                    </span>
+                    <span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>
+                  </div>
                 </div>
               `;
             }
@@ -2892,10 +2954,10 @@
         const allScIds = new Set(sIds);
         gIds.forEach((gid) => {
           config.devices
-            .filter((d) => d.group === gid)
+            .filter((d) => getItemGroups(d).includes(gid))
             .forEach((d) => allDevIds.add(d.id));
           config.shortcuts
-            .filter((s) => s.group === gid)
+            .filter((s) => getItemGroups(s).includes(gid))
             .forEach((s) => allScIds.add(s.id));
         });
 
@@ -2971,15 +3033,12 @@
         const query = searchInput.value.trim().toLowerCase();
 
         const visibleDevices = config.devices.filter((d) => {
-          if (
-            !d.group ||
-            d.group === "none" ||
-            !config.groups.some((g) => g.id === d.group)
-          ) {
-            return false;
-          }
+          const dGroups = getItemGroups(d).filter((gid) =>
+            config.groups.some((g) => g.id === gid),
+          );
+          if (!dGroups.length) return false;
           if (!query) return true;
-          const gName = getGroupName(d.group).toLowerCase();
+          const gName = getGroupName(d).toLowerCase();
           return (
             (d.name && d.name.toLowerCase().includes(query)) ||
             (d.ip && d.ip.toLowerCase().includes(query)) ||
@@ -2994,11 +3053,13 @@
 
         config.groups.forEach((g) => {
           if (g.hidden) return;
-          const groupDevs = visibleDevices.filter((d) => d.group === g.id);
+          const groupDevs = visibleDevices.filter((d) =>
+            getItemGroups(d).includes(g.id),
+          );
           const groupShortcuts = (config.shortcuts || []).filter(
             (s) =>
               !s.hidden &&
-              s.group === g.id &&
+              getItemGroups(s).includes(g.id) &&
               (!query ||
                 (s.name && s.name.toLowerCase().includes(query)) ||
                 (s.host && s.host.toLowerCase().includes(query))),
@@ -3008,16 +3069,16 @@
           const totalCount = groupDevs.length + groupShortcuts.length;
 
           html += `
-            <section class="group-block" id="group-block-${escapeHtml(g.id)}">
-              <div class="group-header">
-                <span class="group-bar" style="background:${escapeHtml(g.color)}"></span>
-                <h3 class="group-title">${escapeHtml(g.name)}</h3>
-                <span class="tab-count">${totalCount}</span>
-              </div>
-              ${groupShortcuts.length ? `<div class="shortcut-grid" style="margin-bottom:${groupDevs.length ? "12px" : "0"}">${groupShortcuts.map(createShortcutHtml).join("")}</div>` : ""}
-              ${groupDevs.length ? `<div class="${gridClass}">${groupDevs.map(createCardHtml).join("")}</div>` : ""}
-            </section>
-          `;
+          <section class="group-block" id="group-block-${escapeHtml(g.id)}">
+            <div class="group-header">
+              <span class="group-bar" style="background:${escapeHtml(g.color)}"></span>
+              <h3 class="group-title">${escapeHtml(g.name)}</h3>
+              <span class="tab-count">${totalCount}</span>
+            </div>
+            ${groupShortcuts.length ? `<div class="shortcut-grid" style="margin-bottom:${groupDevs.length ? "12px" : "0"}">${groupShortcuts.map(createShortcutHtml).join("")}</div>` : ""}
+            ${groupDevs.length ? `<div class="${gridClass}">${groupDevs.map(createCardHtml).join("")}</div>` : ""}
+          </section>
+        `;
         });
 
         if (!html) {

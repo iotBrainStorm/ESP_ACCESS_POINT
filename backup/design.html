@@ -662,6 +662,43 @@
         cursor: default;
       }
 
+      .canvas-viewport.tool-cut {
+        cursor: cell;
+      }
+
+      /* Select Tool: Highlight whichever shape will be selected on click */
+      .workspace:not(.sim-active)
+        .canvas-viewport.tool-select
+        .svg-shape-group:hover
+        .shape-prim {
+        stroke: #facc15 !important;
+        filter: drop-shadow(0 0 7px rgba(250, 204, 21, 0.75));
+      }
+      .workspace:not(.sim-active)
+        .canvas-viewport.tool-select
+        .svg-shape-group.is-locked:hover
+        .shape-prim {
+        stroke: var(--warn) !important;
+        filter: drop-shadow(0 0 7px rgba(245, 158, 11, 0.7));
+      }
+
+      /* Erase Tool: Highlight target in red before erasing */
+      .workspace:not(.sim-active)
+        .canvas-viewport.tool-cut
+        .svg-shape-group:not(.is-locked):hover
+        .shape-prim {
+        stroke: var(--err) !important;
+        filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.85));
+      }
+
+      /* Prevent cut masks from blocking clicks on rooms/accessories in Select mode */
+      .canvas-viewport.tool-select .svg-shape-group.is-cut-mask {
+        pointer-events: none;
+      }
+      .canvas-viewport.tool-cut .svg-shape-group.is-cut-mask {
+        pointer-events: all;
+      }
+
       svg#floorSvg {
         background: var(--canvas-bg);
         border: 1px solid var(--border);
@@ -836,6 +873,102 @@
         transform: translateY(0);
       }
 
+      /* Verification Auth Modal (Matches index.html & config.html) */
+      .pin-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.78);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 95;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition:
+          opacity 0.22s ease,
+          visibility 0.22s ease;
+      }
+      .pin-overlay.open {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+      }
+      .pin-card {
+        width: 100%;
+        max-width: 370px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 22px;
+        text-align: left;
+      }
+      .auth-status-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        margin-bottom: 12px;
+        font-size: 0.74rem;
+        font-weight: 600;
+      }
+      .auth-status-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--card);
+        border: 1px solid var(--border);
+      }
+      .meter-bar {
+        width: 100%;
+        height: 8px;
+        background: var(--bg);
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+      }
+      .meter-fill {
+        height: 100%;
+        background: var(--accent);
+        transition: width 0.15s;
+      }
+      .sim-item-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 11px;
+        border-radius: 10px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        margin-bottom: 7px;
+      }
+      .sim-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+        background: var(--text-muted);
+      }
+      .sim-dot.online {
+        background: var(--ok);
+      }
+      .sim-dot.offline {
+        background: var(--err);
+      }
+      .sim-dot.checking {
+        background: var(--warn);
+      }
+
       @media (max-width: 1024px) {
         .workspace {
           --left-w: 255px;
@@ -876,6 +1009,109 @@
     </style>
   </head>
   <body>
+    <!-- Universal User Verification Modal -->
+    <div class="pin-overlay" id="authModal">
+      <div class="pin-card">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+          "
+        >
+          <h3 id="authModalTitle" style="margin: 0; font-size: 1rem">
+            Verification Required
+          </h3>
+          <button type="button" class="btn btn-sm" onclick="closeAuthModal()">
+            &times;
+          </button>
+        </div>
+        <p
+          id="authModalSub"
+          style="
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+          "
+        >
+          Sign in to continue
+        </p>
+        <div id="authLiveStatus" class="auth-status-bar"></div>
+        <div class="field" style="margin-bottom: 10px">
+          <label>Username</label>
+          <input
+            type="text"
+            id="authUser"
+            class="input"
+            placeholder="esp"
+            autocomplete="username"
+          />
+        </div>
+        <div class="field" style="margin-bottom: 14px">
+          <label>Password</label>
+          <input
+            type="password"
+            id="authPass"
+            class="input"
+            placeholder="••••••"
+            autocomplete="current-password"
+          />
+        </div>
+        <div
+          id="forgetBootBox"
+          style="
+            display: none;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid var(--warn);
+            background: rgba(245, 158, 11, 0.1);
+            margin-bottom: 12px;
+            font-size: 0.76rem;
+          "
+        >
+          <div id="forgetBootText" style="font-weight: 700; color: var(--warn)">
+            Hold ESP32 BOOT button now (5.0s)...
+          </div>
+          <div class="meter-bar" style="margin-top: 6px">
+            <div
+              class="meter-fill"
+              id="forgetBootBar"
+              style="width: 100%; background: var(--warn)"
+            ></div>
+          </div>
+        </div>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+          "
+        >
+          <button
+            type="button"
+            class="btn btn-sm btn-danger"
+            onclick="triggerForgetUsers()"
+          >
+            Forget
+          </button>
+          <div style="display: flex; gap: 8px">
+            <button type="button" class="btn btn-sm" onclick="closeAuthModal()">
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-primary"
+              id="authVerifyBtn"
+              onclick="submitAuthModal()"
+            >
+              Verify
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- ========================================================================
          TOP NAVIGATION BAR
          ======================================================================== -->
@@ -1380,6 +1616,7 @@
                 class="select"
                 onchange="
                   showDimensions = this.value === '1';
+                  building.showDimensions = showDimensions;
                   renderCanvas();
                 "
               >
@@ -2068,18 +2305,6 @@
           id="simModalBody"
           style="font-size: 0.85rem; line-height: 1.5"
         ></div>
-        <div
-          style="
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-            margin-top: 16px;
-          "
-        >
-          <button class="btn btn-primary" onclick="closeSimModal()">
-            Done
-          </button>
-        </div>
       </div>
     </div>
 
@@ -2103,9 +2328,7 @@
       }
 
       function hashCredential(username, password) {
-        const cleanUser = String(username || "")
-          .trim()
-          .toLowerCase();
+        const cleanUser = String(username || "").trim();
         const raw = `${cleanUser}:${String(password || "")}:${KEY_SALT}`;
         let h1 = 0xdeadbeef ^ raw.length,
           h2 = 0x41c6ce57 ^ raw.length;
@@ -2153,6 +2376,10 @@
       }
 
       // Call once inside init() so design.html always has fresh shortcuts & users from ESP32
+      let shortcutOnlineStatus = {};
+      let shortcutBusyMap = {};
+      let activeSimModalContext = null;
+
       async function syncHubConfigFromBackend() {
         try {
           const res = await fetch("/api/config", { cache: "no-store" });
@@ -2164,6 +2391,163 @@
             );
           }
         } catch (_) {}
+        applyHubStatesToShapes();
+        renderCanvas();
+        updateInspector();
+        syncAllDesignShortcuts(true);
+      }
+
+      function isSamePhysicalSwitch(a, b) {
+        if (!a || !b) return false;
+        return (
+          cleanHostInput(a.host).toLowerCase() ===
+            cleanHostInput(b.host).toLowerCase() &&
+          (Number(a.port) || 80) === (Number(b.port) || 80) &&
+          (Number(a.index) || 0) === (Number(b.index) || 0)
+        );
+      }
+
+      function buildDeviceUrl(dev, customPath = null) {
+        if (!dev) return "#";
+        const hubCfg = getHubConfig();
+        const host =
+          hubCfg?.settings?.preferMdns && dev.mdns
+            ? dev.mdns
+            : dev.ip || dev.mdns;
+        const clean = cleanHostInput(host);
+        if (!clean) return "#";
+        const portPart =
+          dev.port && Number(dev.port) !== 80 ? `:${dev.port}` : "";
+        let path = customPath !== null ? customPath : dev.path || "/";
+        if (!path.startsWith("/") && !path.startsWith(":")) path = "/" + path;
+        return path.startsWith(":")
+          ? `http://${clean}${path}`
+          : `http://${clean}${portPart}${path}`;
+      }
+
+      function openLinkedDevice(devId, customPath = null) {
+        const hubCfg = getHubConfig();
+        const dev = (hubCfg?.devices || []).find((d) => d.id === devId);
+        if (!dev) return showToast("Device not found in Hub config");
+        const url = buildDeviceUrl(dev, customPath);
+        if (url === "#") return showToast("Invalid device address");
+        if (hubCfg?.settings?.openNewTab)
+          window.open(url, "_blank", "noopener");
+        else window.open(url, "_blank", "noopener");
+      }
+
+      // Maps real ESP32 shortcut states -> every linked shape & Main Switch on all floors
+      function applyHubStatesToShapes() {
+        const hubCfg = getHubConfig();
+        const shortcuts = hubCfg?.shortcuts || [];
+        if (!shortcuts.length || !building?.floors) return false;
+
+        let changed = false;
+        const scMap = new Map(shortcuts.map((sc) => [sc.id, sc]));
+
+        building.floors.forEach((fl) => {
+          fl.shapes.forEach((sh) => {
+            if (sh.link?.type === "shortcut" && scMap.has(sh.link.targetId)) {
+              const liveOn = !!scMap.get(sh.link.targetId).state;
+              if (!!simSwitchStates[sh.id] !== liveOn) {
+                simSwitchStates[sh.id] = liveOn;
+                changed = true;
+              }
+            } else if (
+              sh.link?.type === "mainswitch" &&
+              Array.isArray(sh.link.targetIds)
+            ) {
+              const linked = sh.link.targetIds
+                .map((id) => scMap.get(id))
+                .filter(Boolean);
+              if (linked.length) {
+                const anyOn = linked.some((sc) => !!sc.state);
+                if (!!simSwitchStates[sh.id] !== anyOn) {
+                  simSwitchStates[sh.id] = anyOn;
+                  changed = true;
+                }
+              }
+            }
+          });
+        });
+        return changed;
+      }
+
+      // Real-time 2.5s poller (exact same /api/switches feedback used by index.html)
+      async function syncAllDesignShortcuts(silent = true) {
+        const hubCfg = getHubConfig();
+        const shortcuts = hubCfg?.shortcuts || [];
+        if (!shortcuts.length) return;
+
+        const hostGroups = new Map();
+        shortcuts.forEach((s) => {
+          const h = cleanHostInput(s.host).toLowerCase();
+          const p = Number(s.port) || 80;
+          if (!h) return;
+          const key = `${h}:${p}`;
+          if (!hostGroups.has(key)) hostGroups.set(key, []);
+          hostGroups.get(key).push(s);
+        });
+
+        let anyChanged = false;
+        const timeoutMs = hubCfg?.settings?.pingTimeoutMs || 1800;
+
+        await Promise.all(
+          [...hostGroups.values()].map(async (group) => {
+            const first = group[0];
+            const cleanH = cleanHostInput(first.host);
+            const portPart =
+              first.port && Number(first.port) !== 80 ? `:${first.port}` : "";
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+            try {
+              const res = await fetch(
+                `http://${cleanH}${portPart}/api/switches`,
+                {
+                  cache: "no-store",
+                  signal: ctrl.signal,
+                },
+              );
+              if (!res.ok) throw new Error("HTTP " + res.status);
+              const data = await res.json();
+              group.forEach((sc) => {
+                const idx = Number(sc.index) || 0;
+                if (
+                  Array.isArray(data.states) &&
+                  data.states[idx] !== undefined
+                ) {
+                  const liveState = !!data.states[idx];
+                  if (sc.state !== liveState) {
+                    sc.state = liveState;
+                    anyChanged = true;
+                  }
+                }
+                if (shortcutOnlineStatus[sc.id] !== "online") {
+                  shortcutOnlineStatus[sc.id] = "online";
+                  anyChanged = true;
+                }
+              });
+            } catch {
+              group.forEach((sc) => {
+                if (shortcutOnlineStatus[sc.id] !== "offline") {
+                  shortcutOnlineStatus[sc.id] = "offline";
+                  anyChanged = true;
+                }
+              });
+            } finally {
+              clearTimeout(timer);
+            }
+          }),
+        );
+
+        const shapeChanged = applyHubStatesToShapes();
+        if (anyChanged) {
+          localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+        }
+        if (anyChanged || shapeChanged || !silent) {
+          renderCanvas();
+          refreshOpenSimModal();
+        }
       }
 
       const SWATCHES = [
@@ -2257,6 +2641,18 @@
           color: "#0ea5e9",
           onColor: "#22c55e",
           svg: '<circle cx="12" cy="12" r="6"/><path d="M12 6V2h6"/><path d="M6 12H2v4"/><circle cx="12" cy="12" r="2"/>',
+        },
+        terminal: {
+          label: "Terminal",
+          color: "#38bdf8",
+          onColor: "#22c55e",
+          svg: '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
+        },
+        graph: {
+          label: "Graph",
+          color: "#22c55e",
+          onColor: "#38bdf8",
+          svg: '<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',
         },
         device: {
           label: "Device",
@@ -2873,6 +3269,9 @@
       }
 
       function syncBuildingInputs() {
+        showDimensions = building.showDimensions !== false;
+        const dimSel = document.getElementById("showDimSelect");
+        if (dimSel) dimSel.value = showDimensions ? "1" : "0";
         document.getElementById("bldgNameInput").value =
           building.name || "My Smart Home";
         document.getElementById("topBuildingName").textContent = (
@@ -3284,14 +3683,56 @@
         box.innerHTML = Object.entries(ACCESSORY_ICONS)
           .map(
             ([key, item]) => `
-            <button type="button" class="acc-btn ${activeTool === "icon" && activeAccessoryKey === key ? "active" : ""}"
-                    onclick="selectAccessory('${key}')" title="Place ${item.label}">
+            <button type="button" draggable="true"
+                    class="acc-btn ${activeTool === "icon" && activeAccessoryKey === key ? "active" : ""}"
+                    ondragstart="onAccessoryDragStart(event, '${key}')"
+                    onclick="selectAccessory('${key}')" title="Click or Drag &amp; Drop ${item.label}">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${item.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${item.svg}</svg>
               <span>${item.label}</span>
             </button>
           `,
           )
           .join("");
+      }
+
+      function onAccessoryDragStart(e, key) {
+        if (appMode === "sim") setAppMode("design");
+        activeAccessoryKey = key;
+        e.dataTransfer.setData("text/plain", key);
+        e.dataTransfer.effectAllowed = "copy";
+      }
+
+      function createAccessoryShapeAt(accKey, sx, sy) {
+        const acc =
+          EXTRA_DEVICE_ICONS[accKey] ||
+          ACCESSORY_ICONS[accKey] ||
+          ACCESSORY_ICONS.bulb;
+        const isGeneralDev = accKey === "device";
+        const linkCat = isGeneralDev ? "device" : "shortcut";
+        const firstTarget = getAvailableHubTargets(linkCat)[0];
+        return {
+          id: "sh_" + Date.now().toString(36),
+          type: "icon",
+          icon: accKey,
+          x: sx,
+          y: sy,
+          r: 20,
+          label: acc.label,
+          color: acc.color,
+          onColor: acc.onColor || "#22c55e",
+          strokeWidth: 2,
+          fillOpacity: 0.22,
+          dashed: false,
+          fontSize: 11,
+          fontWeight: "700",
+          rotation: 0,
+          locked: false,
+          link: {
+            type: linkCat,
+            targetId: firstTarget ? firstTarget.id : "",
+            targetName: firstTarget ? firstTarget.name : acc.label,
+          },
+        };
       }
 
       function selectAccessory(key) {
@@ -3306,9 +3747,9 @@
           b.classList.toggle("active", b.dataset.tool === tool);
         });
         renderAccessoryPalette();
-        document
-          .getElementById("canvasViewport")
-          .classList.toggle("tool-select", tool === "select");
+        const vp = document.getElementById("canvasViewport");
+        vp.classList.toggle("tool-select", tool === "select");
+        vp.classList.toggle("tool-cut", tool === "cut");
       }
 
       function setAppMode(mode) {
@@ -3327,6 +3768,7 @@
 
         if (mode === "sim") {
           clearSelection();
+          syncAllDesignShortcuts(true);
           showToast(
             "Live Simulation Started! Click any glowing room or switch.",
           );
@@ -3372,7 +3814,7 @@
 
           primHtml = `
             <rect class="shape-prim" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="4"
-              fill="${color}" fill-opacity="${fo}" stroke="${color}" stroke-width="${sw}" ${dashAttr} />
+              fill="${color}" fill-opacity="${fo}" stroke="${color}" stroke-width="${sw}" ${dashAttr} style="${fo === 0 ? "pointer-events:stroke" : ""}" />
             ${
               s.label
                 ? `<text class="shape-label" x="${cx}" y="${cy - (dimText && appMode === "design" ? 6 : 0)}"
@@ -3419,19 +3861,18 @@
           `;
         } else if (s.type === "cut") {
           // Only show outline while actively dragging the erase rectangle; no dotted border after erased
-          const isActivelyErasing =
+          const showCutOutline =
             appMode === "design" &&
-            dragState &&
-            dragState.shape &&
-            dragState.shape.id === s.id;
+            (activeTool === "cut" ||
+              (dragState && dragState.shape && dragState.shape.id === s.id));
           primHtml = `
-            <rect class="shape-prim" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"
-              fill="var(--canvas-bg)" stroke="${
-                isActivelyErasing ? "rgba(239,68,68,0.75)" : "none"
-              }" stroke-width="${isActivelyErasing ? 1.5 : 0}" ${
-                isActivelyErasing ? 'stroke-dasharray="4 3"' : ""
-              } />
-          `;
+         <rect class="shape-prim" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"
+           fill="var(--canvas-bg)" stroke="${
+             showCutOutline ? "rgba(239,68,68,0.75)" : "none"
+           }" stroke-width="${showCutOutline ? 1.5 : 0}" ${
+             showCutOutline ? 'stroke-dasharray="4 3"' : ""
+           } />
+       `;
         } else if (s.type === "icon") {
           const acc =
             EXTRA_DEVICE_ICONS[s.icon] ||
@@ -3442,7 +3883,7 @@
           const activeAccColor = isSimOn ? onColor : color;
           primHtml = `
             <circle class="shape-prim" cx="${s.x}" cy="${s.y}" r="${r}"
-              fill="${activeAccColor}" fill-opacity="${isSimOn ? Math.max(fo, 0.35) : fo}" stroke="${activeAccColor}" stroke-width="${sw}" />
+              fill="${activeAccColor}" fill-opacity="${isSimOn ? Math.max(fo, 0.35) : fo}" stroke="${activeAccColor}" stroke-width="${sw}" style="pointer-events:all" />
             <g transform="translate(${s.x - 12 * iconScale}, ${s.y - 12 * iconScale}) scale(${iconScale})"
                stroke="${activeAccColor}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"
                style="pointer-events:none">
@@ -3604,21 +4045,37 @@
           `;
         }
 
-        const customOnVar =
-          s.type === "icon" || s.type === "mainswitch"
-            ? `style="--on-color: ${onColor}"`
-            : "";
-
+        const customOnVar = s.onColor
+          ? `style="--on-color:${escapeHtml(s.onColor)}"`
+          : "";
         return `
-          <g class="svg-shape-group ${hasLink ? "is-clickable" : ""} ${isSimOn ? "sim-on" : ""} ${s.locked ? "is-locked" : ""}"
-             data-shape-id="${s.id}"
-             ${customOnVar}
-             ${rotAttr}
-             onmousedown="onShapeMouseDown(event, '${s.id}')"
-             onclick="onShapeClick(event, '${s.id}')">
-            ${primHtml}
-          </g>
-        `;
+       <g class="svg-shape-group ${hasLink ? "is-clickable" : ""} ${isSimOn ? "sim-on" : ""} ${s.locked ? "is-locked" : ""} ${s.type === "cut" ? "is-cut-mask" : ""}"
+          data-shape-id="${s.id}"
+          ${customOnVar}
+          ${rotAttr}
+          onmouseenter="onShapeHover('${s.id}')"
+          onmouseleave="onShapeHover(null)"
+          onmousedown="onShapeMouseDown(event, '${s.id}')"
+          onclick="onShapeClick(event, '${s.id}')">
+         ${primHtml}
+       </g>
+     `;
+      }
+
+      function onShapeHover(shapeId) {
+        const hud = document.getElementById("hudFloorTitle");
+        if (!hud) return;
+        const floor = getActiveFloor();
+        if (!shapeId || appMode === "sim") {
+          hud.textContent = floor?.name || "Floor";
+          return;
+        }
+        const s = floor?.shapes.find((x) => x.id === shapeId);
+        if (!s) return;
+        const label =
+          s.label || (s.type === "icon" ? s.icon : s.type).toUpperCase();
+        const prefix = activeTool === "cut" ? "Erase: " : "Select: ";
+        hud.textContent = `${prefix}${label}${s.locked ? " (Locked)" : ""}`;
       }
 
       function renderSelectionHandles() {
@@ -3822,6 +4279,22 @@
         let trimmedAnyLine = false;
         const updatedShapes = [];
 
+        let erasedShapesCount = 0;
+        floor.shapes = floor.shapes.filter((s) => {
+          if (
+            s.id === cutShape.id ||
+            s.locked ||
+            s.type === "line" ||
+            s.type === "rect"
+          ) {
+            return true;
+          }
+          const { cx, cy } = getShapeCenter(s);
+          const inside = cx >= rx1 && cx <= rx2 && cy >= ry1 && cy <= ry2;
+          if (inside) erasedShapesCount++;
+          return !inside;
+        });
+
         floor.shapes.forEach((s) => {
           if (s.id === cutShape.id) {
             updatedShapes.push(s);
@@ -3910,7 +4383,7 @@
           );
         });
 
-        if (trimmedAnyLine && !overlapsOtherShapes) {
+        if ((trimmedAnyLine || erasedShapesCount > 0) && !overlapsOtherShapes) {
           floor.shapes = updatedShapes.filter((s) => s.id !== cutShape.id);
         } else {
           // Place the cut mask immediately after the topmost overlapping shape (and its existing cuts)
@@ -3944,6 +4417,32 @@
       }
 
       function setupCanvasEvents() {
+        svgEl.addEventListener("dragover", (e) => {
+          if (appMode === "sim") return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+        });
+
+        svgEl.addEventListener("drop", (e) => {
+          if (appMode === "sim") return;
+          e.preventDefault();
+          const accKey =
+            e.dataTransfer.getData("text/plain") || activeAccessoryKey;
+          if (!accKey || !(accKey in EXTRA_DEVICE_ICONS)) return;
+          const pt = getSvgPoint(e);
+          const sx = snap(pt.x);
+          const sy = snap(pt.y);
+          pushUndo();
+          const floor = getActiveFloor();
+          const newShape = createAccessoryShapeAt(accKey, sx, sy);
+          floor.shapes.push(newShape);
+          selectSingleShape(newShape.id);
+          selectTool("select");
+          renderFloorList();
+          renderCanvas();
+          updateInspector();
+          showToast(`Placed ${newShape.label}`);
+        });
         svgEl.addEventListener("mousedown", (e) => {
           if (appMode === "sim") return;
           const pt = getSvgPoint(e);
@@ -4023,6 +4522,7 @@
             selectSingleShape(newId);
             dragState = { mode: "draw-line", shape: newShape };
           } else if (activeTool === "circle") {
+            const firstSc = getAvailableHubTargets("shortcut")[0];
             const newShape = {
               id: newId,
               type: "circle",
@@ -4042,8 +4542,8 @@
               locked: false,
               link: {
                 type: "shortcut",
-                targetId: "sc_living_light",
-                targetName: "Smart Switch",
+                targetId: firstSc ? firstSc.id : "",
+                targetName: firstSc ? firstSc.name : "Smart Switch",
               },
             };
             floor.shapes.push(newShape);
@@ -4099,13 +4599,36 @@
               startY: sy,
             };
           } else if (activeTool === "cut") {
+            // 1. Click on a wall line -> split a clean 40px doorway gap
             if (trySplitWallLineAtPoint(floor, pt.x, pt.y)) {
               clearSelection();
               renderCanvas();
               updateInspector();
-              showToast("Wall line split! Gap created.");
+              showToast("Wall split! Doorway gap created.");
               return;
             }
+            // 2. Click directly on any unlocked shape (except large rooms) -> erase it cleanly
+            const clickedGroup = e.target.closest?.(".svg-shape-group");
+            const clickedId = clickedGroup?.dataset?.shapeId;
+            if (clickedId) {
+              const targetShape = floor.shapes.find((x) => x.id === clickedId);
+              if (targetShape && targetShape.locked) {
+                undoStack.pop();
+                return showToast(
+                  "Locked shape cannot be erased (unlock first)",
+                );
+              }
+              if (targetShape && targetShape.type !== "rect") {
+                floor.shapes = floor.shapes.filter((x) => x.id !== clickedId);
+                clearSelection();
+                renderFloorList();
+                renderCanvas();
+                updateInspector();
+                showToast(`Erased ${targetShape.label || targetShape.type}`);
+                return;
+              }
+            }
+            // 3. Otherwise start dragging a red erase box (trims lines / deletes enclosed shapes / masks room walls)
             const newShape = {
               id: newId,
               type: "cut",
@@ -4165,36 +4688,9 @@
             selectSingleShape(newId);
             selectTool("select");
           } else if (activeTool === "icon") {
-            const acc =
-              EXTRA_DEVICE_ICONS[activeAccessoryKey] ||
-              ACCESSORY_ICONS[activeAccessoryKey] ||
-              ACCESSORY_ICONS.bulb;
-            const isGeneralDev = activeAccessoryKey === "device";
-            const newShape = {
-              id: newId,
-              type: "icon",
-              icon: activeAccessoryKey,
-              x: sx,
-              y: sy,
-              r: 20,
-              label: acc.label,
-              color: acc.color,
-              onColor: acc.onColor || "#22c55e",
-              strokeWidth: 2,
-              fillOpacity: 0.22,
-              dashed: false,
-              fontSize: 11,
-              fontWeight: "700",
-              rotation: 0,
-              locked: false,
-              link: {
-                type: isGeneralDev ? "device" : "shortcut",
-                targetId: isGeneralDev ? "dev_switch_4ch" : "sc_living_light",
-                targetName: acc.label,
-              },
-            };
+            const newShape = createAccessoryShapeAt(activeAccessoryKey, sx, sy);
             floor.shapes.push(newShape);
-            selectSingleShape(newId);
+            selectSingleShape(newShape.id);
             selectTool("select");
           } else if (activeTool === "text") {
             const newShape = {
@@ -4365,7 +4861,6 @@
               const floor = getActiveFloor();
               applyEraseBoxToFloor(floor, finishedShape);
               clearSelection();
-              selectTool("select");
               showToast("Erased area cleanly");
             } else if (wasDraw) {
               selectTool("select");
@@ -4378,6 +4873,19 @@
         });
 
         window.addEventListener("keydown", (e) => {
+          if (
+            document.getElementById("authModal")?.classList.contains("open")
+          ) {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submitAuthModal();
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              closeAuthModal();
+            }
+            return;
+          }
           if (
             ["INPUT", "SELECT", "TEXTAREA"].includes(
               document.activeElement?.tagName,
@@ -4483,6 +4991,11 @@
           } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
             e.preventDefault();
             duplicateSelected();
+          } else if (e.key === "Escape") {
+            selectTool("select");
+            clearSelection();
+            renderCanvas();
+            updateInspector();
           }
         });
       }
@@ -4792,6 +5305,204 @@
       /* ========================================================================
          6. LIVE SIMULATION CLICK HANDLER
          ======================================================================== */
+      async function toggleRealShortcutById(scId, fallbackShape = null) {
+        const hubCfg = getHubConfig();
+        const sc = (hubCfg?.shortcuts || []).find((x) => x.id === scId);
+
+        // Fallback for sample/demo IDs when no real shortcut matches
+        if (!sc) {
+          if (fallbackShape) {
+            simSwitchStates[fallbackShape.id] =
+              !simSwitchStates[fallbackShape.id];
+            const isOn = simSwitchStates[fallbackShape.id];
+            const lbl =
+              fallbackShape.link?.targetName || fallbackShape.label || "Switch";
+            document.getElementById("simStatusText").textContent =
+              `${lbl} (Preview) toggled ${isOn ? "ON" : "OFF"}`;
+            showToast(`${lbl}: ${isOn ? "ON" : "OFF"} (Demo)`);
+            renderCanvas();
+          }
+          return;
+        }
+
+        if (shortcutBusyMap[sc.id]) return;
+
+        // Enforce shortcut lock just like index.html
+        if (sc.locked) {
+          const ok = await promptVerification(
+            sc.lockRole || "admin",
+            `Unlock Switch: ${sc.name}`,
+          );
+          if (!ok) return;
+        }
+
+        const cleanH = cleanHostInput(sc.host);
+        if (!cleanH) return showToast("Invalid shortcut host");
+        const portPart = sc.port && Number(sc.port) !== 80 ? `:${sc.port}` : "";
+        const url = `http://${cleanH}${portPart}/api/switch/toggle`;
+        const rawKey = revealApiKey(sc.apiKey);
+        const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=toggle&key=${encodeURIComponent(rawKey)}`;
+
+        const matching = hubCfg.shortcuts.filter((item) =>
+          isSamePhysicalSwitch(item, sc),
+        );
+        matching.forEach((item) => (shortcutBusyMap[item.id] = true));
+        refreshOpenSimModal();
+
+        const ctrl = new AbortController();
+        const timer = setTimeout(
+          () => ctrl.abort(),
+          hubCfg?.settings?.pingTimeoutMs || 2000,
+        );
+
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: bodyStr,
+            cache: "no-store",
+            signal: ctrl.signal,
+          });
+          const data = await res.json();
+          if (!res.ok || data.ok === false)
+            throw new Error(data.error || `HTTP ${res.status}`);
+
+          const newState = !!data.state;
+          matching.forEach((item) => {
+            item.state = newState;
+            shortcutOnlineStatus[item.id] = "online";
+          });
+
+          localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+          applyHubStatesToShapes();
+          document.getElementById("simStatusText").textContent =
+            `${sc.name} is now ${newState ? "ON" : "OFF"}`;
+          showToast(`${sc.name}: ${newState ? "ON" : "OFF"}`);
+          syncAllDesignShortcuts(true);
+        } catch (err) {
+          matching.forEach(
+            (item) => (shortcutOnlineStatus[item.id] = "offline"),
+          );
+          showToast(err.message || `Failed to toggle ${sc.name}`);
+        } finally {
+          clearTimeout(timer);
+          matching.forEach((item) => (shortcutBusyMap[item.id] = false));
+          renderCanvas();
+          refreshOpenSimModal();
+        }
+      }
+
+      function renderSimShortcutRow(sc) {
+        const isOn = !!sc.state;
+        const isBusy = !!shortcutBusyMap[sc.id];
+        const st = shortcutOnlineStatus[sc.id] || "checking";
+        const idSafe = escapeHtml(sc.id);
+        return `
+          <div class="sim-item-row">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <span class="sim-dot ${st}"></span>
+              <span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(sc.name)}</span>
+              ${sc.locked ? `<span class="badge" style="color:var(--warn)">🔒</span>` : ""}
+            </div>
+            <button class="btn btn-sm ${isOn ? "btn-primary" : ""}" ${isBusy ? "disabled" : ""}
+              onclick="toggleRealShortcutById('${idSafe}')">
+              ${isBusy ? "..." : isOn ? "ON" : "OFF"}
+            </button>
+          </div>
+        `;
+      }
+
+      function renderSimDeviceRow(dev) {
+        const idSafe = escapeHtml(dev.id);
+        const addr = cleanHostInput(dev.ip || dev.mdns);
+        const altBtn =
+          dev.altLabel && dev.altPath
+            ? `<button class="btn btn-sm" onclick="openLinkedDevice('${idSafe}', '${escapeHtml(dev.altPath)}')">${escapeHtml(dev.altLabel)}</button>`
+            : "";
+        return `
+          <div class="sim-item-row">
+            <div style="min-width:0">
+              <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(dev.name)}</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);font-family:monospace">${escapeHtml(addr)}</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              ${altBtn}
+              <button class="btn btn-sm btn-primary" onclick="openLinkedDevice('${idSafe}')">Open</button>
+            </div>
+          </div>
+        `;
+      }
+
+      function refreshOpenSimModal() {
+        const modal = document.getElementById("simActionModal");
+        if (!modal?.classList.contains("open") || !activeSimModalContext)
+          return;
+        openSimCollectionModal(
+          activeSimModalContext.type,
+          activeSimModalContext.targetId,
+          activeSimModalContext.shapeLabel,
+        );
+      }
+
+      function openSimCollectionModal(type, targetId, shapeLabel) {
+        const hubCfg = getHubConfig();
+        activeSimModalContext = { type, targetId, shapeLabel };
+
+        const inGroup = (item, gid) =>
+          Array.isArray(item.groups)
+            ? item.groups.includes(gid)
+            : item.group === gid;
+
+        let title = shapeLabel || "Connected Hub Item";
+        let devs = [];
+        let scs = [];
+
+        if (type === "device") {
+          const dev = (hubCfg?.devices || []).find((d) => d.id === targetId);
+          title = dev ? dev.name : shapeLabel || "ESP Device";
+          if (dev) devs = [dev];
+        } else if (type === "group") {
+          const grp = (hubCfg?.groups || []).find((g) => g.id === targetId);
+          title = grp ? `Group: ${grp.name}` : shapeLabel || "Group";
+          devs = (hubCfg?.devices || []).filter((d) => inGroup(d, targetId));
+          scs = (hubCfg?.shortcuts || []).filter((s) => inGroup(s, targetId));
+        } else if (type === "favorite") {
+          const fav = (hubCfg?.favorites || []).find((f) => f.id === targetId);
+          title = fav ? `Favorite: ${fav.name}` : shapeLabel || "Favorite";
+          if (fav) {
+            const devIds = new Set(fav.deviceIds || []);
+            const scIds = new Set(fav.shortcutIds || []);
+            (fav.groupIds || []).forEach((gid) => {
+              (hubCfg?.devices || [])
+                .filter((d) => inGroup(d, gid))
+                .forEach((d) => devIds.add(d.id));
+              (hubCfg?.shortcuts || [])
+                .filter((s) => inGroup(s, gid))
+                .forEach((s) => scIds.add(s.id));
+            });
+            devs = (hubCfg?.devices || []).filter((d) => devIds.has(d.id));
+            scs = (hubCfg?.shortcuts || []).filter((s) => scIds.has(s.id));
+          }
+        }
+
+        let html = "";
+        if (scs.length) {
+          html += `<div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Shortcut Switches</div>`;
+          html += scs.map(renderSimShortcutRow).join("");
+        }
+        if (devs.length) {
+          html += `<div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:10px 0 6px">Devices</div>`;
+          html += devs.map(renderSimDeviceRow).join("");
+        }
+        if (!html) {
+          html = `<div class="sim-item-row"><span style="color:var(--text-muted)">No live Hub items matched ID "${escapeHtml(targetId)}". Re-select the target in Blueprint mode.</span></div>`;
+        }
+
+        document.getElementById("simModalTitle").textContent = title;
+        document.getElementById("simModalBody").innerHTML = html;
+        document.getElementById("simActionModal").classList.add("open");
+      }
+
       function onShapeClick(e, shapeId) {
         if (appMode !== "sim") return;
         e.stopPropagation();
@@ -4799,73 +5510,57 @@
         const s = floor.shapes.find((x) => x.id === shapeId);
         if (!s || !s.link || s.link.type === "none") return;
 
-        const { type, targetId, targetName } = s.link;
+        const { type, targetId } = s.link;
 
         if (type === "mainswitch") {
           executeMainSwitch(s);
           return;
         }
-
         if (type === "shortcut") {
-          simSwitchStates[s.id] = !simSwitchStates[s.id];
-          const isOn = simSwitchStates[s.id];
-          document.getElementById("simStatusText").textContent =
-            `Shortcut "${targetName || s.label}" toggled ${isOn ? "ON" : "OFF"}!`;
-          showToast(`${targetName || s.label}: ${isOn ? "ON" : "OFF"}`);
-          renderCanvas();
+          toggleRealShortcutById(targetId, s);
           return;
         }
-
-        const typeLabels = {
-          device: "ESP32 / ESP8266 Device",
-          group: "Room Group Section",
-          favorite: "Pinned Favorite Bundle",
-        };
-
-        document.getElementById("simModalTitle").textContent =
-          `${typeLabels[type] || "Connected Item"}`;
-        document.getElementById("simModalBody").innerHTML = `
-          <div style="padding:12px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px">
-            <div style="font-size:0.74rem;color:var(--text-muted)">Clicked Blueprint Element</div>
-            <div style="font-size:0.95rem;font-weight:700;color:var(--accent)">${escapeHtml(s.label || s.id)}</div>
-          </div>
-          <div style="padding:12px;background:var(--card);border:1px solid var(--border);border-radius:10px">
-            <div style="font-size:0.74rem;color:var(--text-muted)">Bound Hub Target (${escapeHtml(type.toUpperCase())})</div>
-            <div style="font-size:0.95rem;font-weight:700">${escapeHtml(targetName || targetId)}</div>
-            <div style="font-size:0.75rem;color:var(--ok);margin-top:4px">● Ready for Hub Integration (ID: ${escapeHtml(targetId || "custom")})</div>
-          </div>
-        `;
-        document.getElementById("simActionModal").classList.add("open");
+        if (type === "favorite") {
+          // Single-shortcut favorite toggles directly just like index.html
+          const fav = (getHubConfig()?.favorites || []).find(
+            (f) => f.id === targetId,
+          );
+          if (
+            fav &&
+            fav.shortcutIds?.length === 1 &&
+            !fav.deviceIds?.length &&
+            !fav.groupIds?.length
+          ) {
+            toggleRealShortcutById(fav.shortcutIds[0], s);
+            return;
+          }
+        }
+        openSimCollectionModal(type, targetId, s.label || s.link.targetName);
       }
 
       function verifyMainSwitchCredentials(link, hubCfg) {
         if (!link.unlockLocked || !link.authUser || !link.authPassHash) {
           return { ok: false, role: null };
         }
-        const uName = String(link.authUser).trim().toLowerCase();
+        const uName = String(link.authUser).trim();
         const user = (hubCfg?.admin?.users || []).find(
-          (u) =>
-            u.username.toLowerCase() === uName &&
-            u.passHash === link.authPassHash,
+          (u) => u.username === uName && u.passHash === link.authPassHash,
         );
         if (!user) return { ok: false, role: null };
-        if (link.lockRole === "admin" && user.role !== "admin") {
+        if (link.lockRole === "admin" && user.role !== "admin")
           return { ok: false, role: null };
-        }
         return { ok: true, role: user.role };
       }
 
       async function executeMainSwitch(shape) {
         const link = shape.link;
         const targetIds = Array.isArray(link.targetIds) ? link.targetIds : [];
-
-        // Toggle ON/OFF visual state immediately when clicked
+        const label = shape.label || "Main Switch";
         const targetOn = !simSwitchStates[shape.id];
-        simSwitchStates[shape.id] = targetOn;
-        renderCanvas();
 
         if (!targetIds.length) {
-          const label = shape.label || "Main Switch";
+          simSwitchStates[shape.id] = targetOn;
+          renderCanvas();
           document.getElementById("simStatusText").textContent =
             `${label} switched ${targetOn ? "ON" : "OFF"} (no shortcuts linked yet)`;
           return showToast(
@@ -4875,18 +5570,33 @@
 
         const hubCfg = getHubConfig();
         const allShortcuts = hubCfg?.shortcuts || [];
-        const auth = verifyMainSwitchCredentials(link, hubCfg);
 
+        // Offline demo fallback if Hub has no saved shortcuts yet
+        if (!allShortcuts.length) {
+          simSwitchStates[shape.id] = targetOn;
+          building.floors.forEach((fl) => {
+            fl.shapes.forEach((sh) => {
+              if (
+                sh.link?.type === "shortcut" &&
+                targetIds.includes(sh.link.targetId)
+              ) {
+                simSwitchStates[sh.id] = targetOn;
+              }
+            });
+          });
+          renderCanvas();
+          return showToast(`${label} ${targetOn ? "ON" : "OFF"} (Demo mode)`);
+        }
+
+        const auth = verifyMainSwitchCredentials(link, hubCfg);
         const allowed = [];
         let skipped = 0;
 
-        // 1. Fast in-memory role/lock check (zero modals)
         for (const id of targetIds) {
           const sc = allShortcuts.find((x) => x.id === id);
           if (!sc) continue;
-
           if (sc.locked) {
-            const scRole = sc.lockRole || "admin"; // "admin" | "all"
+            const scRole = sc.lockRole || "admin";
             const canUnlock =
               auth.ok && (scRole === "all" || auth.role === "admin");
             if (!canUnlock) {
@@ -4897,8 +5607,13 @@
           allowed.push(sc);
         }
 
-        // 2. Fire all allowed ESP32 switch requests simultaneously
-        const timeoutMs = hubCfg?.settings?.pingTimeoutMs || 1500;
+        if (!allowed.length) {
+          return showToast(
+            `${label}: All ${skipped} linked switch(es) are locked`,
+          );
+        }
+
+        const timeoutMs = hubCfg?.settings?.pingTimeoutMs || 1800;
         const results = await Promise.allSettled(
           allowed.map(async (sc) => {
             const host = cleanHostInput(sc.host);
@@ -4907,9 +5622,7 @@
               sc.port && Number(sc.port) !== 80 ? `:${sc.port}` : "";
             const url = `http://${host}${portPart}/api/switch/toggle`;
             const rawKey = revealApiKey(sc.apiKey);
-            // Sends explicit "on" / "off" so all switches align to the Main Switch
             const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=${targetOn ? "on" : "off"}&key=${encodeURIComponent(rawKey)}`;
-
             const ctrl = new AbortController();
             const timer = setTimeout(() => ctrl.abort(), timeoutMs);
             try {
@@ -4925,7 +5638,14 @@
               const data = await res.json();
               if (!res.ok || data.ok === false)
                 throw new Error(data.error || "Failed");
-              sc.state = data.state !== undefined ? !!data.state : targetOn;
+              const actualState =
+                data.state !== undefined ? !!data.state : targetOn;
+              allShortcuts
+                .filter((item) => isSamePhysicalSwitch(item, sc))
+                .forEach((item) => {
+                  item.state = actualState;
+                  shortcutOnlineStatus[item.id] = "online";
+                });
               return sc.id;
             } finally {
               clearTimeout(timer);
@@ -4933,42 +5653,20 @@
           }),
         );
 
-        // 3. Sync individual shortcut shapes on all floors so icons glow ON/OFF together
-        const succeededIds = new Set(
-          results.filter((r) => r.status === "fulfilled").map((r) => r.value),
-        );
-        // Offline preview fallback: still toggle visual states if no live hub shortcuts exist
-        const visualIds = allShortcuts.length
-          ? succeededIds
-          : new Set(targetIds);
-
-        building.floors.forEach((fl) => {
-          fl.shapes.forEach((sh) => {
-            if (
-              sh.link?.type === "shortcut" &&
-              visualIds.has(sh.link.targetId)
-            ) {
-              simSwitchStates[sh.id] = targetOn;
-            }
-          });
-        });
-
-        if (hubCfg) {
-          localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
-        }
+        const okCount = results.filter((r) => r.status === "fulfilled").length;
+        localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+        applyHubStatesToShapes();
         renderCanvas();
+        syncAllDesignShortcuts(true);
 
-        const okCount = allShortcuts.length
-          ? succeededIds.size
-          : targetIds.length;
-        const label = shape.label || "Main Switch";
         const skipMsg = skipped ? `, ${skipped} skipped (locked)` : "";
-        const statusMsg = `${label} ${targetOn ? "ON" : "OFF"}: ${okCount} switched${skipMsg}`;
+        const statusMsg = `${label} ${targetOn ? "ON" : "OFF"}: ${okCount}/${allowed.length} switched${skipMsg}`;
         document.getElementById("simStatusText").textContent = statusMsg;
         showToast(statusMsg);
       }
 
       function closeSimModal() {
+        activeSimModalContext = null;
         document.getElementById("simActionModal").classList.remove("open");
       }
 
@@ -5293,10 +5991,7 @@
       }
 
       function getAvailableHubTargets(type) {
-        let hubCfg = null;
-        try {
-          hubCfg = JSON.parse(localStorage.getItem(HUB_CONFIG_KEY));
-        } catch (_) {}
+        const hubCfg = getHubConfig();
 
         const map = {
           shortcut: hubCfg?.shortcuts,
@@ -5630,14 +6325,250 @@
           `${Math.round(zoomLevel * 100)}%`;
       }
 
-      function saveBuildingDesign() {
-        localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(building));
-        showToast("Building 2D blueprint saved to storage!");
+      const LOCKOUT_STORAGE_KEY = "esp_iot_hub_lockout_v1";
+      let authResolveCallback = null;
+      let requiredAuthRole = "admin";
+      let authStatusTimer = null;
+      let forgetBootTimer = null;
+
+      function getLockoutData() {
+        try {
+          return (
+            JSON.parse(localStorage.getItem(LOCKOUT_STORAGE_KEY)) || {
+              failedAttempts: 0,
+              lockedAt: null,
+            }
+          );
+        } catch {
+          return { failedAttempts: 0, lockedAt: null };
+        }
       }
 
-      function triggerImportDesignJson() {
+      function checkLockoutState() {
+        const hubCfg = getHubConfig();
+        const maxAtt = Math.min(
+          5,
+          Math.max(1, Number(hubCfg?.admin?.verification?.maxAttempts) || 3),
+        );
+        const policy =
+          hubCfg?.admin?.verification?.lockoutPolicy || "restart_or_1h";
+        const data = getLockoutData();
+        if (!data.lockedAt) {
+          return {
+            locked: false,
+            remainingAttempts: Math.max(0, maxAtt - (data.failedAttempts || 0)),
+            maxAttempts: maxAtt,
+            policy,
+          };
+        }
+        if (policy === "restart_or_1h") {
+          const elapsed = Date.now() - data.lockedAt;
+          if (elapsed >= 3600000) {
+            localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+            return {
+              locked: false,
+              remainingAttempts: maxAtt,
+              maxAttempts: maxAtt,
+              policy,
+            };
+          }
+          const remSec = Math.ceil((3600000 - elapsed) / 1000);
+          return {
+            locked: true,
+            msg: `Device Locked! Wait ${String(Math.floor(remSec / 60)).padStart(2, "0")}m ${String(remSec % 60).padStart(2, "0")}s or Restart ESP32`,
+            policy,
+          };
+        }
+        return {
+          locked: true,
+          msg: "Device Locked! Fresh ESP32 Restart Required",
+          policy,
+        };
+      }
+
+      function refreshAuthModalLiveStatus() {
+        const banner = document.getElementById("authLiveStatus");
+        const verifyBtn = document.getElementById("authVerifyBtn");
+        const uInput = document.getElementById("authUser");
+        const pInput = document.getElementById("authPass");
+        if (!banner) return;
+        const st = checkLockoutState();
+        if (st.locked) {
+          banner.style.borderColor = "var(--err)";
+          banner.style.background = "rgba(239, 68, 68, 0.12)";
+          banner.innerHTML = `<span style="color:var(--err);width:100%;text-align:center">${escapeHtml(st.msg)}</span>`;
+          verifyBtn.disabled = uInput.disabled = pInput.disabled = true;
+        } else {
+          const attColor =
+            st.remainingAttempts <= 1
+              ? "var(--err)"
+              : st.remainingAttempts === 2
+                ? "var(--warn)"
+                : "var(--ok)";
+          banner.style.borderColor = "var(--border)";
+          banner.style.background = "var(--bg)";
+          banner.innerHTML = `<span style="color:var(--text-muted)">Attempts: <strong style="color:${attColor}">${st.remainingAttempts}/${st.maxAttempts}</strong></span><span class="auth-status-pill">Lockout: ${st.policy === "restart_only" ? "Restart Only" : "Restart / 1h"}</span>`;
+          verifyBtn.disabled = uInput.disabled = pInput.disabled = false;
+        }
+      }
+
+      function verifyDesignCredentials(username, password, roleReq) {
+        const hubCfg = getHubConfig();
+        const users = hubCfg?.admin?.users?.length
+          ? hubCfg.admin.users
+          : [
+              {
+                username: "esp",
+                passHash: hashCredential("esp", "456456"),
+                role: "admin",
+              },
+            ];
+        const uName = String(username || "").trim();
+        const hash = hashCredential(uName, password);
+        const user = users.find(
+          (u) => u.username === uName && u.passHash === hash,
+        );
+        if (!user) return { ok: false, msg: "Invalid username or password" };
+        if (roleReq === "admin" && user.role !== "admin")
+          return { ok: false, msg: "Admin permission required" };
+        return { ok: true, user };
+      }
+
+      function promptVerification(roleReq, titleText) {
+        if (!roleReq || roleReq === "none") return Promise.resolve(true);
+        return new Promise((resolve) => {
+          requiredAuthRole = roleReq;
+          authResolveCallback = resolve;
+          document.getElementById("authModalTitle").textContent =
+            titleText || "Verification Required";
+          document.getElementById("authModalSub").textContent =
+            `Required permission: ${roleReq === "admin" ? "Admin" : "Everyone"}`;
+          document.getElementById("authUser").value = "";
+          document.getElementById("authPass").value = "";
+          document.getElementById("forgetBootBox").style.display = "none";
+          document.getElementById("authModal").classList.add("open");
+          refreshAuthModalLiveStatus();
+          clearInterval(authStatusTimer);
+          authStatusTimer = setInterval(refreshAuthModalLiveStatus, 1000);
+          document.getElementById("authUser").focus();
+        });
+      }
+
+      function submitAuthModal() {
+        const st = checkLockoutState();
+        if (st.locked) return showToast(st.msg);
+        const res = verifyDesignCredentials(
+          document.getElementById("authUser").value,
+          document.getElementById("authPass").value,
+          requiredAuthRole,
+        );
+        if (!res.ok) {
+          const hubCfg = getHubConfig();
+          const maxAtt = Math.min(
+            5,
+            Math.max(1, Number(hubCfg?.admin?.verification?.maxAttempts) || 3),
+          );
+          const data = getLockoutData();
+          data.failedAttempts = (data.failedAttempts || 0) + 1;
+          if (data.failedAttempts >= maxAtt) data.lockedAt = Date.now();
+          localStorage.setItem(LOCKOUT_STORAGE_KEY, JSON.stringify(data));
+          refreshAuthModalLiveStatus();
+          const updated = checkLockoutState();
+          return showToast(
+            updated.locked
+              ? updated.msg
+              : `${res.msg} (${updated.remainingAttempts} left)`,
+          );
+        }
+        localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+        clearInterval(authStatusTimer);
+        document.getElementById("authModal").classList.remove("open");
+        if (authResolveCallback) authResolveCallback(res.user);
+        authResolveCallback = null;
+      }
+
+      function closeAuthModal() {
+        clearInterval(forgetBootTimer);
+        clearInterval(authStatusTimer);
+        document.getElementById("authModal").classList.remove("open");
+        if (authResolveCallback) authResolveCallback(false);
+        authResolveCallback = null;
+      }
+
+      async function triggerForgetUsers() {
+        const box = document.getElementById("forgetBootBox");
+        const txt = document.getElementById("forgetBootText");
+        const bar = document.getElementById("forgetBootBar");
+        box.style.display = "block";
+        let remainingMs = 5000;
+        clearInterval(forgetBootTimer);
+        const bootPromise = fetch("/api/auth/forget-boot", { method: "POST" })
+          .then((r) => r.json())
+          .catch(() => ({ bootHeld: false }));
+        forgetBootTimer = setInterval(() => {
+          remainingMs -= 100;
+          txt.textContent = `Hold ESP32 BOOT button within ${Math.max(0, remainingMs / 1000).toFixed(1)}s...`;
+          bar.style.width = `${(remainingMs / 5000) * 100}%`;
+          if (remainingMs <= 0) clearInterval(forgetBootTimer);
+        }, 100);
+        const result = await bootPromise;
+        clearInterval(forgetBootTimer);
+        box.style.display = "none";
+        if (result?.bootHeld) {
+          const hubCfg = getHubConfig();
+          if (hubCfg?.admin) {
+            hubCfg.admin.users = [
+              {
+                username: "esp",
+                passHash: hashCredential("esp", "456456"),
+                role: "admin",
+              },
+            ];
+            localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+          }
+          localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+          refreshAuthModalLiveStatus();
+          showToast("Users reset! Default is now esp / 456456");
+        } else {
+          showToast("Forget aborted: BOOT button was not held within 5s");
+        }
+      }
+
+      async function verifyDesignAction(label) {
+        const hubCfg = getHubConfig();
+        const roleReq = hubCfg?.admin?.verification?.actions?.design || "admin";
+        if (roleReq === "none") return true;
+        return !!(await promptVerification(roleReq, `Verify: ${label}`));
+      }
+
+      async function saveBuildingDesign() {
+        if (!(await verifyDesignAction("Save Design"))) return;
+        localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(building));
+        fetch("/api/design", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(building),
+        }).catch(() => {});
+        showToast("Building 2D blueprint saved!");
+      }
+
+      async function triggerImportDesignJson() {
+        if (!(await verifyDesignAction("Import Design JSON"))) return;
         const fileInput = document.getElementById("importJsonInput");
         if (fileInput) fileInput.click();
+      }
+
+      async function exportDesignJson() {
+        if (!(await verifyDesignAction("Export Design JSON"))) return;
+        const blob = new Blob([JSON.stringify(building, null, 2)], {
+          type: "application/json",
+        });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${(building.name || "home-building").toLowerCase().replace(/\s+/g, "-")}-2d-svg.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showToast("Exported 2D SVG Building JSON!");
       }
 
       function importDesignJson(event) {
@@ -5661,6 +6592,7 @@
               unit: parsed.unit || "ft",
               width: parsed.width || 920,
               height: parsed.height || 600,
+              showDimensions: parsed.showDimensions !== false,
               floors: parsed.floors.map((fl, fIdx) => ({
                 id: fl.id || "fl_" + Date.now().toString(36) + "_" + fIdx,
                 name: fl.name || `Floor ${fIdx}`,
@@ -5705,18 +6637,6 @@
         reader.readAsText(file);
       }
 
-      function exportDesignJson() {
-        const blob = new Blob([JSON.stringify(building, null, 2)], {
-          type: "application/json",
-        });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `${(building.name || "home-building").toLowerCase().replace(/\s+/g, "-")}-2d-svg.json`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-        showToast("Exported 2D SVG Building JSON!");
-      }
-
       function escapeHtml(str) {
         return String(str || "").replace(
           /[&<>"']/g,
@@ -5738,6 +6658,24 @@
         clearTimeout(t._timer);
         t._timer = setTimeout(() => t.classList.remove("show"), 2200);
       }
+
+      // Real-time feedback polling every 2.5s (same interval as Home UI)
+      setInterval(() => {
+        syncAllDesignShortcuts(true);
+      }, 2500);
+
+      // Instant sync when a switch is toggled in index.html in another browser tab
+      window.addEventListener("storage", (e) => {
+        if (e.key === HUB_CONFIG_KEY && e.newValue) {
+          try {
+            cachedHubConfig = JSON.parse(e.newValue);
+            if (applyHubStatesToShapes()) {
+              renderCanvas();
+              refreshOpenSimModal();
+            }
+          } catch (_) {}
+        }
+      });
 
       init();
     </script>
