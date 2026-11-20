@@ -319,6 +319,12 @@
         overflow-y: auto;
         padding: 12px;
         gap: 14px;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+
+      .side-panel::-webkit-scrollbar {
+        display: none;
       }
 
       .right-panel {
@@ -724,6 +730,7 @@
       }
       .canvas-viewport.tool-cut .svg-shape-group.is-cut-mask {
         pointer-events: all;
+        cursor: move;
       }
 
       svg#floorSvg {
@@ -1609,6 +1616,70 @@
             </button>
           </div>
 
+          <!-- Erase Tool Size & Move Controls (Shown when Erase tool is active) -->
+          <!-- <div
+            id="eraseToolOptions"
+            style="
+              display: none;
+              margin-top: 10px;
+              padding: 9px;
+              border-radius: 9px;
+              background: var(--bg);
+              border: 1px solid rgba(239, 68, 68, 0.45);
+            "
+          >
+            <div
+              style="
+                font-size: 0.7rem;
+                font-weight: 800;
+                color: var(--err);
+                text-transform: uppercase;
+                margin-bottom: 6px;
+              "
+            >
+              Erase Size &amp; Move
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>Width (px)</label>
+                <input
+                  type="number"
+                  id="eraseWidthInput"
+                  class="input"
+                  min="8"
+                  max="400"
+                  step="2"
+                  value="40"
+                  oninput="updateEraseDefaultSize()"
+                />
+              </div>
+              <div class="field">
+                <label>Height (px)</label>
+                <input
+                  type="number"
+                  id="eraseHeightInput"
+                  class="input"
+                  min="8"
+                  max="400"
+                  step="2"
+                  value="40"
+                  oninput="updateEraseDefaultSize()"
+                />
+              </div>
+            </div>
+            <div
+              style="
+                font-size: 0.68rem;
+                color: var(--text-muted);
+                margin-top: 5px;
+                line-height: 1.4;
+              "
+            >
+              Click a dashed red erase box to <strong>move</strong> or drag its
+              corner to <strong>resize</strong>.
+            </div>
+          </div> -->
+
           <!-- HOME ACCESSORIES PALETTE -->
           <div style="margin-top: 12px">
             <label
@@ -1958,7 +2029,7 @@
             id="multiOnColorWrap"
             style="margin-top: 8px; display: none"
           >
-            <label>Batch Turn On Color (Accessories)</label>
+            <label>Turn On Color (Shortcut Buttons)</label>
             <div class="swatch-row" id="multiOnColorSwatches"></div>
           </div>
 
@@ -2908,6 +2979,8 @@
       let activeTool = "select"; // "select" | "rect" | "line" | "circle" | "door" | "text" | "stair" | "cut" | "icon"
       let appMode = "design"; // "design" | "sim"
       let snapSize = 20;
+      let eraseBrushW = 40;
+      let eraseBrushH = 40;
       let showDimensions = true;
       let zoomLevel = 1;
 
@@ -4035,6 +4108,37 @@
         const vp = document.getElementById("canvasViewport");
         vp.classList.toggle("tool-select", tool === "select");
         vp.classList.toggle("tool-cut", tool === "cut");
+
+        // const eraseOpts = document.getElementById("eraseToolOptions");
+        // if (eraseOpts) {
+        //   eraseOpts.style.display = tool === "cut" ? "block" : "none";
+        // }
+        renderCanvas();
+      }
+
+      function updateEraseDefaultSize() {
+        eraseBrushW = Math.max(
+          8,
+          Math.min(
+            400,
+            Number(document.getElementById("eraseWidthInput").value) || 40,
+          ),
+        );
+        eraseBrushH = Math.max(
+          8,
+          Math.min(
+            400,
+            Number(document.getElementById("eraseHeightInput").value) || 40,
+          ),
+        );
+        // If an erase box is currently selected, resize it live too
+        const s = getSelectedShape();
+        if (s && s.type === "cut" && !s.locked) {
+          s.w = eraseBrushW;
+          s.h = eraseBrushH;
+          renderCanvas();
+          syncInspectorGeometryInputs();
+        }
       }
 
       function setAppMode(mode) {
@@ -4327,19 +4431,20 @@
             }
           `;
         } else if (s.type === "cut") {
-          // Only show outline while actively dragging the erase rectangle; no dotted border after erased
+          const isCutSelected = selectedShapeIds.has(s.id);
           const showCutOutline =
             appMode === "design" &&
             (activeTool === "cut" ||
+              isCutSelected ||
               (dragState && dragState.shape && dragState.shape.id === s.id));
           primHtml = `
-         <rect class="shape-prim" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"
-           fill="var(--canvas-bg)" stroke="${
-             showCutOutline ? "rgba(239,68,68,0.75)" : "none"
-           }" stroke-width="${showCutOutline ? 1.5 : 0}" ${
-             showCutOutline ? 'stroke-dasharray="4 3"' : ""
-           } />
-       `;
+            <rect class="shape-prim" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}"
+              fill="var(--canvas-bg)" stroke="${
+                showCutOutline ? "rgba(239,68,68,0.85)" : "none"
+              }" stroke-width="${showCutOutline ? 1.5 : 0}" ${
+                showCutOutline ? 'stroke-dasharray="4 3"' : ""
+              } />
+          `;
         } else if (s.type === "icon") {
           const acc =
             EXTRA_DEVICE_ICONS[s.icon] ||
@@ -4720,7 +4825,7 @@
 
       // Splits a wall line into two segments with a 40px gap if clicked with the Erase tool
       function trySplitWallLineAtPoint(floor, px, py) {
-        const GAP_HALF = 20;
+        const GAP_HALF = Math.max(4, Math.round(eraseBrushW / 2));
         for (let i = floor.shapes.length - 1; i >= 0; i--) {
           const s = floor.shapes[i];
           if (s.type !== "line" || s.locked) continue;
@@ -5110,14 +5215,14 @@
                 return;
               }
             }
-            // 3. Otherwise start dragging a red erase box (trims lines / deletes enclosed shapes / masks room walls)
+            // 3. Click to place preset-size erase box, or drag to draw custom size
             const newShape = {
               id: newId,
               type: "cut",
-              x: sx,
-              y: sy,
-              w: 20,
-              h: 20,
+              x: Math.max(0, sx - Math.round(eraseBrushW / 2)),
+              y: Math.max(0, sy - Math.round(eraseBrushH / 2)),
+              w: eraseBrushW,
+              h: eraseBrushH,
               label: "",
               color: "#ef4444",
               strokeWidth: 0,
@@ -5130,12 +5235,13 @@
               link: { type: "none", targetId: "", targetName: "" },
             };
             floor.shapes.push(newShape);
-            clearSelection();
+            selectSingleShape(newId);
             dragState = {
               mode: "draw-rect",
               shape: newShape,
               startX: sx,
               startY: sy,
+              hasDragged: false,
             };
           } else if (activeTool === "mainswitch") {
             const newShape = {
@@ -5313,10 +5419,23 @@
             dragState.mode === "draw-rect" ||
             dragState.mode === "se"
           ) {
+            if (
+              dragState.mode === "draw-rect" &&
+              s.type === "cut" &&
+              !dragState.hasDragged
+            ) {
+              if (
+                Math.hypot(pt.x - dragState.startX, pt.y - dragState.startY) < 6
+              ) {
+                return;
+              }
+              dragState.hasDragged = true;
+            }
             const baseX = dragState.startX ?? s.x;
             const baseY = dragState.startY ?? s.y;
-            let rawW = Math.max(20, Math.abs(sx - baseX));
-            let rawH = Math.max(20, Math.abs(sy - baseY));
+            const minDim = s.type === "cut" ? 8 : 20;
+            let rawW = Math.max(minDim, Math.abs(sx - baseX));
+            let rawH = Math.max(minDim, Math.abs(sy - baseY));
 
             // Hold Shift -> Perfect Square (or Door which is always square)
             if (e.shiftKey || s.type === "door") {
@@ -5388,8 +5507,15 @@
             if (wasDraw && finishedShape && finishedShape.type === "cut") {
               const floor = getActiveFloor();
               applyEraseBoxToFloor(floor, finishedShape);
-              clearSelection();
-              showToast("Erased area cleanly");
+              if (floor.shapes.some((sh) => sh.id === finishedShape.id)) {
+                selectSingleShape(finishedShape.id);
+                showToast(
+                  "Erase box placed — drag to move or use corner handle to resize",
+                );
+              } else {
+                clearSelection();
+                showToast("Erased area cleanly");
+              }
             } else if (wasDraw) {
               selectTool("select");
             }
@@ -5576,13 +5702,19 @@
 
       function onShapeMouseDown(e, shapeId) {
         if (appMode === "sim") return;
-        // If any drawing or cut tool is active, let the click pass through to the canvas!
-        if (activeTool !== "select") return;
-
-        e.stopPropagation();
         const floor = getActiveFloor();
         const s = floor.shapes.find((x) => x.id === shapeId);
         if (!s) return;
+
+        // Allow selecting & moving existing Erase boxes while Erase tool is active
+        if (
+          activeTool !== "select" &&
+          !(activeTool === "cut" && s.type === "cut")
+        ) {
+          return;
+        }
+
+        e.stopPropagation();
 
         // Ctrl+Click or Cmd+Click toggles shape in multi-selection
         const groupMembers = s.groupId
@@ -6206,6 +6338,11 @@
         return floor?.shapes.find((s) => s.id === selectedShapeId) || null;
       }
 
+      function supportsTurnOnColor(s) {
+        if (!s) return false;
+        return s.link?.type === "shortcut" || s.type === "mainswitch";
+      }
+
       function updateInspector() {
         const emptyCard = document.getElementById("noSelectionCard");
         const multiCard = document.getElementById("multiSelectionCard");
@@ -6279,9 +6416,9 @@
                 `<div class="swatch" style="background:${c}" onclick="updateBatchColor('${c}')"></div>`,
             ).join("");
 
-          const hasAccessories = list.some((s) => s.type === "icon");
+          const hasShortcutLinked = list.some((s) => supportsTurnOnColor(s));
           const multiOnWrap = document.getElementById("multiOnColorWrap");
-          if (hasAccessories) {
+          if (hasShortcutLinked) {
             multiOnWrap.style.display = "flex";
             document.getElementById("multiOnColorSwatches").innerHTML =
               SWATCHES.map(
@@ -6346,7 +6483,6 @@
         if (s.type === "icon") {
           devKindWrap.style.display = "flex";
           mcbLabelsWrap.style.display = "none";
-          onColorWrap.style.display = "flex";
           const sel = document.getElementById("inspDeviceKindSelect");
           sel.innerHTML = Object.entries(EXTRA_DEVICE_ICONS)
             .map(
@@ -6354,19 +6490,23 @@
                 `<option value="${k}" ${s.icon === k ? "selected" : ""}>${escapeHtml(v.label)}</option>`,
             )
             .join("");
-          renderInspectorOnColorSwatches(s.onColor || "#22c55e");
         } else if (s.type === "mainswitch") {
           devKindWrap.style.display = "none";
           mcbLabelsWrap.style.display = "grid";
-          onColorWrap.style.display = "flex";
           document.getElementById("inspOnLabel").value =
             s.onLabel !== undefined ? s.onLabel : "ON";
           document.getElementById("inspOffLabel").value =
             s.offLabel !== undefined ? s.offLabel : "OFF";
-          renderInspectorOnColorSwatches(s.onColor || "#22c55e");
         } else {
           devKindWrap.style.display = "none";
           mcbLabelsWrap.style.display = "none";
+        }
+
+        // Show Turn On Color ONLY for Shortcut Buttons (and Main Switch MCB)
+        if (supportsTurnOnColor(s)) {
+          onColorWrap.style.display = "flex";
+          renderInspectorOnColorSwatches(s.onColor || "#22c55e");
+        } else {
           onColorWrap.style.display = "none";
         }
 
@@ -6409,13 +6549,14 @@
 
       function updateBatchOnColor(onColor) {
         const list = getSelectedShapesList().filter(
-          (s) => !s.locked && s.type === "icon",
+          (s) => !s.locked && supportsTurnOnColor(s),
         );
-        if (!list.length) return showToast("Selected accessories are locked");
+        if (!list.length)
+          return showToast("Selected shortcut items are locked");
         pushUndo();
         list.forEach((s) => (s.onColor = onColor));
         renderCanvas();
-        showToast("Updated Turn On Color for selected accessories");
+        showToast("Updated Turn On Color for selected shortcut items");
       }
 
       function syncInspectorGeometryInputs() {
@@ -6435,6 +6576,12 @@
           document.getElementById("inspY").value = s.y;
           document.getElementById("inspW").value = s.w;
           document.getElementById("inspH").value = s.h;
+          if (s.type === "cut") {
+            const ew = document.getElementById("eraseWidthInput");
+            const eh = document.getElementById("eraseHeightInput");
+            if (ew) ew.value = s.w;
+            if (eh) eh.value = s.h;
+          }
         } else if (s.type === "line") {
           document.getElementById("lblX1").textContent = "Start X1";
           document.getElementById("lblY1").textContent = "Start Y1";
@@ -6723,6 +6870,7 @@
           };
         }
         populateLinkControls(s);
+        updateInspector();
         renderFloorList();
         renderCanvas();
       }
