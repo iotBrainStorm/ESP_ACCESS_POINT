@@ -7,7 +7,8 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <meta name="theme-color" content="#0b1120" />
-    <title>Hub NVS Configuration</title>
+    <title>Hub Configuration</title>
+    <link rel="icon" type="image/svg+xml" href="config.svg" />
     <style>
       /* ==========================================
          1. THEME VARIABLES & GLOBAL RESET
@@ -2050,13 +2051,14 @@
                 &amp; switches
               </div>
             </div>
-            <a
-              href="design.html"
+            <button
+              type="button"
               class="btn btn-primary"
-              style="text-decoration: none; white-space: nowrap"
+              style="white-space: nowrap"
+              onclick="openDesignListModal()"
             >
               Go to Design
-            </a>
+            </button>
           </div>
         </div>
       </section>
@@ -2562,6 +2564,34 @@
       </div>
     </div>
 
+    <!-- MODAL 6: Saved Designs List -->
+    <div
+      class="modal-backdrop"
+      id="designListModal"
+      onclick="if (event.target === this) closeDesignListModal();"
+    >
+      <div class="modal">
+        <div class="modal-head">
+          <h3>Saved Home Designs</h3>
+          <button class="btn btn-sm" onclick="closeDesignListModal()">
+            &times;
+          </button>
+        </div>
+        <div class="item-list" id="savedDesignsList"></div>
+        <div class="modal-foot">
+          <button
+            class="btn btn-primary btn-sm"
+            onclick="window.location.href = 'design.html?new=1'"
+          >
+            + New Design
+          </button>
+          <button class="btn btn-sm" onclick="closeDesignListModal()">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notification & Blur Backdrop -->
     <div class="toast-backdrop" id="toastBackdrop"></div>
     <div class="toast" id="toast"></div>
@@ -2571,6 +2601,8 @@
          1. CONSTANTS & STATIC DICTIONARIES
          ============================================================================ */
       const STORAGE_KEY = "esp_iot_hub_config_v1";
+      const DESIGN_STORAGE_KEY = "esp_iot_hub_building_design_v1";
+      let pendingImportedDesigns = null;
       const NVS_MAX_BYTES = 16384;
       const KEY_SALT = "esp32_nvs_hub_v1_secret";
 
@@ -5728,6 +5760,125 @@
       /* ============================================================================
          15. TAB 9: NVS STORAGE, BACKUP & SYSTEM ACTIONS
          ============================================================================ */
+      function sanitizeDesignsList(raw) {
+        if (!raw) return [];
+        const list = Array.isArray(raw)
+          ? raw
+          : raw.floors && Array.isArray(raw.floors)
+            ? [raw]
+            : [];
+        return list
+          .filter((b) => b && Array.isArray(b.floors) && b.floors.length)
+          .map((b, bIdx) => ({
+            ...b,
+            id: b.id || "bldg_" + Date.now().toString(36) + "_" + bIdx,
+            name: b.name || `Smart Home ${bIdx + 1}`,
+            unit: b.unit || "ft",
+            width: Number(b.width) || 920,
+            height: Number(b.height) || 600,
+            showDimensions: b.showDimensions !== false,
+            floorSwitcher: {
+              enabled: true,
+              x: 20,
+              y: 20,
+              w: 58,
+              btnH: 34,
+              gap: 6,
+              orientation: "vertical",
+              color: "#38bdf8",
+              fontSize: 12,
+              locked: false,
+              ...(b.floorSwitcher || {}),
+            },
+            floors: b.floors.map((fl, fIdx) => ({
+              id: fl.id || "fl_" + Date.now().toString(36) + "_" + fIdx,
+              name: fl.name || `Floor ${fIdx}`,
+              code: fl.code || (fIdx === 0 ? "G" : `${fIdx}F`),
+              shapes: Array.isArray(fl.shapes)
+                ? fl.shapes.map((s, sIdx) => ({
+                    ...s,
+                    id:
+                      s.id ||
+                      "sh_" + Date.now().toString(36) + "_" + fIdx + "_" + sIdx,
+                    rotation: Number(s.rotation) || 0,
+                    locked: !!s.locked,
+                    link: s.link || {
+                      type: "none",
+                      targetId: "",
+                      targetName: "",
+                    },
+                  }))
+                : [],
+            })),
+          }));
+      }
+
+      async function loadAllSavedDesigns() {
+        if (pendingImportedDesigns !== null) return pendingImportedDesigns;
+        if (!isOfflinePreview) {
+          try {
+            const res = await fetch("/api/design", { cache: "no-store" });
+            if (res.ok) {
+              const list = sanitizeDesignsList(await res.json());
+              localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(list));
+              return list;
+            }
+          } catch (_) {}
+        }
+        try {
+          return sanitizeDesignsList(
+            JSON.parse(localStorage.getItem(DESIGN_STORAGE_KEY)),
+          );
+        } catch {
+          return [];
+        }
+      }
+
+      async function openDesignListModal() {
+        const listEl = document.getElementById("savedDesignsList");
+        listEl.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">Loading saved designs...</div>`;
+        document.getElementById("designListModal").classList.add("open");
+        syncModalScrollLock();
+
+        const designs = await loadAllSavedDesigns();
+        if (!designs.length) {
+          listEl.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">No saved designs found yet. Click <strong>+ New Design</strong> to create one.</div>`;
+          return;
+        }
+
+        listEl.innerHTML = designs
+          .map((d) => {
+            const floorCount = d.floors.length;
+            const shapeCount = d.floors.reduce(
+              (sum, f) => sum + (f.shapes?.length || 0),
+              0,
+            );
+            const openUrl = `design.html?id=${encodeURIComponent(d.id)}`;
+            return `
+              <div class="dev-row">
+                <div class="dev-row-left">
+                  <div class="icon-box" style="background:var(--accent-soft);color:var(--accent)">
+                    ${svgIcon("home", 20)}
+                  </div>
+                  <div>
+                    <div class="dev-row-title">${escapeHtml(d.name)}</div>
+                    <div class="dev-row-sub">${floorCount} Floor${floorCount > 1 ? "s" : ""} &bull; ${shapeCount} Shapes</div>
+                  </div>
+                </div>
+                <div class="row-actions">
+                  <a href="${openUrl}" class="btn btn-primary btn-sm" style="text-decoration:none">Open</a>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      function closeDesignListModal() {
+        document.getElementById("designListModal").classList.remove("open");
+        syncModalScrollLock();
+      }
+
       async function saveToNvs() {
         const keysToVerify = [...pendingReorderAuth];
         let requiredRole = "none";
@@ -5777,12 +5928,29 @@
             });
             if (!res.ok) throw new Error("ESP32 NVS write failed");
           }
+
+          // Also commit restored designs from Import JSON
+          if (pendingImportedDesigns !== null) {
+            localStorage.setItem(
+              DESIGN_STORAGE_KEY,
+              JSON.stringify(pendingImportedDesigns),
+            );
+            if (!isOfflinePreview) {
+              await fetch("/api/design", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(pendingImportedDesigns),
+              }).catch(() => {});
+            }
+            pendingImportedDesigns = null;
+          }
+
           isDirty = false;
           pendingReorderAuth.clear();
           document.getElementById("saveStatus").textContent = isOfflinePreview
             ? "Saved to Browser Storage (Preview Mode)"
             : "Saved to ESP32 NVS successfully";
-          showToast("Configuration saved!");
+          showToast("Configuration & designs saved!");
         } catch (e) {
           showToast("Error saving to ESP32 NVS");
         } finally {
@@ -5818,28 +5986,39 @@
       async function exportBackup() {
         const verified = await promptVerification(
           "admin",
-          "Admin Auth: Export JSON Backup",
+          "Admin Auth: Export Full JSON Backup",
         );
         if (!verified) return;
 
         setBackupLoadingModal(
           true,
           "Please Wait...",
-          "Preparing and exporting configuration backup...",
+          "Exporting full configuration & saved 2D designs...",
         );
         await waitForNextPaint();
-        await new Promise((r) => setTimeout(r, 450));
+        await new Promise((r) => setTimeout(r, 400));
 
         try {
-          const blob = new Blob([JSON.stringify(config, null, 2)], {
+          const allDesigns = await loadAllSavedDesigns();
+          // Bundle everything cleanly without bloating the 16KB NVS config object
+          const fullBackup = {
+            backupVersion: 2,
+            exportedAt: new Date().toISOString(),
+            ...config,
+            designs: allDesigns,
+          };
+
+          const blob = new Blob([JSON.stringify(fullBackup, null, 2)], {
             type: "application/json",
           });
           const a = document.createElement("a");
           a.href = URL.createObjectURL(blob);
-          a.download = `esp-iot-hub-${new Date().toISOString().slice(0, 10)}.json`;
+          a.download = `esp-iot-hub-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
           a.click();
           URL.revokeObjectURL(a.href);
-          showToast("Backup JSON exported!");
+          showToast(
+            `Exported full backup (${allDesigns.length} design${allDesigns.length === 1 ? "" : "s"} included)!`,
+          );
         } finally {
           setBackupLoadingModal(false);
         }
@@ -5861,11 +6040,10 @@
         const file = event.target.files?.[0];
         if (!file) return;
 
-        // Show "Please Wait..." modal immediately and force browser paint before parsing
         setBackupLoadingModal(
           true,
           "Please Wait...",
-          "Reading and restoring JSON backup...",
+          "Reading and restoring configuration & designs...",
         );
         await waitForNextPaint();
 
@@ -5874,15 +6052,33 @@
           try {
             await new Promise((r) => setTimeout(r, 350));
             const parsed = JSON.parse(e.target.result);
-            if (!parsed.devices || !parsed.groups || !parsed.settings) {
+            const rawCfg =
+              parsed.config && typeof parsed.config === "object"
+                ? parsed.config
+                : parsed;
+
+            if (!rawCfg.devices || !rawCfg.groups || !rawCfg.settings) {
               throw new Error("Invalid schema");
             }
-            config = sanitizeConfig(parsed);
+
+            // 1. Restore full Hub config (Devices, Shortcuts, Groups, Favorites, Network, Admin, Settings)
+            config = sanitizeConfig(rawCfg);
+
+            // 2. Restore 2D Building Designs (supports array `designs` or single `design`)
+            const rawDesigns = parsed.designs ?? parsed.design ?? null;
+            let designMsg = "";
+            if (rawDesigns !== null) {
+              pendingImportedDesigns = sanitizeDesignsList(rawDesigns);
+              designMsg = ` + ${pendingImportedDesigns.length} design(s)`;
+            }
+
             markDirty();
             applyTheme();
             await waitForNextPaint();
             renderAll();
-            showToast("Backup restored! Click Save to ESP32 to write to NVS.");
+            showToast(
+              `Backup restored${designMsg}! Click "Save to ESP32" to apply.`,
+            );
           } catch {
             showToast("Invalid backup JSON file");
           } finally {
@@ -5987,6 +6183,7 @@
           return;
 
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(DESIGN_STORAGE_KEY);
         clearLockoutData();
         sessionStorage.clear();
         isDirty = false;

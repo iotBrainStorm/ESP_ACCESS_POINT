@@ -8,6 +8,7 @@
     />
     <meta name="theme-color" content="#0b1120" />
     <title>Design My Home</title>
+    <link rel="icon" type="image/svg+xml" href="design.svg" />
     <style>
       /* ==========================================================================
          1. THEME VARIABLES & GLOBAL RESET (MATCHES HUB THEME)
@@ -241,6 +242,32 @@
         background: rgba(239, 68, 68, 0.12);
         border-color: var(--err);
         color: var(--err);
+      }
+      .btn-danger-solid {
+        background: var(--err);
+        border-color: var(--err);
+        color: #ffffff;
+        font-weight: 700;
+      }
+      .btn-danger-solid:hover:not(:disabled) {
+        color: #ffffff;
+        border-color: var(--err);
+        filter: brightness(1.1);
+      }
+      .floor-nav-svg {
+        cursor: move;
+      }
+      .floor-nav-svg.is-locked {
+        cursor: pointer;
+      }
+      .workspace.sim-active .floor-nav-svg {
+        cursor: default;
+      }
+      .workspace.sim-active .floor-nav-btn {
+        cursor: pointer;
+      }
+      .workspace.sim-active .floor-nav-btn:hover rect {
+        filter: brightness(1.18);
       }
       .btn-sm {
         height: 28px;
@@ -1221,22 +1248,12 @@
         <button class="btn" id="undoBtn" onclick="undo()" title="Undo (Ctrl+Z)">
           Undo
         </button>
-        <input
-          type="file"
-          id="importJsonInput"
-          accept=".json,application/json"
-          style="display: none"
-          onchange="importDesignJson(event)"
-        />
         <button
-          class="btn"
-          onclick="triggerImportDesignJson()"
-          title="Import JSON"
+          class="btn btn-danger-solid"
+          onclick="deleteBuildingDesign()"
+          title="Delete this design permanently"
         >
-          Import
-        </button>
-        <button class="btn" onclick="exportDesignJson()" title="Download JSON">
-          Export
+          Delete Design
         </button>
         <button
           class="btn btn-primary"
@@ -1361,6 +1378,17 @@
                 </button>
               </div>
             </div>
+          </div>
+          <div class="field" style="margin-top: 8px">
+            <label>Floor Switcher SVG (Inside Canvas)</label>
+            <select
+              id="floorNavToggleSelect"
+              class="select"
+              onchange="toggleFloorSwitcherVisible(this.value === '1')"
+            >
+              <option value="1" selected>Show on Canvas</option>
+              <option value="0">Hide from Canvas</option>
+            </select>
           </div>
         </div>
 
@@ -1737,6 +1765,9 @@
             <!-- Drawn Shapes Layer -->
             <g id="shapesLayer"></g>
 
+            <!-- In-Canvas Dynamic Floor Switcher SVG Layer -->
+            <g id="floorNavLayer"></g>
+
             <!-- Active Selection, Lock Badges, Marquee & Resize Handles Layer -->
             <g id="handlesLayer"></g>
           </svg>
@@ -1770,6 +1801,134 @@
             shapes, or <strong>drag a selection box</strong> from empty space to
             lock/unlock, rotate, style, or link them to your Smart Hub.
           </p>
+        </div>
+
+        <!-- Floor Switcher SVG Inspector Card -->
+        <div
+          class="panel-card"
+          id="floorNavInspectorCard"
+          style="display: none"
+        >
+          <div class="panel-title">
+            <span>Floor Switcher SVG</span>
+            <button
+              type="button"
+              class="btn btn-sm"
+              id="fnLockToggleBtn"
+              onclick="toggleFloorNavLock()"
+              title="Lock / Unlock Floor Switcher"
+            >
+              &#128275;
+            </button>
+          </div>
+
+          <div class="field">
+            <label>Layout Direction</label>
+            <select
+              id="fnOrientation"
+              class="select"
+              onchange="updateFloorNavProp('orientation', this.value)"
+            >
+              <option value="vertical">Vertical (Stacked Floors)</option>
+              <option value="horizontal">Horizontal (Row)</option>
+            </select>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>Pos X</label>
+              <input
+                type="number"
+                id="fnX"
+                class="input"
+                oninput="updateFloorNavProp('x', Number(this.value))"
+              />
+            </div>
+            <div class="field">
+              <label>Pos Y</label>
+              <input
+                type="number"
+                id="fnY"
+                class="input"
+                oninput="updateFloorNavProp('y', Number(this.value))"
+              />
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>Button Width</label>
+              <input
+                type="number"
+                id="fnW"
+                class="input"
+                min="30"
+                max="200"
+                oninput="
+                  updateFloorNavProp('w', Math.max(30, Number(this.value)))
+                "
+              />
+            </div>
+            <div class="field">
+              <label>Button Height</label>
+              <input
+                type="number"
+                id="fnBtnH"
+                class="input"
+                min="20"
+                max="120"
+                oninput="
+                  updateFloorNavProp('btnH', Math.max(20, Number(this.value)))
+                "
+              />
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>Button Gap</label>
+              <input
+                type="number"
+                id="fnGap"
+                class="input"
+                min="2"
+                max="30"
+                oninput="
+                  updateFloorNavProp('gap', Math.max(2, Number(this.value)))
+                "
+              />
+            </div>
+            <div class="field">
+              <label>Font Size</label>
+              <input
+                type="number"
+                id="fnFontSize"
+                class="input"
+                min="8"
+                max="28"
+                oninput="
+                  updateFloorNavProp(
+                    'fontSize',
+                    Math.max(8, Number(this.value)),
+                  )
+                "
+              />
+            </div>
+          </div>
+
+          <div class="field" style="margin-top: 8px">
+            <label>Active Floor Color</label>
+            <div class="swatch-row" id="fnColorSwatches"></div>
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-sm btn-danger"
+            style="width: 100%; margin-top: 10px"
+            onclick="toggleFloorSwitcherVisible(false)"
+          >
+            Hide Floor Switcher
+          </button>
         </div>
 
         <!-- Multi-Selection Batch Inspector Card -->
@@ -2767,6 +2926,8 @@
       const svgEl = document.getElementById("floorSvg");
       const shapesLayer = document.getElementById("shapesLayer");
       const handlesLayer = document.getElementById("handlesLayer");
+      const floorNavLayer = document.getElementById("floorNavLayer");
+      let floorNavSelected = false;
 
       /* ========================================================================
          1. INITIALIZATION & SAMPLE SMART HOME GENERATOR
@@ -2781,6 +2942,96 @@
             );
           }
         } catch (_) {}
+      }
+
+      function getDefaultFloorSwitcher() {
+        return {
+          enabled: true,
+          x: 20,
+          y: 20,
+          w: 58,
+          btnH: 34,
+          gap: 6,
+          orientation: "vertical",
+          color: "#38bdf8",
+          fontSize: 12,
+          locked: false,
+        };
+      }
+
+      function getFloorSwitcher() {
+        if (!building.floorSwitcher) {
+          building.floorSwitcher = getDefaultFloorSwitcher();
+        }
+        return building.floorSwitcher;
+      }
+
+      function createBlankBuilding() {
+        return {
+          id: "bldg_" + Date.now().toString(36),
+          name: "New Smart Home",
+          unit: "ft",
+          width: 920,
+          height: 600,
+          showDimensions: true,
+          floorSwitcher: getDefaultFloorSwitcher(),
+          floors: [
+            {
+              id: "fl_" + Date.now().toString(36),
+              name: "Ground Floor",
+              code: "G",
+              shapes: [
+                {
+                  id: "sh_outer_" + Date.now().toString(36),
+                  type: "rect",
+                  x: 100,
+                  y: 60,
+                  w: 720,
+                  h: 480,
+                  label: "",
+                  color: "#94a3b8",
+                  strokeWidth: 4,
+                  fillOpacity: 0,
+                  dashed: false,
+                  fontSize: 14,
+                  fontWeight: "700",
+                  rotation: 0,
+                  locked: true,
+                  link: { type: "none", targetId: "", targetName: "" },
+                },
+              ],
+            },
+          ],
+        };
+      }
+
+      function normalizeDesignsStore(raw) {
+        if (!raw) return [];
+        const list = Array.isArray(raw)
+          ? raw
+          : raw.floors && Array.isArray(raw.floors)
+            ? [raw]
+            : [];
+        return list
+          .filter((b) => b && Array.isArray(b.floors) && b.floors.length)
+          .map((b, i) => ({
+            ...b,
+            id: b.id || "bldg_default_" + i,
+            floorSwitcher: {
+              ...getDefaultFloorSwitcher(),
+              ...(b.floorSwitcher || {}),
+            },
+          }));
+      }
+
+      function getLocalDesignsList() {
+        try {
+          return normalizeDesignsStore(
+            JSON.parse(localStorage.getItem(DESIGN_STORAGE_KEY)),
+          );
+        } catch {
+          return [];
+        }
       }
 
       function createDefaultSampleBuilding() {
@@ -3178,17 +3429,47 @@
         };
       }
 
-      function init() {
+      async function init() {
         applyHubTheme();
+        const params = new URLSearchParams(window.location.search);
+        const requestedId = params.get("id");
+        const isNew = params.get("new") === "1";
+
+        let allDesigns = getLocalDesignsList();
         try {
-          const saved = localStorage.getItem(DESIGN_STORAGE_KEY);
-          building = saved ? JSON.parse(saved) : createDefaultSampleBuilding();
-        } catch {
-          building = createDefaultSampleBuilding();
+          const res = await fetch("/api/design", { cache: "no-store" });
+          if (res.ok) {
+            const remote = normalizeDesignsStore(await res.json());
+            if (remote.length) {
+              allDesigns = remote;
+              localStorage.setItem(
+                DESIGN_STORAGE_KEY,
+                JSON.stringify(allDesigns),
+              );
+            }
+          }
+        } catch (_) {}
+
+        if (isNew) {
+          building = createBlankBuilding();
+        } else if (requestedId) {
+          building =
+            allDesigns.find((d) => d.id === requestedId) ||
+            allDesigns[0] ||
+            createDefaultSampleBuilding();
+        } else {
+          building = allDesigns[0] || createDefaultSampleBuilding();
+        }
+
+        if (!building.id) building.id = "bldg_" + Date.now().toString(36);
+        if (!building.floorSwitcher) {
+          building.floorSwitcher = getDefaultFloorSwitcher();
         }
         if (!building.floors || !building.floors.length) {
           building = createDefaultSampleBuilding();
+          building.id = "bldg_" + Date.now().toString(36);
         }
+
         activeFloorId = building.floors[0].id;
         syncBuildingInputs();
         renderFloorList();
@@ -3200,11 +3481,13 @@
       }
 
       function clearSelection() {
+        floorNavSelected = false;
         selectedShapeId = null;
         selectedShapeIds.clear();
       }
 
       function selectSingleShape(id) {
+        floorNavSelected = false;
         selectedShapeIds.clear();
         if (id) {
           selectedShapeIds.add(id);
@@ -3272,6 +3555,8 @@
         showDimensions = building.showDimensions !== false;
         const dimSel = document.getElementById("showDimSelect");
         if (dimSel) dimSel.value = showDimensions ? "1" : "0";
+        const fnSel = document.getElementById("floorNavToggleSelect");
+        if (fnSel) fnSel.value = getFloorSwitcher().enabled ? "1" : "0";
         document.getElementById("bldgNameInput").value =
           building.name || "My Smart Home";
         document.getElementById("topBuildingName").textContent = (
@@ -3785,9 +4070,191 @@
           .map((s) => renderShapeSvg(s))
           .join("");
 
+        renderFloorSwitcherSvg();
         renderSelectionHandles();
         syncTopLockButton();
         syncTopGroupButton();
+      }
+
+      function getFloorSwitcherBounds() {
+        const fs = getFloorSwitcher();
+        const n = Math.max(1, building.floors.length);
+        const pad = 8;
+        const headerH = 18;
+        if (fs.orientation === "horizontal") {
+          return {
+            x: fs.x,
+            y: fs.y,
+            w: pad * 2 + n * fs.w + (n - 1) * fs.gap,
+            h: headerH + pad + fs.btnH + pad,
+          };
+        }
+        return {
+          x: fs.x,
+          y: fs.y,
+          w: fs.w + pad * 2,
+          h: headerH + pad + n * fs.btnH + (n - 1) * fs.gap + pad,
+        };
+      }
+
+      function renderFloorSwitcherSvg() {
+        if (!floorNavLayer) return;
+        const fs = getFloorSwitcher();
+        if (!fs.enabled) {
+          floorNavLayer.innerHTML = "";
+          return;
+        }
+
+        const pad = 8;
+        const headerH = 18;
+        const b = getFloorSwitcherBounds();
+        const accent = fs.color || "#38bdf8";
+        // Vertical stacks highest floor on top, Ground floor at bottom
+        const orderedFloors =
+          fs.orientation === "vertical"
+            ? [...building.floors].reverse()
+            : [...building.floors];
+
+        const buttonsHtml = orderedFloors
+          .map((fl, i) => {
+            const isActive = fl.id === activeFloorId;
+            const bx =
+              fs.orientation === "horizontal"
+                ? b.x + pad + i * (fs.w + fs.gap)
+                : b.x + pad;
+            const by =
+              fs.orientation === "horizontal"
+                ? b.y + headerH + pad
+                : b.y + headerH + pad + i * (fs.btnH + fs.gap);
+            const labelText = fl.code || fl.name.slice(0, 3).toUpperCase();
+
+            return `
+              <g class="floor-nav-btn"
+                 onclick="onFloorNavButtonClick(event, '${escapeHtml(fl.id)}')"
+                 ondblclick="event.stopPropagation(); switchFloor('${escapeHtml(fl.id)}')">
+                <title>${escapeHtml(fl.name)}</title>
+                <rect x="${bx}" y="${by}" width="${fs.w}" height="${fs.btnH}" rx="6"
+                  fill="${isActive ? accent : "var(--bg)"}"
+                  stroke="${isActive ? accent : "var(--border)"}"
+                  stroke-width="${isActive ? 2 : 1.2}" />
+                <text x="${bx + fs.w / 2}" y="${by + fs.btnH / 2 + 1}"
+                  text-anchor="middle" dominant-baseline="middle"
+                  fill="${isActive ? "#031525" : "var(--text)"}"
+                  font-size="${fs.fontSize || 12}" font-weight="800"
+                  style="pointer-events:none">${escapeHtml(labelText)}</text>
+              </g>
+            `;
+          })
+          .join("");
+
+        floorNavLayer.innerHTML = `
+          <g class="floor-nav-svg ${fs.locked ? "is-locked" : ""}"
+             onmousedown="onFloorNavMouseDown(event)">
+            <rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="10"
+              fill="var(--card)" fill-opacity="0.92"
+              stroke="${floorNavSelected && appMode === "design" ? accent : "var(--border)"}"
+              stroke-width="${floorNavSelected && appMode === "design" ? 2 : 1.5}" />
+            <text x="${b.x + b.w / 2}" y="${b.y + 13}"
+              text-anchor="middle" fill="var(--text-muted)"
+              font-size="9" font-weight="800" letter-spacing="0.06em"
+              style="pointer-events:none">FLOORS</text>
+            ${buttonsHtml}
+          </g>
+        `;
+      }
+
+      function onFloorNavButtonClick(e, floorId) {
+        if (appMode === "sim") {
+          e.stopPropagation();
+          switchFloor(floorId);
+          const fl = getActiveFloor();
+          document.getElementById("simStatusText").textContent =
+            `Switched to ${fl?.name || "Floor"}`;
+          showToast(`Viewing ${fl?.name}`);
+        }
+      }
+
+      function onFloorNavMouseDown(e) {
+        if (appMode === "sim") return;
+        e.stopPropagation();
+        clearSelection();
+        floorNavSelected = true;
+        renderCanvas();
+        updateInspector();
+
+        const fs = getFloorSwitcher();
+        if (fs.locked) {
+          showToast("Floor Switcher is locked (Unlock in right panel to move)");
+          return;
+        }
+        pushUndo();
+        const pt = getSvgPoint(e);
+        dragState = {
+          mode: "move-floornav",
+          startMouseX: pt.x,
+          startMouseY: pt.y,
+          origX: fs.x,
+          origY: fs.y,
+        };
+      }
+
+      function onFloorNavResizeDown(e) {
+        if (appMode === "sim") return;
+        e.stopPropagation();
+        const fs = getFloorSwitcher();
+        if (fs.locked) return;
+        pushUndo();
+        const pt = getSvgPoint(e);
+        dragState = {
+          mode: "resize-floornav",
+          startMouseX: pt.x,
+          startMouseY: pt.y,
+          origW: fs.w,
+          origBtnH: fs.btnH,
+        };
+      }
+
+      function toggleFloorSwitcherVisible(show) {
+        pushUndo();
+        const fs = getFloorSwitcher();
+        fs.enabled = !!show;
+        if (!fs.enabled) floorNavSelected = false;
+        syncBuildingInputs();
+        renderCanvas();
+        updateInspector();
+      }
+
+      function toggleFloorNavLock() {
+        pushUndo();
+        const fs = getFloorSwitcher();
+        fs.locked = !fs.locked;
+        renderCanvas();
+        updateInspector();
+      }
+
+      function updateFloorNavProp(key, val) {
+        const fs = getFloorSwitcher();
+        if (fs.locked && ["x", "y", "w", "btnH", "gap"].includes(key)) {
+          return showToast("Floor Switcher is locked");
+        }
+        fs[key] = val;
+        renderCanvas();
+        if (key === "color") renderFloorNavSwatches(val);
+      }
+
+      function renderFloorNavSwatches(activeColor) {
+        const box = document.getElementById("fnColorSwatches");
+        if (!box) return;
+        box.innerHTML =
+          SWATCHES.map(
+            (c) => `
+            <div class="swatch ${activeColor.toLowerCase() === c.toLowerCase() ? "selected" : ""}"
+                 style="background:${c}"
+                 onclick="updateFloorNavProp('color', '${c}')"></div>
+          `,
+          ).join("") +
+          `<input type="color" value="${activeColor}" style="width:26px;height:26px;border:none;background:none;cursor:pointer"
+             onchange="updateFloorNavProp('color', this.value)" />`;
       }
 
       function renderShapeSvg(s) {
@@ -4107,6 +4574,21 @@
         const selectedList = floor.shapes.filter((x) =>
           selectedShapeIds.has(x.id),
         );
+        if (floorNavSelected && getFloorSwitcher().enabled) {
+          const fs = getFloorSwitcher();
+          const b = getFloorSwitcherBounds();
+          html += `
+            <rect class="selection-box ${fs.locked ? "locked-box" : ""}"
+              x="${b.x - 3}" y="${b.y - 3}" width="${b.w + 6}" height="${b.h + 6}" rx="11" />
+            ${
+              fs.locked
+                ? `<text x="${b.x + b.w}" y="${b.y - 6}" text-anchor="end" font-size="11" fill="var(--warn)" font-weight="700">🔒 Locked</text>`
+                : `<rect class="resize-handle" x="${b.x + b.w - 5}" y="${b.y + b.h - 5}" width="10" height="10" rx="2"
+                     title="Drag to resize Floor Switcher buttons"
+                     onmousedown="onFloorNavResizeDown(event)" />`
+            }
+          `;
+        }
         if (!selectedList.length) {
           handlesLayer.innerHTML = html;
           return;
@@ -4760,6 +5242,52 @@
             const arr = [...selectedShapeIds];
             selectedShapeId = arr.length ? arr[arr.length - 1] : null;
             renderSelectionHandles();
+            return;
+          }
+
+          if (dragState.mode === "move-floornav") {
+            const fs = getFloorSwitcher();
+            fs.x = Math.max(
+              0,
+              snap(dragState.origX + (pt.x - dragState.startMouseX)),
+            );
+            fs.y = Math.max(
+              0,
+              snap(dragState.origY + (pt.y - dragState.startMouseY)),
+            );
+            renderCanvas();
+            document.getElementById("fnX").value = fs.x;
+            document.getElementById("fnY").value = fs.y;
+            return;
+          }
+
+          if (dragState.mode === "resize-floornav") {
+            const fs = getFloorSwitcher();
+            const n = Math.max(1, building.floors.length);
+            const dx = pt.x - dragState.startMouseX;
+            const dy = pt.y - dragState.startMouseY;
+            if (fs.orientation === "horizontal") {
+              fs.w = Math.max(
+                30,
+                Math.min(200, Math.round(dragState.origW + dx / n)),
+              );
+              fs.btnH = Math.max(
+                20,
+                Math.min(120, Math.round(dragState.origBtnH + dy)),
+              );
+            } else {
+              fs.w = Math.max(
+                30,
+                Math.min(200, Math.round(dragState.origW + dx)),
+              );
+              fs.btnH = Math.max(
+                20,
+                Math.min(120, Math.round(dragState.origBtnH + dy / n)),
+              );
+            }
+            renderCanvas();
+            document.getElementById("fnW").value = fs.w;
+            document.getElementById("fnBtnH").value = fs.btnH;
             return;
           }
 
@@ -5682,6 +6210,39 @@
         const emptyCard = document.getElementById("noSelectionCard");
         const multiCard = document.getElementById("multiSelectionCard");
         const content = document.getElementById("inspectorContent");
+        const fnCard = document.getElementById("floorNavInspectorCard");
+
+        if (fnCard) fnCard.style.display = "none";
+
+        if (
+          appMode === "design" &&
+          floorNavSelected &&
+          getFloorSwitcher().enabled
+        ) {
+          const fs = getFloorSwitcher();
+          emptyCard.style.display = "none";
+          multiCard.style.display = "none";
+          content.style.display = "none";
+          fnCard.style.display = "block";
+          document.getElementById("fnOrientation").value =
+            fs.orientation || "vertical";
+          document.getElementById("fnX").value = fs.x;
+          document.getElementById("fnY").value = fs.y;
+          document.getElementById("fnW").value = fs.w;
+          document.getElementById("fnBtnH").value = fs.btnH;
+          document.getElementById("fnGap").value = fs.gap;
+          document.getElementById("fnFontSize").value = fs.fontSize || 12;
+          const fnLockBtn = document.getElementById("fnLockToggleBtn");
+          fnLockBtn.innerHTML = fs.locked ? "&#128274;" : "&#128275;";
+          fnLockBtn.className = fs.locked
+            ? "btn btn-sm btn-warn"
+            : "btn btn-sm";
+          ["fnX", "fnY", "fnW", "fnBtnH", "fnGap"].forEach((id) => {
+            document.getElementById(id).disabled = !!fs.locked;
+          });
+          renderFloorNavSwatches(fs.color || "#38bdf8");
+          return;
+        }
 
         if (appMode === "sim" || selectedShapeIds.size === 0) {
           emptyCard.style.display = "block";
@@ -6543,98 +7104,71 @@
 
       async function saveBuildingDesign() {
         if (!(await verifyDesignAction("Save Design"))) return;
-        localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(building));
+        if (!building.id) building.id = "bldg_" + Date.now().toString(36);
+
+        const allDesigns = getLocalDesignsList();
+        const idx = allDesigns.findIndex((d) => d.id === building.id);
+        if (idx !== -1) allDesigns[idx] = building;
+        else allDesigns.push(building);
+
+        localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(allDesigns));
+        history.replaceState(
+          null,
+          "",
+          `design.html?id=${encodeURIComponent(building.id)}`,
+        );
+
         fetch("/api/design", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(building),
+          body: JSON.stringify(allDesigns),
         }).catch(() => {});
-        showToast("Building 2D blueprint saved!");
+
+        showToast(`Saved "${building.name}"!`);
       }
 
-      async function triggerImportDesignJson() {
-        if (!(await verifyDesignAction("Import Design JSON"))) return;
-        const fileInput = document.getElementById("importJsonInput");
-        if (fileInput) fileInput.click();
-      }
+      async function deleteBuildingDesign() {
+        if (!(await verifyDesignAction("Delete Design"))) return;
+        const name = building?.name || "this design";
+        if (
+          !confirm(
+            `Delete "${name}" permanently?\n\nAll floors and shapes inside this design will be removed.`,
+          )
+        ) {
+          return;
+        }
 
-      async function exportDesignJson() {
-        if (!(await verifyDesignAction("Export Design JSON"))) return;
-        const blob = new Blob([JSON.stringify(building, null, 2)], {
-          type: "application/json",
-        });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `${(building.name || "home-building").toLowerCase().replace(/\s+/g, "-")}-2d-svg.json`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-        showToast("Exported 2D SVG Building JSON!");
-      }
+        const remaining = getLocalDesignsList().filter(
+          (d) => d.id !== building.id,
+        );
+        localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(remaining));
 
-      function importDesignJson(event) {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const parsed = JSON.parse(e.target.result);
-            if (
-              !parsed ||
-              !Array.isArray(parsed.floors) ||
-              !parsed.floors.length
-            ) {
-              showToast("Invalid building JSON file");
-              return;
-            }
-            pushUndo();
-            building = {
-              name: parsed.name || "Imported Smart Home",
-              unit: parsed.unit || "ft",
-              width: parsed.width || 920,
-              height: parsed.height || 600,
-              showDimensions: parsed.showDimensions !== false,
-              floors: parsed.floors.map((fl, fIdx) => ({
-                id: fl.id || "fl_" + Date.now().toString(36) + "_" + fIdx,
-                name: fl.name || `Floor ${fIdx}`,
-                code: fl.code || (fIdx === 0 ? "G" : `${fIdx}F`),
-                shapes: Array.isArray(fl.shapes)
-                  ? fl.shapes.map((s, sIdx) => ({
-                      ...s,
-                      id:
-                        s.id ||
-                        "sh_" +
-                          Date.now().toString(36) +
-                          "_" +
-                          fIdx +
-                          "_" +
-                          sIdx,
-                      onColor:
-                        s.type === "icon" ? s.onColor || "#22c55e" : s.onColor,
-                      rotation: Number(s.rotation) || 0,
-                      locked: !!s.locked,
-                      link: s.link || {
-                        type: "none",
-                        targetId: "",
-                        targetName: "",
-                      },
-                    }))
-                  : [],
-              })),
-            };
-            activeFloorId = building.floors[0].id;
-            clearSelection();
-            syncBuildingInputs();
-            renderFloorList();
-            renderCanvas();
-            updateInspector();
-            showToast("Imported 2D SVG Building JSON!");
-          } catch (_) {
-            showToast("Failed to parse JSON file");
-          } finally {
-            event.target.value = "";
-          }
-        };
-        reader.readAsText(file);
+        await fetch("/api/design", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(remaining),
+        }).catch(() => {});
+
+        showToast(`Deleted "${name}"`);
+
+        if (remaining.length) {
+          building = remaining[0];
+          activeFloorId = building.floors[0].id;
+          clearSelection();
+          history.replaceState(
+            null,
+            "",
+            `design.html?id=${encodeURIComponent(building.id)}`,
+          );
+          syncBuildingInputs();
+          renderFloorList();
+          renderCanvas();
+          updateInspector();
+        } else {
+          setTimeout(() => {
+            window.location.href = "config.html";
+          }, 600);
+        }
       }
 
       function escapeHtml(str) {
