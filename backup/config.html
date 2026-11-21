@@ -993,7 +993,7 @@
       <!-- TAB 1: DEVICES -->
       <section class="panel active" id="tab-devices">
         <div class="panel-header">
-          <h2>Saved ESP Devices (<span id="devCountLabel">0</span>)</h2>
+          <h2>Saved Devices (<span id="devCountLabel">0</span>)</h2>
           <div style="display: flex; gap: 8px; flex-wrap: wrap">
             <input
               type="text"
@@ -1031,7 +1031,7 @@
         </div>
 
         <div class="panel-header">
-          <h2>Saved Shortcut Buttons (<span id="scCountLabel">0</span>)</h2>
+          <h2>Saved Buttons (<span id="scCountLabel">0</span>)</h2>
           <div style="display: flex; gap: 8px; flex-wrap: wrap">
             <input
               type="text"
@@ -1054,9 +1054,9 @@
         <div class="card-box">
           <div class="toggle-row" style="padding: 0">
             <div>
-              <div class="toggle-title">Enable Group Section on Home UI</div>
+              <div class="toggle-title">Enable Group Section</div>
               <div class="toggle-desc">
-                Shows categorized room &amp; device groups on the main dashboard
+                Shows categorized room &amp; device groups on Home
               </div>
             </div>
             <input
@@ -1092,11 +1092,9 @@
         <div class="card-box">
           <div class="toggle-row" style="padding: 0">
             <div>
-              <div class="toggle-title">
-                Enable Favorites Section on Home UI
-              </div>
+              <div class="toggle-title">Enable Favorites Section</div>
               <div class="toggle-desc">
-                Shows the pinned Favorites Dock at the top of the home page
+                Shows the Favorites Dock at home page
               </div>
             </div>
             <input
@@ -1264,7 +1262,7 @@
               </div>
             </div>
             <div class="field">
-              <label>Portal Timeout (Seconds)</label>
+              <label>Portal Timeout (Sec)</label>
               <input
                 type="number"
                 id="netApTimeout"
@@ -1469,7 +1467,7 @@
 
           <div class="form-grid">
             <div class="field">
-              <label>IP Range (Start – End)</label>
+              <label>IP Range</label>
               <div style="display: flex; align-items: center; gap: 6px">
                 <input
                   type="number"
@@ -1498,7 +1496,7 @@
             </div>
 
             <div class="field">
-              <label>IoT Web Port (Default 80)</label>
+              <label>Device Port (Default 80)</label>
               <input
                 type="number"
                 id="scanPort"
@@ -1513,7 +1511,7 @@
             </div>
 
             <div class="field">
-              <label>Top-Level Domain (TLD)</label>
+              <label>Top Level Domain (TLD)</label>
               <input
                 type="text"
                 id="scanTld"
@@ -2239,13 +2237,11 @@
         <div
           id="saveStatus"
           style="font-size: 0.82rem; color: var(--text-muted)"
-        >
-          All changes synced
-        </div>
+        ></div>
         <div style="display: flex; gap: 8px">
           <button class="btn" onclick="discardChanges()">Discard</button>
           <button class="btn btn-primary" id="saveNvsBtn" onclick="saveToNvs()">
-            Save to ESP32
+            Save Settings
           </button>
         </div>
       </div>
@@ -2272,7 +2268,7 @@
             />
           </div>
           <div class="field" style="grid-column: 1 / -1">
-            <label>Groups (Select One or Multiple)</label>
+            <label>Add to Groups</label>
             <div class="check-list-box" id="devGroupsBox"></div>
           </div>
           <div class="field">
@@ -2285,7 +2281,7 @@
             />
           </div>
           <div class="field">
-            <label>mDNS Hostname</label>
+            <label>Hostname</label>
             <input
               type="text"
               id="devMdns"
@@ -2308,7 +2304,7 @@
             />
           </div>
           <div class="field">
-            <label>Secondary Button Name (Optional)</label>
+            <label>Secondary Button Name</label>
             <input
               type="text"
               id="devAltLabel"
@@ -2396,7 +2392,7 @@
             />
           </div>
           <div class="field" style="grid-column: 1 / -1">
-            <label>Groups (Select One or Multiple)</label>
+            <label>Add to Groups</label>
             <div class="check-list-box" id="scGroupsBox"></div>
           </div>
           <div class="field">
@@ -2530,12 +2526,12 @@
         </div>
 
         <div class="field" style="margin-top: 14px">
-          <label>Assign Saved Devices (Optional)</label>
+          <label>Assign Saved Devices</label>
           <div class="check-list-box" id="grpDevicesCheckList"></div>
         </div>
 
         <div class="field" style="margin-top: 12px">
-          <label>Assign Saved Shortcut Buttons (Optional)</label>
+          <label>Assign Saved Shortcut Buttons</label>
           <div class="check-list-box" id="grpShortcutsCheckList"></div>
         </div>
 
@@ -2560,7 +2556,7 @@
 
         <div class="form-grid">
           <div class="field">
-            <label>Favorite / Card Name *</label>
+            <label>Favorite Card Name *</label>
             <input
               type="text"
               id="favName"
@@ -2581,17 +2577,17 @@
         </div>
 
         <div class="field" style="margin-top: 14px">
-          <label>Include Saved Devices (Optional)</label>
+          <label>Include Saved Devices</label>
           <div class="check-list-box" id="favDevicesCheckList"></div>
         </div>
 
         <div class="field" style="margin-top: 12px">
-          <label>Include Saved Shortcut Buttons (Optional)</label>
+          <label>Include Saved Shortcut Buttons</label>
           <div class="check-list-box" id="favShortcutsCheckList"></div>
         </div>
 
         <div class="field" style="margin-top: 12px">
-          <label>Include Saved Groups (Optional)</label>
+          <label>Include Saved Groups</label>
           <div class="check-list-box" id="favGroupsCheckList"></div>
         </div>
 
@@ -2947,7 +2943,7 @@
       function markDirty() {
         isDirty = true;
         document.getElementById("saveStatus").innerHTML =
-          `<span class="unsaved-dot"></span>Unsaved changes`;
+          `<span class="unsaved-dot"></span>Unsaved Settings`;
         updateNvsMeter();
       }
 
@@ -3704,7 +3700,7 @@
           config.devices.length;
 
         if (!config.devices.length) {
-          list.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">No devices saved yet. Click <strong>+ Add Device</strong> or use the <strong>mDNS Scanner</strong>.</div>`;
+          list.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">Click <strong>+ Add Device</strong> or use the <strong>mDNS Scanner</strong>.</div>`;
           return;
         }
 
@@ -3990,7 +3986,7 @@
           config.shortcuts.length;
 
         if (!config.shortcuts.length) {
-          list.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">No shortcut buttons saved yet. Click <strong>+ Add Shortcut</strong> to create an API toggle button.</div>`;
+          list.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">Click <strong>+ Add Shortcut</strong> to create an API toggle button.</div>`;
           return;
         }
 
@@ -4587,7 +4583,7 @@
           config.favorites.length;
 
         if (!config.favorites.length) {
-          list.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">No favorites pinned yet. Click <strong>+ Add Favorite</strong> or pin any Device / Shortcut.</div>`;
+          list.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">Click <strong>+ Add Favorite</strong></div>`;
           return;
         }
 
