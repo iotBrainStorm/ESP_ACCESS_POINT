@@ -1979,6 +1979,34 @@
                 oninput="updatePref('pingTimeoutMs', Number(this.value))"
               />
             </div>
+            <div class="field">
+              <label>Shortcut Auto-Sync Interval</label>
+              <select
+                id="prefSyncMs"
+                class="select"
+                onchange="updatePref('shortcutSyncMs', Number(this.value))"
+              >
+                <option value="1500">Fast (1.5s)</option>
+                <option value="2500">Balanced (2.5s - Default)</option>
+                <option value="5000">Power Save (5.0s)</option>
+                <option value="10000">Low Traffic (10s)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Default Home Device View</label>
+              <select
+                id="prefDefaultView"
+                class="select"
+                onchange="updatePref('defaultViewMode', this.value)"
+              >
+                <option value="grid">Grid View</option>
+                <option value="list">Compact List View</option>
+              </select>
+            </div>
+            <div class="field" style="grid-column: 1 / -1">
+              <label>Global Accent Color</label>
+              <div class="color-row" id="prefAccentPicker"></div>
+            </div>
           </div>
 
           <div class="toggle-row">
@@ -2039,6 +2067,55 @@
               id="prefAutoPing"
               onchange="updatePref('autoPing', this.checked)"
             />
+          </div>
+
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-title">Haptic Tap Feedback (Mobile)</div>
+              <div class="toggle-desc">
+                Subtle vibration when toggling smart switches on phones
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="switch"
+              id="prefHaptic"
+              onchange="updatePref('hapticFeedback', this.checked)"
+            />
+          </div>
+
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-title">Confirm Before Toggling Switches</div>
+              <div class="toggle-desc">
+                Prevents accidental relay toggles while scrolling on mobile
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="switch"
+              id="prefConfirmToggle"
+              onchange="updatePref('confirmShortcutToggle', this.checked)"
+            />
+          </div>
+        </div>
+
+        <div class="card-box">
+          <div class="toggle-row" style="padding: 0">
+            <div>
+              <div class="toggle-title">Home UI Layout &amp; Card Studio</div>
+              <div class="toggle-desc">
+                Customize card sizes, colors, columns, section order &amp;
+                preview in Mobile / Desktop views
+              </div>
+            </div>
+            <a
+              href="layout.html"
+              class="btn btn-primary"
+              style="white-space: nowrap; text-decoration: none"
+            >
+              Go to Layout
+            </a>
           </div>
         </div>
 
@@ -2879,25 +2956,31 @@
           "data-theme",
           config.settings.theme || "dark",
         );
+        const acc = config.settings.accentColor || "";
+        if (acc) {
+          document.documentElement.style.setProperty("--accent", acc);
+          document.documentElement.style.setProperty(
+            "--accent-soft",
+            `color-mix(in srgb, ${acc} 16%, transparent)`,
+          );
+        } else {
+          document.documentElement.style.removeProperty("--accent");
+          document.documentElement.style.removeProperty("--accent-soft");
+        }
       }
 
-      // function populateGroupSelect(selectId, selectedVal = "none") {
-      //   const sel = document.getElementById(selectId);
-      //   let html = `<option value="none">None</option>`;
-      //   html += config.groups
-      //     .map(
-      //       (g) =>
-      //         `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`,
-      //     )
-      //     .join("");
-      //   sel.innerHTML = html;
-      //   sel.value =
-      //     selectedVal &&
-      //     (selectedVal === "none" ||
-      //       config.groups.some((g) => g.id === selectedVal))
-      //       ? selectedVal
-      //       : "none";
-      // }
+      function renderPrefAccentPicker() {
+        const box = document.getElementById("prefAccentPicker");
+        if (!box) return;
+        const cur = config.settings.accentColor || "";
+        box.innerHTML =
+          `<button type="button" class="btn btn-sm" style="${!cur ? "border-color:var(--accent);color:var(--accent)" : ""}" onclick="updatePref('accentColor',''); applyTheme(); renderPrefAccentPicker()">Default</button>` +
+          SWATCHES.map(
+            (c) =>
+              `<div class="swatch ${cur.toLowerCase() === c ? "selected" : ""}" style="background:${c}" onclick="updatePref('accentColor','${c}'); applyTheme(); renderPrefAccentPicker()"></div>`,
+          ).join("") +
+          `<input type="color" value="${cur || "#38bdf8"}" style="width:32px;height:28px;border:none;background:none" onchange="updatePref('accentColor',this.value); applyTheme(); renderPrefAccentPicker()" />`;
+      }
 
       function getItemGroups(item) {
         if (!item) return [];
@@ -3106,6 +3189,12 @@
             enableShortcuts: true,
             enableGroups: true,
             enableFavorites: true,
+            accentColor: "",
+            shortcutSyncMs: 2500,
+            defaultViewMode: "grid",
+            hapticFeedback: true,
+            confirmShortcutToggle: false,
+            uiLayout: null,
           },
           network: {
             mode: "dhcp",
@@ -5750,10 +5839,28 @@
           s.enableGroups !== false;
         document.getElementById("enableFavoritesToggle").checked =
           s.enableFavorites !== false;
+
+        if (document.getElementById("prefSyncMs"))
+          document.getElementById("prefSyncMs").value = String(
+            s.shortcutSyncMs || 2500,
+          );
+        if (document.getElementById("prefDefaultView"))
+          document.getElementById("prefDefaultView").value =
+            s.defaultViewMode || "grid";
+        if (document.getElementById("prefHaptic"))
+          document.getElementById("prefHaptic").checked =
+            s.hapticFeedback !== false;
+        if (document.getElementById("prefConfirmToggle"))
+          document.getElementById("prefConfirmToggle").checked =
+            !!s.confirmShortcutToggle;
+        renderPrefAccentPicker();
       }
 
       function updatePref(key, val) {
         config.settings[key] = val;
+        if (key === "showIpOnCard" && config.settings.uiLayout?.group) {
+          config.settings.uiLayout.group.showAddr = val;
+        }
         markDirty();
       }
 
@@ -5840,38 +5947,46 @@
         document.getElementById("designListModal").classList.add("open");
         syncModalScrollLock();
 
+        const hasPendingImport = pendingImportedDesigns !== null;
         const designs = await loadAllSavedDesigns();
         if (!designs.length) {
           listEl.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">No saved designs found yet. Click <strong>+ New Design</strong> to create one.</div>`;
           return;
         }
 
-        listEl.innerHTML = designs
-          .map((d) => {
-            const floorCount = d.floors.length;
-            const shapeCount = d.floors.reduce(
-              (sum, f) => sum + (f.shapes?.length || 0),
-              0,
-            );
-            const openUrl = `design.html?id=${encodeURIComponent(d.id)}`;
-            return `
-              <div class="dev-row">
-                <div class="dev-row-left">
-                  <div class="icon-box" style="background:var(--accent-soft);color:var(--accent)">
-                    ${svgIcon("home", 20)}
+        const pendingBanner = hasPendingImport
+          ? `<div class="card-box" style="border-color:var(--warn);color:var(--warn);font-size:0.78rem;margin-bottom:4px">Imported designs are staged. Click <strong>Save to ESP32</strong> first before opening them.</div>`
+          : "";
+
+        listEl.innerHTML =
+          pendingBanner +
+          designs
+            .map((d) => {
+              const floorCount = d.floors.length;
+              const shapeCount = d.floors.reduce(
+                (sum, f) => sum + (f.shapes?.length || 0),
+                0,
+              );
+              const openUrl = `design.html?id=${encodeURIComponent(d.id)}`;
+              const actionHtml = hasPendingImport
+                ? `<button class="btn btn-sm" disabled>Save First</button>`
+                : `<a href="${openUrl}" class="btn btn-primary btn-sm" style="text-decoration:none">Open</a>`;
+              return `
+                <div class="dev-row">
+                  <div class="dev-row-left">
+                    <div class="icon-box" style="background:var(--accent-soft);color:var(--accent)">
+                      ${svgIcon("home", 20)}
+                    </div>
+                    <div>
+                      <div class="dev-row-title">${escapeHtml(d.name)}</div>
+                      <div class="dev-row-sub">${floorCount} Floor${floorCount > 1 ? "s" : ""} &bull; ${shapeCount} Shapes</div>
+                    </div>
                   </div>
-                  <div>
-                    <div class="dev-row-title">${escapeHtml(d.name)}</div>
-                    <div class="dev-row-sub">${floorCount} Floor${floorCount > 1 ? "s" : ""} &bull; ${shapeCount} Shapes</div>
-                  </div>
+                  <div class="row-actions">${actionHtml}</div>
                 </div>
-                <div class="row-actions">
-                  <a href="${openUrl}" class="btn btn-primary btn-sm" style="text-decoration:none">Open</a>
-                </div>
-              </div>
-            `;
-          })
-          .join("");
+              `;
+            })
+            .join("");
       }
 
       function closeDesignListModal() {
@@ -5917,7 +6032,7 @@
         btn.disabled = true;
         btn.textContent = "Saving...";
 
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        const hadDesigns = pendingImportedDesigns !== null;
 
         try {
           if (!isOfflinePreview) {
@@ -5926,22 +6041,25 @@
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(config),
             });
-            if (!res.ok) throw new Error("ESP32 NVS write failed");
+            if (!res.ok) throw new Error("ESP32 NVS config write failed");
           }
 
-          // Also commit restored designs from Import JSON
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+
+          // Commit restored designs only if backend write succeeds
           if (pendingImportedDesigns !== null) {
+            if (!isOfflinePreview) {
+              const dRes = await fetch("/api/design", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(pendingImportedDesigns),
+              });
+              if (!dRes.ok) throw new Error("ESP32 design write failed");
+            }
             localStorage.setItem(
               DESIGN_STORAGE_KEY,
               JSON.stringify(pendingImportedDesigns),
             );
-            if (!isOfflinePreview) {
-              await fetch("/api/design", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(pendingImportedDesigns),
-              }).catch(() => {});
-            }
             pendingImportedDesigns = null;
           }
 
@@ -5950,9 +6068,13 @@
           document.getElementById("saveStatus").textContent = isOfflinePreview
             ? "Saved to Browser Storage (Preview Mode)"
             : "Saved to ESP32 NVS successfully";
-          showToast("Configuration & designs saved!");
+          showToast(
+            hadDesigns
+              ? "Configuration & designs saved!"
+              : "Configuration saved!",
+          );
         } catch (e) {
-          showToast("Error saving to ESP32 NVS");
+          showToast(e.message || "Error saving to ESP32 NVS");
         } finally {
           btn.disabled = false;
           btn.textContent = "Save to ESP32";
@@ -6000,7 +6122,6 @@
 
         try {
           const allDesigns = await loadAllSavedDesigns();
-          // Bundle everything cleanly without bloating the 16KB NVS config object
           const fullBackup = {
             backupVersion: 2,
             exportedAt: new Date().toISOString(),
@@ -6011,11 +6132,14 @@
           const blob = new Blob([JSON.stringify(fullBackup, null, 2)], {
             type: "application/json",
           });
+          const blobUrl = URL.createObjectURL(blob);
           const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
+          a.href = blobUrl;
           a.download = `esp-iot-hub-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
+          document.body.appendChild(a);
           a.click();
-          URL.revokeObjectURL(a.href);
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
           showToast(
             `Exported full backup (${allDesigns.length} design${allDesigns.length === 1 ? "" : "s"} included)!`,
           );
@@ -6097,8 +6221,10 @@
         if (!(await verifyAction("restart", "Restart ESP32 Hub"))) return;
         if (!confirm("Restart the central ESP32 hub?")) return;
         showToast("Restarting ESP32...");
-        if (!isOfflinePreview) clearLockoutData();
-        await fetch("/api/reboot", { method: "POST" }).catch(() => {});
+        clearLockoutData();
+        if (!isOfflinePreview) {
+          await fetch("/api/reboot", { method: "POST" }).catch(() => {});
+        }
         setTimeout(() => (location.href = "index.html"), 4000);
       }
 

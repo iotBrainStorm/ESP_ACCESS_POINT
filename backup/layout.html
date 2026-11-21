@@ -1,0 +1,3164 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#0b1120" />
+    <title>Home Layout</title>
+    <link rel="icon" type="image/svg+xml" href="layout.svg" />
+    <style>
+      /* ==========================================================================
+         1. THEME VARIABLES & RESET
+         ========================================================================== */
+      :root {
+        --bg: #0b1120;
+        --bg-elev: #111827;
+        --card: #162033;
+        --card-hover: #1d2942;
+        --border: #24324d;
+        --text: #f1f5f9;
+        --text-muted: #94a3b8;
+        --accent: #38bdf8;
+        --accent-soft: rgba(56, 189, 248, 0.16);
+        --ok: #22c55e;
+        --err: #ef4444;
+        --warn: #f59e0b;
+        --star: #fbbf24;
+        --shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+        --radius: 14px;
+      }
+
+      [data-theme="amoled"] {
+        --bg: #000000;
+        --bg-elev: #09090b;
+        --card: #121215;
+        --card-hover: #1a1a1f;
+        --border: #27272a;
+        --text: #fafafa;
+        --text-muted: #a1a1aa;
+        --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      }
+
+      [data-theme="light"] {
+        --bg: #f1f5f9;
+        --bg-elev: #ffffff;
+        --card: #ffffff;
+        --card-hover: #f8fafc;
+        --border: #cbd5e1;
+        --text: #0f172a;
+        --text-muted: #64748b;
+        --accent: #0284c7;
+        --accent-soft: rgba(2, 132, 199, 0.12);
+        --shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      html,
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+        line-height: 1.45;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ==========================================================================
+         2. TOP STUDIO BAR
+         ========================================================================== */
+      .topbar {
+        background: var(--bg-elev);
+        border-bottom: 1px solid var(--border);
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        z-index: 40;
+        flex-shrink: 0;
+      }
+
+      .topbar-left,
+      .topbar-center,
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--text);
+        text-decoration: none;
+        font-size: 0.8rem;
+        font-weight: 700;
+        transition: 0.15s;
+      }
+      .back-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .studio-title {
+        font-size: 0.96rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .badge {
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        white-space: nowrap;
+      }
+
+      .seg-toggle {
+        display: inline-flex;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 2px;
+        gap: 2px;
+      }
+
+      .seg-btn {
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 5px 11px;
+        border-radius: 7px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: 0.15s;
+      }
+      .seg-btn.active {
+        background: var(--accent);
+        color: #031525;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--text);
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.15s;
+        white-space: nowrap;
+      }
+      .btn:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #031525;
+        font-weight: 700;
+      }
+      .btn-primary:hover:not(:disabled) {
+        color: #031525;
+        filter: brightness(1.08);
+      }
+      .btn-sm {
+        height: 28px;
+        padding: 0 9px;
+        font-size: 0.72rem;
+        border-radius: 7px;
+      }
+
+      .mobile-pane-switch {
+        display: none;
+        background: var(--bg-elev);
+        border-bottom: 1px solid var(--border);
+        padding: 8px 12px;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      /* ==========================================================================
+         3. 2-COLUMN WORKSPACE (CONTROLS + LIVE PREVIEW)
+         ========================================================================== */
+      .workspace {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 370px 1fr;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* Left Controls Sidebar */
+      .controls-pane {
+        background: var(--bg-elev);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .ctrl-tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-elev);
+        flex-shrink: 0;
+      }
+
+      .ctrl-tab {
+        padding: 7px 4px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--text-muted);
+        font-size: 0.74rem;
+        font-weight: 700;
+        cursor: pointer;
+        text-align: center;
+        transition: 0.15s;
+      }
+      .ctrl-tab.active {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .ctrl-scroll {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        scrollbar-width: thin;
+      }
+
+      .ctrl-panel {
+        display: none;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .ctrl-panel.active {
+        display: flex;
+      }
+
+      .ctrl-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+      }
+
+      .ctrl-card-title {
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin-bottom: 10px;
+      }
+      .field:last-child {
+        margin-bottom: 0;
+      }
+      .field label {
+        font-size: 0.74rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .field-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .field-row:last-child {
+        margin-bottom: 0;
+      }
+      .field-row .field {
+        margin-bottom: 0;
+      }
+
+      .select,
+      .input {
+        width: 100%;
+        height: 34px;
+        padding: 0 9px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 0.8rem;
+        outline: none;
+      }
+      .select:focus,
+      .input:focus {
+        border-color: var(--accent);
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+      .toggle-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+      .toggle-row:first-child {
+        padding-top: 0;
+      }
+
+      input[type="checkbox"].switch {
+        appearance: none;
+        width: 38px;
+        height: 22px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        position: relative;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: 0.2s;
+      }
+      input[type="checkbox"].switch::after {
+        content: "";
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        top: 2px;
+        left: 2px;
+        transition: 0.2s;
+      }
+      input[type="checkbox"].switch:checked {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      input[type="checkbox"].switch:checked::after {
+        background: #031525;
+        transform: translateX(16px);
+      }
+
+      .swatch-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        align-items: center;
+      }
+      .swatch {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        cursor: pointer;
+        transition: 0.12s;
+      }
+      .swatch.selected {
+        border-color: #ffffff;
+        box-shadow: 0 0 0 2px var(--accent);
+        transform: scale(1.1);
+      }
+
+      .preset-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+      .preset-btn {
+        padding: 8px 9px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 0.74rem;
+        font-weight: 700;
+        cursor: pointer;
+        text-align: left;
+        transition: 0.15s;
+      }
+      .preset-btn span {
+        display: block;
+        font-size: 0.66rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+      .preset-btn:hover {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+
+      .order-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .order-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 7px 10px;
+        border-radius: 8px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        font-size: 0.8rem;
+        font-weight: 700;
+      }
+
+      /* ==========================================================================
+         4. RIGHT LIVE PREVIEW STAGE
+         ========================================================================== */
+      .preview-pane {
+        background: radial-gradient(
+          circle at 1px 1px,
+          var(--border) 1px,
+          transparent 0
+        );
+        background-size: 22px 22px;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .preview-toolbar {
+        padding: 8px 14px;
+        background: color-mix(in srgb, var(--bg-elev) 90%, transparent);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+        flex-shrink: 0;
+      }
+
+      .preview-viewport {
+        flex: 1;
+        overflow: auto;
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      .preview-frame {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: 0 20px 55px rgba(0, 0, 0, 0.45);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 620px;
+        transition:
+          width 0.25s ease,
+          border-radius 0.25s ease;
+      }
+
+      .preview-frame.mobile-mode {
+        width: 390px;
+        max-width: 100%;
+        border: 8px solid #1e293b;
+        border-radius: 34px;
+        min-height: 740px;
+      }
+
+      .mobile-notch {
+        display: none;
+        height: 24px;
+        background: var(--bg-elev);
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--border);
+      }
+      .preview-frame.mobile-mode .mobile-notch {
+        display: flex;
+      }
+
+      /* ==========================================================================
+         5. LIVE PREVIEW HOME UI STYLES (MIRRORS index.html EXACTLY)
+         ========================================================================== */
+      .pv-topbar {
+        background: color-mix(in srgb, var(--bg-elev) 90%, transparent);
+        border-bottom: 1px solid var(--border);
+      }
+      .pv-topbar-inner {
+        max-width: var(--pv-max-w, 1280px);
+        margin: 0 auto;
+        padding: 11px 14px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+      }
+      .pv-brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-right: auto;
+        min-width: 0;
+      }
+      .pv-brand-ico {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+      }
+      .pv-brand h1 {
+        font-size: 0.96rem;
+        font-weight: 800;
+      }
+      .pv-brand-sub {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-wrap: wrap;
+      }
+      .pv-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        font-size: 0.68rem;
+        font-weight: 600;
+      }
+      .pv-search {
+        flex: 1 1 180px;
+        max-width: 260px;
+        height: 32px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--text-muted);
+        padding: 0 10px;
+        display: flex;
+        align-items: center;
+        font-size: 0.78rem;
+      }
+      .preview-frame.mobile-mode .pv-search {
+        order: 3;
+        flex: 1 1 100%;
+        max-width: 100%;
+      }
+      .pv-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .pv-map-btn {
+        height: 32px;
+        padding: 0 10px;
+        border-radius: 9px;
+        border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--border));
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .preview-frame.mobile-mode .pv-map-btn span {
+        display: none;
+      }
+      .pv-ico-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--text);
+        display: grid;
+        place-items: center;
+      }
+
+      .pv-main {
+        width: 100%;
+        max-width: var(--pv-max-w, 1280px);
+        margin: 0 auto;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        flex: 1;
+      }
+
+      .pv-sec-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .dot.online {
+        background: var(--ok);
+      }
+      .dot.offline {
+        background: var(--err);
+      }
+
+      /* Card Surface Styles */
+      .preview-frame[data-card-style="glass"] .pv-sc-card,
+      .preview-frame[data-card-style="glass"] .pv-dev-card {
+        background: color-mix(in srgb, var(--card) 62%, transparent);
+        backdrop-filter: blur(10px);
+        border-color: color-mix(in srgb, var(--text) 14%, transparent);
+      }
+      .preview-frame[data-card-style="bordered"] .pv-sc-card,
+      .preview-frame[data-card-style="bordered"] .pv-dev-card {
+        background: transparent;
+        box-shadow: none;
+        border-width: 1.5px;
+      }
+      .preview-frame[data-card-style="elevated"] .pv-sc-card,
+      .preview-frame[data-card-style="elevated"] .pv-dev-card {
+        border-color: transparent;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.36);
+      }
+      .preview-frame[data-card-style="flat"] .pv-sc-card,
+      .preview-frame[data-card-style="flat"] .pv-dev-card {
+        box-shadow: none;
+      }
+
+      /* Grids & Responsive Column Controls */
+      .pv-sc-grid {
+        display: grid;
+        grid-template-columns: var(
+          --cols-desk,
+          repeat(auto-fill, minmax(210px, 1fr))
+        );
+        gap: var(--grid-gap, 12px);
+      }
+      .pv-dev-grid {
+        display: grid;
+        grid-template-columns: var(
+          --cols-desk,
+          repeat(auto-fill, minmax(255px, 1fr))
+        );
+        gap: var(--grid-gap, 14px);
+      }
+      .preview-frame.mobile-mode .pv-sc-grid,
+      .preview-frame.mobile-mode .pv-dev-grid {
+        grid-template-columns: var(--cols-mob, 1fr);
+        gap: 10px;
+      }
+
+      /* Favorites Horizontal Strip & Pill modes */
+      .pv-sc-grid[data-layout="strip"] {
+        display: flex;
+        overflow-x: auto;
+        gap: 10px;
+        padding-bottom: 4px;
+      }
+      .pv-sc-grid[data-layout="strip"] .pv-sc-card {
+        min-width: 190px;
+        flex-shrink: 0;
+      }
+      .pv-sc-grid[data-layout="pill"] {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .pv-sc-grid[data-layout="pill"] .pv-sc-card {
+        border-radius: 999px;
+        padding: 7px 14px;
+        width: auto;
+      }
+      .pv-sc-grid[data-layout="pill"] .pv-sc-card::before {
+        display: none;
+      }
+
+      /* Shortcut / Favorite Card Base */
+      .pv-sc-card {
+        position: relative;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--pv-radius, 14px);
+        padding: var(--card-pad, 12px 14px);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        cursor: pointer;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        transition: 0.16s ease;
+        user-select: none;
+      }
+      .pv-sc-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 4px;
+        background: var(--sc-color, var(--accent));
+        opacity: 0.65;
+      }
+      .pv-sc-grid[data-accent-pos="top"] .pv-sc-card::before {
+        right: 0;
+        bottom: auto;
+        width: auto;
+        height: 3px;
+      }
+      .pv-sc-grid[data-accent-pos="none"] .pv-sc-card::before {
+        display: none;
+      }
+      .pv-sc-grid[data-accent-pos="tint"] .pv-sc-card::before {
+        display: none;
+      }
+      .pv-sc-grid[data-accent-pos="tint"] .pv-sc-card {
+        background: color-mix(
+          in srgb,
+          var(--sc-color, var(--accent)) 12%,
+          var(--card)
+        );
+        border-color: color-mix(
+          in srgb,
+          var(--sc-color, var(--accent)) 35%,
+          var(--border)
+        );
+      }
+
+      /* Tile Layout for Shortcuts */
+      .pv-sc-grid[data-layout="tile"] .pv-sc-card {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 14px 10px;
+        gap: 8px;
+      }
+      .pv-sc-grid[data-layout="tile"] .pv-sc-left {
+        flex-direction: column;
+        gap: 6px;
+      }
+      .pv-sc-grid[data-layout="tile"] .pv-sc-title {
+        justify-content: center;
+      }
+
+      /* Size Variants */
+      .pv-sc-grid[data-size="sm"] {
+        --card-pad: 8px 10px;
+        --grid-gap: 8px;
+      }
+      .pv-sc-grid[data-size="sm"] .pv-sc-ico {
+        width: 30px;
+        height: 30px;
+      }
+      .pv-sc-grid[data-size="sm"] .pv-sc-title {
+        font-size: 0.8rem;
+      }
+      .pv-sc-grid[data-size="lg"] {
+        --card-pad: 16px 18px;
+        --grid-gap: 14px;
+      }
+      .pv-sc-grid[data-size="lg"] .pv-sc-ico {
+        width: 44px;
+        height: 44px;
+      }
+      .pv-sc-grid[data-size="lg"] .pv-sc-title {
+        font-size: 0.98rem;
+      }
+
+      /* Active ON Styles */
+      .pv-sc-card.on {
+        border-color: var(--sc-color, var(--ok));
+        background: color-mix(
+          in srgb,
+          var(--sc-color, var(--ok)) 12%,
+          var(--card)
+        );
+      }
+      .pv-sc-card.on::before {
+        opacity: 1;
+      }
+      .pv-sc-grid[data-on-style="solid"] .pv-sc-card.on {
+        background: var(--sc-color, var(--ok));
+        color: #031525;
+      }
+      .pv-sc-grid[data-on-style="solid"] .pv-sc-card.on .pv-sc-sub,
+      .pv-sc-grid[data-on-style="solid"] .pv-sc-card.on .pv-sc-ico {
+        color: #031525;
+        background: rgba(3, 21, 37, 0.14);
+      }
+      .pv-sc-grid[data-on-style="solid"] .pv-sc-card.on .pv-sc-pill {
+        background: #031525;
+        color: #ffffff;
+        border-color: transparent;
+      }
+      .pv-sc-grid[data-on-style="glow"] .pv-sc-card.on {
+        box-shadow:
+          0 0 0 1px var(--sc-color, var(--ok)),
+          0 0 18px
+            color-mix(in srgb, var(--sc-color, var(--ok)) 42%, transparent);
+      }
+
+      .pv-sc-left {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+      }
+      .pv-sc-ico {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        background: color-mix(
+          in srgb,
+          var(--sc-color, var(--accent)) 16%,
+          transparent
+        );
+        color: var(--sc-color, var(--accent));
+      }
+      .pv-sc-title {
+        font-size: 0.88rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+      .pv-sc-title span.txt {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pv-sc-sub {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pv-sc-right {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .pv-sc-pill {
+        font-size: 0.68rem;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text-muted);
+      }
+      .pv-sc-card.on .pv-sc-pill {
+        background: rgba(34, 197, 94, 0.16);
+        border-color: var(--ok);
+        color: var(--ok);
+      }
+
+      /* Group Headers & Device Cards */
+      .pv-group-block {
+        margin-bottom: 18px;
+      }
+      .pv-group-block:last-child {
+        margin-bottom: 0;
+      }
+      .pv-group-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+      }
+      .pv-group-head.collapsible {
+        cursor: pointer;
+        user-select: none;
+      }
+      .pv-group-head[data-style="pill"] {
+        border-bottom: none;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 5px 12px;
+        width: fit-content;
+      }
+      .pv-group-head[data-style="minimal"] {
+        border-bottom: none;
+        padding-bottom: 2px;
+      }
+      .pv-group-bar {
+        width: 4px;
+        height: 15px;
+        border-radius: 4px;
+      }
+      .pv-group-title {
+        font-size: 0.88rem;
+        font-weight: 700;
+      }
+      .pv-tab-count {
+        font-size: 0.68rem;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.16);
+      }
+      .pv-group-block.collapsed .pv-group-body {
+        display: none;
+      }
+
+      .pv-dev-card {
+        position: relative;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--pv-radius, 14px);
+        padding: var(--dev-pad, 13px);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 10px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .pv-dev-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--card-accent, var(--accent));
+      }
+      .pv-dev-grid[data-accent-pos="left"] .pv-dev-card::before {
+        right: auto;
+        bottom: 0;
+        width: 4px;
+        height: auto;
+      }
+      .pv-dev-grid[data-accent-pos="none"] .pv-dev-card::before,
+      .pv-dev-grid[data-accent-pos="tint"] .pv-dev-card::before {
+        display: none;
+      }
+      .pv-dev-grid[data-accent-pos="tint"] .pv-dev-card {
+        background: color-mix(
+          in srgb,
+          var(--card-accent, var(--accent)) 10%,
+          var(--card)
+        );
+        border-color: color-mix(
+          in srgb,
+          var(--card-accent, var(--accent)) 35%,
+          var(--border)
+        );
+      }
+
+      .pv-dev-grid[data-size="sm"] {
+        --dev-pad: 9px 11px;
+        --grid-gap: 9px;
+      }
+      .pv-dev-grid[data-size="sm"] .pv-dev-ico {
+        width: 32px;
+        height: 32px;
+      }
+      .pv-dev-grid[data-size="sm"] .pv-dev-name {
+        font-size: 0.84rem;
+      }
+      .pv-dev-grid[data-size="lg"] {
+        --dev-pad: 17px;
+        --grid-gap: 16px;
+      }
+      .pv-dev-grid[data-size="lg"] .pv-dev-ico {
+        width: 48px;
+        height: 48px;
+      }
+      .pv-dev-grid[data-size="lg"] .pv-dev-name {
+        font-size: 1.04rem;
+      }
+
+      /* Device Card Layouts: compact & tile */
+      .pv-dev-grid[data-layout="compact"] .pv-dev-card {
+        flex-direction: row;
+        align-items: center;
+        padding: 9px 12px;
+      }
+      .pv-dev-grid[data-layout="compact"] .pv-dev-bottom {
+        border-top: none;
+        padding-top: 0;
+        margin-left: auto;
+      }
+      .pv-dev-grid[data-layout="tile"] .pv-dev-card {
+        align-items: center;
+        text-align: center;
+      }
+      .pv-dev-grid[data-layout="tile"] .pv-dev-top {
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+      }
+      .pv-dev-grid[data-layout="tile"] .pv-dev-title-row {
+        justify-content: center;
+      }
+      .pv-dev-grid[data-layout="tile"] .pv-dev-fav {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+      }
+      .pv-dev-grid[data-layout="tile"] .pv-dev-bottom {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .pv-dev-top {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .pv-dev-ico {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        background: color-mix(
+          in srgb,
+          var(--card-accent, var(--accent)) 15%,
+          transparent
+        );
+        color: var(--card-accent, var(--accent));
+      }
+      .pv-dev-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .pv-dev-title-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .pv-dev-name {
+        font-size: 0.92rem;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pv-dev-meta {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pv-dev-fav {
+        color: var(--star);
+        font-size: 0.95rem;
+        line-height: 1;
+      }
+      .pv-dev-bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        padding-top: 9px;
+        border-top: 1px solid var(--border);
+      }
+      .pv-addr-pill {
+        font-family: ui-monospace, monospace;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        padding: 3px 7px;
+        border-radius: 6px;
+      }
+      .pv-ping-pill {
+        font-family: ui-monospace, monospace;
+        font-size: 0.68rem;
+        color: var(--ok);
+        background: rgba(34, 197, 94, 0.14);
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-weight: 700;
+      }
+      .pv-mini-btn {
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--bg-elev);
+        color: var(--text);
+      }
+
+      .pv-footer {
+        border-top: 1px solid var(--border);
+        background: var(--bg-elev);
+        padding: 10px 14px;
+        text-align: center;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+      }
+
+      /* Toast */
+      .toast {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%) translateY(60px);
+        background: var(--text);
+        color: var(--bg);
+        padding: 9px 18px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        opacity: 0;
+        pointer-events: none;
+        transition: 0.22s ease;
+        z-index: 100;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      /* ==========================================================================
+         6. MOBILE RESPONSIVE STUDIO WORKSPACE
+         ========================================================================== */
+      @media (max-width: 900px) {
+        .mobile-pane-switch {
+          display: flex;
+        }
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+        .workspace.mob-show-controls .preview-pane {
+          display: none;
+        }
+        .workspace.mob-show-preview .controls-pane {
+          display: none;
+        }
+        .preview-viewport {
+          padding: 12px;
+        }
+        .topbar-center {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Top Studio Header -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <a href="config.html" class="back-btn">&larr; Config</a>
+        <div class="studio-title">
+          <span>Layout Studio</span>
+          <span class="badge" id="nvsBadge">0.0 KB / 16 KB</span>
+        </div>
+      </div>
+
+      <div class="topbar-center">
+        <div class="seg-toggle" title="Switch Preview Viewport">
+          <button
+            class="seg-btn active"
+            id="pvDeskBtn"
+            onclick="setPreviewDevice('desktop')"
+          >
+            Desktop
+          </button>
+          <button
+            class="seg-btn"
+            id="pvMobBtn"
+            onclick="setPreviewDevice('mobile')"
+          >
+            Mobile
+          </button>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <button class="btn" onclick="resetLayoutDefaults()">Reset</button>
+        <button
+          class="btn btn-primary"
+          id="saveLayoutBtn"
+          onclick="saveLayout()"
+        >
+          Save to ESP32
+        </button>
+      </div>
+    </header>
+
+    <!-- Mobile Pane Switcher (Controls vs Live Preview) -->
+    <div class="mobile-pane-switch">
+      <div class="seg-toggle" style="width: 100%; max-width: 340px">
+        <button
+          class="seg-btn active"
+          id="mobTabCtrl"
+          style="flex: 1; justify-content: center"
+          onclick="setMobilePane('controls')"
+        >
+          Customize Controls
+        </button>
+        <button
+          class="seg-btn"
+          id="mobTabPrev"
+          style="flex: 1; justify-content: center"
+          onclick="setMobilePane('preview')"
+        >
+          Live Preview
+        </button>
+      </div>
+    </div>
+
+    <!-- Main 2-Pane Workspace -->
+    <div class="workspace mob-show-controls" id="workspace">
+      <!-- LEFT PANE: CUSTOMIZATION CONTROLS -->
+      <aside class="controls-pane">
+        <div class="ctrl-tabs">
+          <button
+            class="ctrl-tab active"
+            onclick="switchCtrlTab('global', this)"
+          >
+            Global
+          </button>
+          <button class="ctrl-tab" onclick="switchCtrlTab('fav', this)">
+            Favorites
+          </button>
+          <button class="ctrl-tab" onclick="switchCtrlTab('shortcut', this)">
+            Shortcuts
+          </button>
+          <button class="ctrl-tab" onclick="switchCtrlTab('group', this)">
+            Groups
+          </button>
+        </div>
+
+        <div class="ctrl-scroll">
+          <!-- TAB 1: GLOBAL & SECTIONS -->
+          <div class="ctrl-panel active" id="panel-global">
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Quick Layout Presets</div>
+              <div class="preset-grid">
+                <button class="preset-btn" onclick="applyPreset('default')">
+                  Default Slate<span>Balanced cards &amp; grids</span>
+                </button>
+                <button class="preset-btn" onclick="applyPreset('tablet')">
+                  Wall Tablet<span>Square tiles, bold glow</span>
+                </button>
+                <button class="preset-btn" onclick="applyPreset('compact')">
+                  Compact Mobile<span>2-col dense touch grid</span>
+                </button>
+                <button class="preset-btn" onclick="applyPreset('glass')">
+                  Minimal Glass<span>Clean pills &amp; frosted UI</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Home Section Order</div>
+              <div class="order-list" id="sectionOrderList"></div>
+            </div>
+
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Global Surface &amp; Theme</div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Card Surface</label>
+                  <select
+                    id="uiCardStyle"
+                    class="select"
+                    onchange="setUi('cardStyle', this.value)"
+                  >
+                    <option value="default">Default</option>
+                    <option value="glass">Frosted Glass</option>
+                    <option value="bordered">Outlined / Bordered</option>
+                    <option value="elevated">Soft Elevated</option>
+                    <option value="flat">Clean Flat</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Max Width</label>
+                  <select
+                    id="uiMaxWidth"
+                    class="select"
+                    onchange="setUi('maxWidth', Number(this.value))"
+                  >
+                    <option value="1040">Compact (1040px)</option>
+                    <option value="1280">Standard (1280px)</option>
+                    <option value="1480">Wide (1480px)</option>
+                    <option value="0">Full Width (100%)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>
+                  <span>Card Corner Radius</span>
+                  <strong id="radiusVal">14px</strong>
+                </label>
+                <input
+                  type="range"
+                  id="uiRadius"
+                  min="4"
+                  max="24"
+                  step="1"
+                  oninput="setUi('radius', Number(this.value))"
+                />
+              </div>
+
+              <div class="field">
+                <label>Global Accent Color</label>
+                <div class="swatch-row" id="globalAccentSwatches"></div>
+              </div>
+            </div>
+
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Header &amp; Footer Elements</div>
+              <div class="toggle-row">
+                <span>Show Search Bar</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrSearch"
+                  onchange="setHeader('showSearch', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Live Clock Pill</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrClock"
+                  onchange="setHeader('showClock', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Map View Button</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrMap"
+                  onchange="setHeader('showMapBtn', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show IP / DNS Switcher</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrAddr"
+                  onchange="setHeader('showAddrToggle', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Bottom Telemetry Footer</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrFooter"
+                  onchange="setHeader('showFooter', this.checked)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: FAVORITES CARD DESIGN -->
+          <div class="ctrl-panel" id="panel-fav">
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Favorites Layout &amp; Sizing</div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Layout Style</label>
+                  <select
+                    id="favLayout"
+                    class="select"
+                    onchange="setCard('fav', 'layout', this.value)"
+                  >
+                    <option value="grid">Grid Cards</option>
+                    <option value="strip">Horizontal Strip</option>
+                    <option value="pill">Compact Pills</option>
+                    <option value="tile">Square Tiles</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Card Size</label>
+                  <select
+                    id="favSize"
+                    class="select"
+                    onchange="setCard('fav', 'size', this.value)"
+                  >
+                    <option value="sm">Small (Compact)</option>
+                    <option value="md">Medium (Default)</option>
+                    <option value="lg">Large (Spacious)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field">
+                  <label>Desktop Columns</label>
+                  <select
+                    id="favColsDesk"
+                    class="select"
+                    onchange="setCard('fav', 'colsDesktop', Number(this.value))"
+                  >
+                    <option value="0">Auto Fit</option>
+                    <option value="2">2 Columns</option>
+                    <option value="3">3 Columns</option>
+                    <option value="4">4 Columns</option>
+                    <option value="5">5 Columns</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Mobile Columns</label>
+                  <select
+                    id="favColsMob"
+                    class="select"
+                    onchange="setCard('fav', 'colsMobile', Number(this.value))"
+                  >
+                    <option value="1">1 Column</option>
+                    <option value="2">2 Columns</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field">
+                  <label>Accent Bar</label>
+                  <select
+                    id="favAccentPos"
+                    class="select"
+                    onchange="setCard('fav', 'accentPos', this.value)"
+                  >
+                    <option value="left">Left Strip</option>
+                    <option value="top">Top Strip</option>
+                    <option value="tint">Full Soft Tint</option>
+                    <option value="none">None</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Card Color Mode</label>
+                  <select
+                    id="favColorMode"
+                    class="select"
+                    onchange="setCard('fav', 'colorMode', this.value)"
+                  >
+                    <option value="item">Each Item's Color</option>
+                    <option value="custom">Uniform Custom Color</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field" id="favCustomColorWrap" style="display: none">
+                <label>Uniform Favorites Color</label>
+                <div class="swatch-row" id="favColorSwatches"></div>
+              </div>
+            </div>
+
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Favorite Card Contents</div>
+              <div class="toggle-row">
+                <span>Show Icon</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="favShowIcon"
+                  onchange="setCard('fav', 'showIcon', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Online Status Dot</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="favShowDot"
+                  onchange="setCard('fav', 'showDot', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Subtitle / Address</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="favShowSub"
+                  onchange="setCard('fav', 'showSub', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Lock Indicator</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="favShowLock"
+                  onchange="setCard('fav', 'showLock', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show ON / OFF / OPEN Pill</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="favShowPill"
+                  onchange="setCard('fav', 'showPill', this.checked)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: SHORTCUT CARDS DESIGN -->
+          <div class="ctrl-panel" id="panel-shortcut">
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">
+                Shortcut Card Layout &amp; Sizing
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Layout Style</label>
+                  <select
+                    id="scLayout"
+                    class="select"
+                    onchange="setCard('shortcut', 'layout', this.value)"
+                  >
+                    <option value="row">Horizontal Row</option>
+                    <option value="tile">Square Tile (Centered)</option>
+                    <option value="pill">Compact Pill</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Card Size</label>
+                  <select
+                    id="scSize"
+                    class="select"
+                    onchange="setCard('shortcut', 'size', this.value)"
+                  >
+                    <option value="sm">Small (Compact)</option>
+                    <option value="md">Medium (Default)</option>
+                    <option value="lg">Large (Spacious)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field">
+                  <label>Desktop Columns</label>
+                  <select
+                    id="scColsDesk"
+                    class="select"
+                    onchange="
+                      setCard('shortcut', 'colsDesktop', Number(this.value))
+                    "
+                  >
+                    <option value="0">Auto Fit</option>
+                    <option value="2">2 Columns</option>
+                    <option value="3">3 Columns</option>
+                    <option value="4">4 Columns</option>
+                    <option value="5">5 Columns</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Mobile Columns</label>
+                  <select
+                    id="scColsMob"
+                    class="select"
+                    onchange="
+                      setCard('shortcut', 'colsMobile', Number(this.value))
+                    "
+                  >
+                    <option value="1">1 Column</option>
+                    <option value="2">2 Columns</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field">
+                  <label>Accent Bar</label>
+                  <select
+                    id="scAccentPos"
+                    class="select"
+                    onchange="setCard('shortcut', 'accentPos', this.value)"
+                  >
+                    <option value="left">Left Strip</option>
+                    <option value="top">Top Strip</option>
+                    <option value="tint">Full Soft Tint</option>
+                    <option value="none">None</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Active (ON) Effect</label>
+                  <select
+                    id="scOnStyle"
+                    class="select"
+                    onchange="setCard('shortcut', 'onStyle', this.value)"
+                  >
+                    <option value="tint">Soft Tint + Border</option>
+                    <option value="solid">Solid Color Fill</option>
+                    <option value="glow">Neon Outer Glow</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>Card Color Mode</label>
+                <select
+                  id="scColorMode"
+                  class="select"
+                  onchange="setCard('shortcut', 'colorMode', this.value)"
+                >
+                  <option value="item">Each Shortcut's Color</option>
+                  <option value="custom">Uniform Custom Color</option>
+                </select>
+              </div>
+
+              <div class="field" id="scCustomColorWrap" style="display: none">
+                <label>Uniform Shortcut Color</label>
+                <div class="swatch-row" id="scColorSwatches"></div>
+              </div>
+            </div>
+
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Shortcut Card Contents</div>
+              <div class="toggle-row">
+                <span>Show Icon</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="scShowIcon"
+                  onchange="setCard('shortcut', 'showIcon', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Online Status Dot</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="scShowDot"
+                  onchange="setCard('shortcut', 'showDot', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Lock Indicator</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="scShowLock"
+                  onchange="setCard('shortcut', 'showLock', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show ON / OFF State Pill</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="scShowPill"
+                  onchange="setCard('shortcut', 'showPill', this.checked)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 4: GROUPS & DEVICE CARDS DESIGN -->
+          <div class="ctrl-panel" id="panel-group">
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Group Header &amp; Device Cards</div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Group Header Style</label>
+                  <select
+                    id="grpHeaderStyle"
+                    class="select"
+                    onchange="setCard('group', 'headerStyle', this.value)"
+                  >
+                    <option value="bar">Accent Bar + Line</option>
+                    <option value="pill">Pill Header</option>
+                    <option value="minimal">Clean Minimal</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Device Card Layout</label>
+                  <select
+                    id="grpLayout"
+                    class="select"
+                    onchange="setCard('group', 'layout', this.value)"
+                  >
+                    <option value="card">Standard Card</option>
+                    <option value="compact">Compact Row</option>
+                    <option value="tile">Centered Tile</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field">
+                  <label>Card Size</label>
+                  <select
+                    id="grpSize"
+                    class="select"
+                    onchange="setCard('group', 'size', this.value)"
+                  >
+                    <option value="sm">Small (Compact)</option>
+                    <option value="md">Medium (Default)</option>
+                    <option value="lg">Large (Spacious)</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Accent Bar</label>
+                  <select
+                    id="grpAccentPos"
+                    class="select"
+                    onchange="setCard('group', 'accentPos', this.value)"
+                  >
+                    <option value="top">Top Strip</option>
+                    <option value="left">Left Strip</option>
+                    <option value="tint">Full Soft Tint</option>
+                    <option value="none">None</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field">
+                  <label>Desktop Columns</label>
+                  <select
+                    id="grpColsDesk"
+                    class="select"
+                    onchange="
+                      setCard('group', 'colsDesktop', Number(this.value))
+                    "
+                  >
+                    <option value="0">Auto Fit</option>
+                    <option value="2">2 Columns</option>
+                    <option value="3">3 Columns</option>
+                    <option value="4">4 Columns</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Mobile Columns</label>
+                  <select
+                    id="grpColsMob"
+                    class="select"
+                    onchange="
+                      setCard('group', 'colsMobile', Number(this.value))
+                    "
+                  >
+                    <option value="1">1 Column</option>
+                    <option value="2">2 Columns</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>Card Color Mode</label>
+                <select
+                  id="grpColorMode"
+                  class="select"
+                  onchange="setCard('group', 'colorMode', this.value)"
+                >
+                  <option value="item">Each Device's Color</option>
+                  <option value="custom">Uniform Custom Color</option>
+                </select>
+              </div>
+
+              <div class="field" id="grpCustomColorWrap" style="display: none">
+                <label>Uniform Device Color</label>
+                <div class="swatch-row" id="grpColorSwatches"></div>
+              </div>
+
+              <div class="toggle-row" style="margin-top: 6px">
+                <span>Collapsible Group Accordions</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="grpCollapsible"
+                  onchange="setCard('group', 'collapsible', this.checked)"
+                />
+              </div>
+            </div>
+
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Device Card Contents</div>
+              <div class="toggle-row">
+                <span>Show Device Icon</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="grpShowIcon"
+                  onchange="setCard('group', 'showIcon', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Online Status Dot</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="grpShowDot"
+                  onchange="setCard('group', 'showDot', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Note / Group Subtitle</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="grpShowNote"
+                  onchange="setCard('group', 'showNote', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Favorite Star Button</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="grpShowFavBtn"
+                  onchange="setCard('group', 'showFavBtn', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show IP / mDNS Address Pill</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="grpShowAddr"
+                  onchange="setCard('group', 'showAddr', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Ping Latency (ms)</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="grpShowPing"
+                  onchange="setCard('group', 'showPing', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Secondary Button (OTA / API)</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="grpShowAltBtn"
+                  onchange="setCard('group', 'showAltBtn', this.checked)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- RIGHT PANE: INTERACTIVE DESKTOP & MOBILE LIVE PREVIEW -->
+      <section class="preview-pane">
+        <div class="preview-toolbar">
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              flex-wrap: wrap;
+            "
+          >
+            <span class="badge" style="color: var(--accent)" id="pvModeTag">
+              Desktop Preview
+            </span>
+            <span style="font-size: 0.72rem; color: var(--text-muted)">
+              Tip: Click shortcut cards to test ON/OFF states
+            </span>
+          </div>
+
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              flex-wrap: wrap;
+            "
+          >
+            <div class="seg-toggle">
+              <button
+                class="seg-btn"
+                id="thDark"
+                onclick="setPreviewTheme('dark')"
+              >
+                Dark
+              </button>
+              <button
+                class="seg-btn"
+                id="thAmoled"
+                onclick="setPreviewTheme('amoled')"
+              >
+                AMOLED
+              </button>
+              <button
+                class="seg-btn"
+                id="thLight"
+                onclick="setPreviewTheme('light')"
+              >
+                Light
+              </button>
+            </div>
+            <button
+              class="btn btn-sm"
+              id="dataModeBtn"
+              onclick="toggleSampleData()"
+            >
+              Data: Auto
+            </button>
+          </div>
+        </div>
+
+        <div class="preview-viewport">
+          <div
+            class="preview-frame"
+            id="previewFrame"
+            data-card-style="default"
+          >
+            <div class="mobile-notch">
+              <span>9:41</span>
+              <span>ESP32 PWA</span>
+              <span>WiFi 100%</span>
+            </div>
+            <div
+              id="previewMount"
+              style="display: flex; flex-direction: column; flex: 1"
+            ></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      const STORAGE_KEY = "esp_iot_hub_config_v1";
+      const NVS_MAX_BYTES = 16384;
+
+      const SWATCHES = [
+        "#38bdf8",
+        "#22c55e",
+        "#a855f7",
+        "#f59e0b",
+        "#f43f5e",
+        "#14b8a6",
+        "#6366f1",
+        "#ec4899",
+      ];
+
+      const ICONS = {
+        chip: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',
+        led: '<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>',
+        switch:
+          '<rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/>',
+        fan: '<path d="M12 12c0-3 2.5-5 5-5 2.8 0 5 2.2 5 5s-2.2 5-5 5h-5"/><path d="M12 12c3 0 5 2.5 5 5 0 2.8-2.2 5-5 5s-5-2.2-5-5v-5"/><path d="M12 12c0 3-2.5 5-5 5-2.8 0-5-2.2-5-5s2.2-5 5-5h5"/><path d="M12 12c-3 0-5-2.5-5-5 0-2.8 2.2-5 5-5s5 2.2 5 5v5"/>',
+        solar:
+          '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+        matrix:
+          '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="8" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="12" r="1"/><circle cx="8" cy="16" r="1"/><circle cx="12" cy="16" r="1"/><circle cx="16" cy="16" r="1"/>',
+        lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        unlock:
+          '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+      };
+
+      const SAMPLE_DATA = {
+        groups: [
+          { id: "sg1", name: "Living Room", color: "#38bdf8" },
+          { id: "sg2", name: "Solar & Lab", color: "#22c55e" },
+        ],
+        devices: [
+          {
+            id: "sd1",
+            name: "4-CH Smart Switch",
+            ip: "192.168.0.51",
+            note: "Main Relay Board",
+            groups: ["sg1"],
+            icon: "switch",
+            color: "#38bdf8",
+            fav: true,
+            altLabel: "OTA",
+            altPath: "/update",
+          },
+          {
+            id: "sd2",
+            name: "ESP LED Studio",
+            ip: "192.168.0.60",
+            note: "MAX7219 Matrix + Audio",
+            groups: ["sg1"],
+            icon: "matrix",
+            color: "#a855f7",
+            fav: false,
+            altLabel: "Web",
+            altPath: "/ui",
+          },
+          {
+            id: "sd3",
+            name: "RS485 Solar Monitor",
+            ip: "192.168.0.75",
+            note: "Inverter & Lux Telemetry",
+            groups: ["sg2"],
+            icon: "solar",
+            color: "#f59e0b",
+            fav: true,
+            altLabel: "API",
+            altPath: "/api/status",
+          },
+        ],
+        shortcuts: [
+          {
+            id: "ss1",
+            name: "Ceiling Light",
+            icon: "led",
+            color: "#fbbf24",
+            groups: ["sg1"],
+            locked: false,
+            state: true,
+          },
+          {
+            id: "ss2",
+            name: "BLDC Fan",
+            icon: "fan",
+            color: "#38bdf8",
+            groups: ["sg1"],
+            locked: false,
+            state: false,
+          },
+          {
+            id: "ss3",
+            name: "Workstation Mains",
+            icon: "switch",
+            color: "#f43f5e",
+            groups: ["sg2"],
+            locked: true,
+            state: true,
+          },
+        ],
+        favorites: [
+          {
+            id: "sf1",
+            name: "Ceiling Light",
+            icon: "led",
+            color: "#fbbf24",
+            deviceIds: [],
+            shortcutIds: ["ss1"],
+            groupIds: [],
+          },
+          {
+            id: "sf2",
+            name: "RS485 Solar Monitor",
+            icon: "solar",
+            color: "#f59e0b",
+            deviceIds: ["sd3"],
+            shortcutIds: [],
+            groupIds: [],
+          },
+          {
+            id: "sf3",
+            name: "Living Bundle",
+            icon: "chip",
+            color: "#a855f7",
+            deviceIds: ["sd1", "sd2"],
+            shortcutIds: ["ss2"],
+            groupIds: [],
+          },
+        ],
+      };
+
+      function getDefaultLayoutConfig() {
+        return {
+          sectionOrder: ["favorites", "shortcuts", "groups"],
+          cardStyle: "default",
+          radius: 14,
+          maxWidth: 1280,
+          header: {
+            showSearch: true,
+            showClock: true,
+            showMapBtn: true,
+            showAddrToggle: true,
+            showFooter: true,
+          },
+          fav: {
+            layout: "grid",
+            size: "md",
+            colsDesktop: 0,
+            colsMobile: 1,
+            accentPos: "left",
+            colorMode: "item",
+            customColor: "#fbbf24",
+            showIcon: true,
+            showDot: true,
+            showSub: true,
+            showLock: true,
+            showPill: true,
+          },
+          shortcut: {
+            layout: "row",
+            size: "md",
+            colsDesktop: 0,
+            colsMobile: 1,
+            accentPos: "left",
+            onStyle: "tint",
+            colorMode: "item",
+            customColor: "#38bdf8",
+            showIcon: true,
+            showDot: true,
+            showLock: true,
+            showPill: true,
+          },
+          group: {
+            headerStyle: "bar",
+            collapsible: false,
+            layout: "card",
+            size: "md",
+            colsDesktop: 0,
+            colsMobile: 1,
+            accentPos: "top",
+            colorMode: "item",
+            customColor: "#38bdf8",
+            showIcon: true,
+            showDot: true,
+            showNote: true,
+            showFavBtn: true,
+            showAddr: true,
+            showPing: false,
+            showAltBtn: true,
+          },
+        };
+      }
+
+      function mergeLayoutConfig(raw) {
+        const def = getDefaultLayoutConfig();
+        if (!raw || typeof raw !== "object") return def;
+        const order =
+          Array.isArray(raw.sectionOrder) && raw.sectionOrder.length === 3
+            ? raw.sectionOrder
+            : def.sectionOrder;
+        return {
+          ...def,
+          ...raw,
+          sectionOrder: order,
+          header: { ...def.header, ...(raw.header || {}) },
+          fav: { ...def.fav, ...(raw.fav || {}) },
+          shortcut: { ...def.shortcut, ...(raw.shortcut || {}) },
+          group: { ...def.group, ...(raw.group || {}) },
+        };
+      }
+
+      let config = null;
+      let ui = getDefaultLayoutConfig();
+      let isOfflinePreview = false;
+      let isDirty = false;
+      let previewDevice = "desktop";
+      let forceSampleData = false;
+      let previewSwitchStates = {};
+      let previewCollapsed = new Set();
+
+      function escapeHtml(str) {
+        return String(str || "").replace(
+          /[&<>"']/g,
+          (m) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[m],
+        );
+      }
+
+      function svgIcon(name, size = 18) {
+        return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ICONS.chip}</svg>`;
+      }
+
+      function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.classList.add("show");
+        clearTimeout(t._timer);
+        t._timer = setTimeout(() => t.classList.remove("show"), 2200);
+      }
+
+      function markDirty() {
+        isDirty = true;
+        config.settings.uiLayout = ui;
+        updateNvsBadge();
+      }
+
+      function updateNvsBadge() {
+        const bytes = new TextEncoder().encode(JSON.stringify(config)).length;
+        const el = document.getElementById("nvsBadge");
+        el.textContent = `${(bytes / 1024).toFixed(1)} KB / 16 KB`;
+        el.style.color =
+          bytes > NVS_MAX_BYTES * 0.88 ? "var(--err)" : "var(--text-muted)";
+      }
+
+      function applyGlobalThemeAndAccent() {
+        const theme = config.settings.theme || "dark";
+        document.documentElement.setAttribute("data-theme", theme);
+        ["dark", "amoled", "light"].forEach((t) => {
+          const btn = document.getElementById(
+            "th" + t.charAt(0).toUpperCase() + t.slice(1),
+          );
+          if (btn) btn.classList.toggle("active", theme === t);
+        });
+
+        const acc = config.settings.accentColor || "";
+        if (acc) {
+          document.documentElement.style.setProperty("--accent", acc);
+          document.documentElement.style.setProperty(
+            "--accent-soft",
+            `color-mix(in srgb, ${acc} 16%, transparent)`,
+          );
+        } else {
+          document.documentElement.style.removeProperty("--accent");
+          document.documentElement.style.removeProperty("--accent-soft");
+        }
+      }
+
+      /* ==========================================================================
+         INIT & STATE LOADING
+         ========================================================================== */
+      const KEY_SALT = "esp32_nvs_hub_v1_secret";
+      const LOCKOUT_STORAGE_KEY = "esp_iot_hub_lockout_v1";
+
+      function hashCredential(username, password) {
+        const cleanUser = String(username || "").trim();
+        const raw = `${cleanUser}:${String(password || "")}:${KEY_SALT}`;
+        let h1 = 0xdeadbeef ^ raw.length,
+          h2 = 0x41c6ce57 ^ raw.length;
+        for (let i = 0, ch; i < raw.length; i++) {
+          ch = raw.charCodeAt(i);
+          h1 = Math.imul(h1 ^ ch, 2654435761);
+          h2 = Math.imul(h2 ^ ch, 1597334677);
+        }
+        h1 =
+          Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
+          Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 =
+          Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
+          Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        return (
+          "sha:" +
+          (h2 >>> 0).toString(16).padStart(8, "0") +
+          (h1 >>> 0).toString(16).padStart(8, "0")
+        );
+      }
+
+      function enforceLayoutAuth() {
+        const policy = config.admin?.verification?.configPage || {
+          mode: "session",
+          role: "admin",
+        };
+        if (policy.mode === "none") return Promise.resolve(true);
+
+        const sessionKey = "hub_auth_configPage";
+        if (policy.mode === "session") {
+          const savedRole = sessionStorage.getItem(sessionKey);
+          if (
+            savedRole &&
+            (policy.role === "all" ||
+              savedRole === policy.role ||
+              savedRole === "admin")
+          ) {
+            return Promise.resolve(true);
+          }
+        }
+
+        return new Promise((resolve) => {
+          const overlay = document.createElement("div");
+          overlay.style.cssText =
+            "position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);z-index:120;display:flex;align-items:center;justify-content:center;padding:16px";
+          const roleLabel = policy.role === "admin" ? "Admin" : "Everyone";
+          overlay.innerHTML = `
+            <div style="width:100%;max-width:360px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px">
+              <h3 style="margin-bottom:4px;font-size:1rem">Login Required - Layout Studio</h3>
+              <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:12px">Required permission: ${roleLabel}</p>
+              <div class="field"><label>Username</label><input type="text" id="lyAuthUser" class="input" placeholder="esp" autocomplete="username" /></div>
+              <div class="field" style="margin-bottom:14px"><label>Password</label><input type="password" id="lyAuthPass" class="input" placeholder="••••••" autocomplete="current-password" /></div>
+              <div style="display:flex;justify-content:flex-end;gap:8px">
+                <button type="button" class="btn" id="lyAuthCancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="lyAuthSubmit">Verify</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(overlay);
+
+          const uEl = overlay.querySelector("#lyAuthUser");
+          const pEl = overlay.querySelector("#lyAuthPass");
+          uEl.focus();
+
+          const finish = (ok) => {
+            overlay.remove();
+            resolve(ok);
+          };
+
+          const attempt = () => {
+            const maxAtt = Math.min(
+              5,
+              Math.max(1, Number(config.admin?.verification?.maxAttempts) || 3),
+            );
+            const lockPolicy =
+              config.admin?.verification?.lockoutPolicy || "restart_or_1h";
+            let lockData;
+            try {
+              lockData = JSON.parse(
+                localStorage.getItem(LOCKOUT_STORAGE_KEY),
+              ) || {
+                failedAttempts: 0,
+                lockedAt: null,
+              };
+            } catch {
+              lockData = { failedAttempts: 0, lockedAt: null };
+            }
+
+            if (lockData.lockedAt) {
+              if (
+                lockPolicy === "restart_or_1h" &&
+                Date.now() - lockData.lockedAt >= 3600000
+              ) {
+                localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+                lockData = { failedAttempts: 0, lockedAt: null };
+              } else {
+                return showToast("Device Locked! Restart ESP32 or wait 1h");
+              }
+            }
+
+            const users = config.admin?.users?.length
+              ? config.admin.users
+              : [
+                  {
+                    username: "esp",
+                    passHash: hashCredential("esp", "456456"),
+                    role: "admin",
+                  },
+                ];
+            const uName = uEl.value.trim();
+            const hash = hashCredential(uName, pEl.value);
+            const user = users.find(
+              (u) => u.username === uName && u.passHash === hash,
+            );
+            if (!user || (policy.role === "admin" && user.role !== "admin")) {
+              lockData.failedAttempts = (lockData.failedAttempts || 0) + 1;
+              if (lockData.failedAttempts >= maxAtt) {
+                lockData.lockedAt = Date.now();
+              }
+              localStorage.setItem(
+                LOCKOUT_STORAGE_KEY,
+                JSON.stringify(lockData),
+              );
+              return showToast(
+                !user
+                  ? "Invalid username or password"
+                  : "Admin permission required",
+              );
+            }
+
+            localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+            if (policy.mode === "session") {
+              sessionStorage.setItem(sessionKey, user.role);
+            }
+            finish(true);
+          };
+
+          overlay.querySelector("#lyAuthCancel").onclick = () => finish(false);
+          overlay.querySelector("#lyAuthSubmit").onclick = attempt;
+          overlay.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") attempt();
+            if (e.key === "Escape") finish(false);
+          });
+        });
+      }
+
+      async function init() {
+        try {
+          const res = await fetch("/api/config", { cache: "no-store" });
+          if (!res.ok) throw new Error();
+          config = await res.json();
+          isOfflinePreview = false;
+        } catch {
+          isOfflinePreview = true;
+          try {
+            config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+          } catch {
+            config = {};
+          }
+        }
+
+        if (!config.settings)
+          config.settings = {
+            title: "ACCESS POINT",
+            subtitle: "ESP32 Central Gateway",
+            theme: "dark",
+          };
+        if (!Array.isArray(config.groups)) config.groups = [];
+        if (!Array.isArray(config.devices)) config.devices = [];
+        if (!Array.isArray(config.shortcuts)) config.shortcuts = [];
+        if (!Array.isArray(config.favorites)) config.favorites = [];
+
+        applyGlobalThemeAndAccent();
+
+        const loggedIn = await enforceLayoutAuth();
+        if (!loggedIn) {
+          window.location.href = "config.html";
+          return;
+        }
+
+        ui = mergeLayoutConfig(config.settings.uiLayout);
+        config.settings.uiLayout = ui;
+
+        // Seed preview switch states
+        [...SAMPLE_DATA.shortcuts, ...config.shortcuts].forEach((s) => {
+          previewSwitchStates[s.id] = !!s.state;
+        });
+
+        syncControlsFromState();
+        renderPreview();
+        updateNvsBadge();
+
+        if (window.innerWidth <= 900) {
+          setPreviewDevice("mobile");
+        }
+      }
+
+      /* ==========================================================================
+         CONTROLS SYNC & MUTATORS
+         ========================================================================== */
+      function switchCtrlTab(tab, btn) {
+        document
+          .querySelectorAll(".ctrl-tab")
+          .forEach((b) => b.classList.remove("active"));
+        document
+          .querySelectorAll(".ctrl-panel")
+          .forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`panel-${tab}`).classList.add("active");
+      }
+
+      function setMobilePane(pane) {
+        const ws = document.getElementById("workspace");
+        ws.classList.toggle("mob-show-controls", pane === "controls");
+        ws.classList.toggle("mob-show-preview", pane === "preview");
+        document
+          .getElementById("mobTabCtrl")
+          .classList.toggle("active", pane === "controls");
+        document
+          .getElementById("mobTabPrev")
+          .classList.toggle("active", pane === "preview");
+      }
+
+      function setPreviewDevice(dev) {
+        previewDevice = dev;
+        const frame = document.getElementById("previewFrame");
+        frame.classList.toggle("mobile-mode", dev === "mobile");
+        document
+          .getElementById("pvDeskBtn")
+          ?.classList.toggle("active", dev === "desktop");
+        document
+          .getElementById("pvMobBtn")
+          ?.classList.toggle("active", dev === "mobile");
+        document.getElementById("pvModeTag").textContent =
+          dev === "mobile" ? "Mobile Preview (390px)" : "Desktop Preview";
+      }
+
+      function setPreviewTheme(theme) {
+        config.settings.theme = theme;
+        applyGlobalThemeAndAccent();
+        markDirty();
+      }
+
+      function toggleSampleData() {
+        forceSampleData = !forceSampleData;
+        document.getElementById("dataModeBtn").textContent = forceSampleData
+          ? "Data: Sample"
+          : "Data: Live";
+        renderPreview();
+      }
+
+      function renderSwatches(
+        containerId,
+        selectedHex,
+        onSelectFnName,
+        includeDefault = false,
+      ) {
+        const el = document.getElementById(containerId);
+        if (!el) return;
+        const defBtn = includeDefault
+          ? `<button type="button" class="btn btn-sm" style="height:24px;padding:0 7px;${!selectedHex ? "border-color:var(--accent);color:var(--accent)" : ""}" onclick="${onSelectFnName}('')">Default</button>`
+          : "";
+        el.innerHTML =
+          defBtn +
+          SWATCHES.map(
+            (c) =>
+              `<div class="swatch ${selectedHex?.toLowerCase() === c ? "selected" : ""}" style="background:${c}" onclick="${onSelectFnName}('${c}')"></div>`,
+          ).join("") +
+          `<input type="color" value="${selectedHex || "#38bdf8"}" style="width:26px;height:24px;border:none;background:none;cursor:pointer" onchange="${onSelectFnName}(this.value)" />`;
+      }
+
+      function setGlobalAccent(hex) {
+        config.settings.accentColor = hex;
+        applyGlobalThemeAndAccent();
+        renderSwatches("globalAccentSwatches", hex, "setGlobalAccent", true);
+        markDirty();
+      }
+
+      function setFavCustomColor(hex) {
+        setCard("fav", "customColor", hex);
+        renderSwatches("favColorSwatches", hex, "setFavCustomColor");
+      }
+
+      function setScCustomColor(hex) {
+        setCard("shortcut", "customColor", hex);
+        renderSwatches("scColorSwatches", hex, "setScCustomColor");
+      }
+
+      function setGrpCustomColor(hex) {
+        setCard("group", "customColor", hex);
+        renderSwatches("grpColorSwatches", hex, "setGrpCustomColor");
+      }
+
+      function setUi(key, val) {
+        ui[key] = val;
+        if (key === "radius")
+          document.getElementById("radiusVal").textContent = `${val}px`;
+        markDirty();
+        renderPreview();
+      }
+
+      function setHeader(key, val) {
+        ui.header[key] = val;
+        markDirty();
+        renderPreview();
+      }
+
+      function setCard(section, key, val) {
+        ui[section][key] = val;
+        if (key === "colorMode") syncColorModeVisibility();
+        if (key === "showAddr" && section === "group") {
+          config.settings.showIpOnCard = val;
+        }
+        markDirty();
+        renderPreview();
+      }
+
+      function moveSectionOrder(idx, dir) {
+        const target = idx + dir;
+        if (target < 0 || target >= ui.sectionOrder.length) return;
+        [ui.sectionOrder[idx], ui.sectionOrder[target]] = [
+          ui.sectionOrder[target],
+          ui.sectionOrder[idx],
+        ];
+        renderSectionOrderList();
+        markDirty();
+        renderPreview();
+      }
+
+      function renderSectionOrderList() {
+        const labels = {
+          favorites: "★ Favorites Dock",
+          shortcuts: "⚡ Shortcut Buttons",
+          groups: "▦ Groups & Devices",
+        };
+        document.getElementById("sectionOrderList").innerHTML = ui.sectionOrder
+          .map(
+            (key, i) => `
+            <div class="order-item">
+              <span>${labels[key] || key}</span>
+              <div style="display:flex;gap:4px">
+                <button class="btn btn-sm" ${i === 0 ? "disabled" : ""} onclick="moveSectionOrder(${i}, -1)">&uarr;</button>
+                <button class="btn btn-sm" ${i === ui.sectionOrder.length - 1 ? "disabled" : ""} onclick="moveSectionOrder(${i}, 1)">&darr;</button>
+              </div>
+            </div>
+          `,
+          )
+          .join("");
+      }
+
+      function syncColorModeVisibility() {
+        document.getElementById("favCustomColorWrap").style.display =
+          ui.fav.colorMode === "custom" ? "flex" : "none";
+        document.getElementById("scCustomColorWrap").style.display =
+          ui.shortcut.colorMode === "custom" ? "flex" : "none";
+        document.getElementById("grpCustomColorWrap").style.display =
+          ui.group.colorMode === "custom" ? "flex" : "none";
+      }
+
+      function syncControlsFromState() {
+        renderSectionOrderList();
+
+        // Global
+        document.getElementById("uiCardStyle").value = ui.cardStyle;
+        document.getElementById("uiMaxWidth").value = String(ui.maxWidth);
+        document.getElementById("uiRadius").value = ui.radius;
+        document.getElementById("radiusVal").textContent = `${ui.radius}px`;
+        renderSwatches(
+          "globalAccentSwatches",
+          config.settings.accentColor || "",
+          "setGlobalAccent",
+          true,
+        );
+
+        document.getElementById("hdrSearch").checked = ui.header.showSearch;
+        document.getElementById("hdrClock").checked = ui.header.showClock;
+        document.getElementById("hdrMap").checked = ui.header.showMapBtn;
+        document.getElementById("hdrAddr").checked = ui.header.showAddrToggle;
+        document.getElementById("hdrFooter").checked = ui.header.showFooter;
+
+        // Favorites
+        document.getElementById("favLayout").value = ui.fav.layout;
+        document.getElementById("favSize").value = ui.fav.size;
+        document.getElementById("favColsDesk").value = String(
+          ui.fav.colsDesktop,
+        );
+        document.getElementById("favColsMob").value = String(ui.fav.colsMobile);
+        document.getElementById("favAccentPos").value = ui.fav.accentPos;
+        document.getElementById("favColorMode").value = ui.fav.colorMode;
+        document.getElementById("favShowIcon").checked = ui.fav.showIcon;
+        document.getElementById("favShowDot").checked = ui.fav.showDot;
+        document.getElementById("favShowSub").checked = ui.fav.showSub;
+        document.getElementById("favShowLock").checked = ui.fav.showLock;
+        document.getElementById("favShowPill").checked = ui.fav.showPill;
+        renderSwatches(
+          "favColorSwatches",
+          ui.fav.customColor,
+          "setFavCustomColor",
+        );
+
+        // Shortcuts
+        document.getElementById("scLayout").value = ui.shortcut.layout;
+        document.getElementById("scSize").value = ui.shortcut.size;
+        document.getElementById("scColsDesk").value = String(
+          ui.shortcut.colsDesktop,
+        );
+        document.getElementById("scColsMob").value = String(
+          ui.shortcut.colsMobile,
+        );
+        document.getElementById("scAccentPos").value = ui.shortcut.accentPos;
+        document.getElementById("scOnStyle").value = ui.shortcut.onStyle;
+        document.getElementById("scColorMode").value = ui.shortcut.colorMode;
+        document.getElementById("scShowIcon").checked = ui.shortcut.showIcon;
+        document.getElementById("scShowDot").checked = ui.shortcut.showDot;
+        document.getElementById("scShowLock").checked = ui.shortcut.showLock;
+        document.getElementById("scShowPill").checked = ui.shortcut.showPill;
+        renderSwatches(
+          "scColorSwatches",
+          ui.shortcut.customColor,
+          "setScCustomColor",
+        );
+
+        // Groups & Devices
+        document.getElementById("grpHeaderStyle").value = ui.group.headerStyle;
+        document.getElementById("grpLayout").value = ui.group.layout;
+        document.getElementById("grpSize").value = ui.group.size;
+        document.getElementById("grpAccentPos").value = ui.group.accentPos;
+        document.getElementById("grpColsDesk").value = String(
+          ui.group.colsDesktop,
+        );
+        document.getElementById("grpColsMob").value = String(
+          ui.group.colsMobile,
+        );
+        document.getElementById("grpColorMode").value = ui.group.colorMode;
+        document.getElementById("grpCollapsible").checked =
+          ui.group.collapsible;
+        document.getElementById("grpShowIcon").checked = ui.group.showIcon;
+        document.getElementById("grpShowDot").checked = ui.group.showDot;
+        document.getElementById("grpShowNote").checked = ui.group.showNote;
+        document.getElementById("grpShowFavBtn").checked = ui.group.showFavBtn;
+        document.getElementById("grpShowAddr").checked = ui.group.showAddr;
+        document.getElementById("grpShowPing").checked = ui.group.showPing;
+        document.getElementById("grpShowAltBtn").checked = ui.group.showAltBtn;
+        renderSwatches(
+          "grpColorSwatches",
+          ui.group.customColor,
+          "setGrpCustomColor",
+        );
+
+        syncColorModeVisibility();
+      }
+
+      /* ==========================================================================
+         PRESETS & RESET
+         ========================================================================== */
+      function applyPreset(name) {
+        const base = getDefaultLayoutConfig();
+        if (name === "tablet") {
+          base.cardStyle = "elevated";
+          base.radius = 18;
+          base.header.showSearch = false;
+          base.header.showFooter = false;
+          base.fav.layout = "tile";
+          base.fav.colsDesktop = 4;
+          base.fav.colsMobile = 2;
+          base.shortcut.layout = "tile";
+          base.shortcut.onStyle = "glow";
+          base.shortcut.colsDesktop = 4;
+          base.shortcut.colsMobile = 2;
+          base.group.layout = "tile";
+          base.group.colsDesktop = 3;
+          base.group.colsMobile = 2;
+          base.group.showPing = true;
+        } else if (name === "compact") {
+          base.cardStyle = "flat";
+          base.radius = 10;
+          base.fav.layout = "strip";
+          base.fav.size = "sm";
+          base.shortcut.size = "sm";
+          base.shortcut.colsDesktop = 4;
+          base.shortcut.colsMobile = 2;
+          base.shortcut.showLock = false;
+          base.group.layout = "compact";
+          base.group.size = "sm";
+          base.group.headerStyle = "minimal";
+          base.group.collapsible = true;
+        } else if (name === "glass") {
+          base.cardStyle = "glass";
+          base.radius = 20;
+          base.fav.layout = "pill";
+          base.fav.accentPos = "none";
+          base.shortcut.accentPos = "tint";
+          base.shortcut.onStyle = "solid";
+          base.group.headerStyle = "pill";
+          base.group.accentPos = "none";
+        }
+        ui = base;
+        syncControlsFromState();
+        markDirty();
+        renderPreview();
+        showToast(`Applied "${name}" preset`);
+      }
+
+      function resetLayoutDefaults() {
+        if (!confirm("Reset Home UI Layout back to default settings?")) return;
+        ui = getDefaultLayoutConfig();
+        config.settings.accentColor = "";
+        applyGlobalThemeAndAccent();
+        syncControlsFromState();
+        markDirty();
+        renderPreview();
+        showToast("Layout reset to default");
+      }
+
+      /* ==========================================================================
+         LIVE PREVIEW RENDERER
+         ========================================================================== */
+      function getPreviewDataset() {
+        const hasReal =
+          config.devices.length > 0 ||
+          config.shortcuts.length > 0 ||
+          config.favorites.length > 0;
+        if (forceSampleData || !hasReal) return SAMPLE_DATA;
+        return {
+          groups: config.groups.filter((g) => !g.hidden),
+          devices: config.devices,
+          shortcuts: config.shortcuts.filter((s) => !s.hidden),
+          favorites: config.favorites.filter((f) => !f.hidden),
+        };
+      }
+
+      function colsStyle(colsDesk, colsMob, minPx) {
+        const desk =
+          colsDesk > 0
+            ? `repeat(${colsDesk}, minmax(0, 1fr))`
+            : `repeat(auto-fill, minmax(${minPx}px, 1fr))`;
+        const mob = colsMob === 2 ? "repeat(2, minmax(0, 1fr))" : "1fr";
+        return `--cols-desk:${desk};--cols-mob:${mob}`;
+      }
+
+      function togglePreviewShortcut(id) {
+        previewSwitchStates[id] = !previewSwitchStates[id];
+        renderPreview();
+      }
+
+      function togglePreviewGroup(gid) {
+        if (!ui.group.collapsible) return;
+        if (previewCollapsed.has(gid)) previewCollapsed.delete(gid);
+        else previewCollapsed.add(gid);
+        renderPreview();
+      }
+
+      function renderPreviewShortcutCard(sc, cfg, isFav = false) {
+        const isOn = !!previewSwitchStates[sc.id];
+        const color =
+          cfg.colorMode === "custom" ? cfg.customColor : sc.color || "#38bdf8";
+        return `
+          <div class="pv-sc-card ${isOn ? "on" : ""}" style="--sc-color:${escapeHtml(color)}" onclick="togglePreviewShortcut('${escapeHtml(sc.id)}')">
+            <div class="pv-sc-left">
+              ${cfg.showIcon ? `<div class="pv-sc-ico">${svgIcon(sc.icon || "switch", 18)}</div>` : ""}
+              <div style="min-width:0">
+                <div class="pv-sc-title">
+                  ${cfg.showDot ? `<span class="dot online"></span>` : ""}
+                  <span class="txt">${escapeHtml(sc.name)}</span>
+                </div>
+              </div>
+            </div>
+            <div class="pv-sc-right">
+              ${cfg.showLock ? `<span style="opacity:${sc.locked ? 1 : 0.45};color:${sc.locked ? "var(--warn)" : "var(--text-muted)"}">${svgIcon(sc.locked ? "lock" : "unlock", 13)}</span>` : ""}
+              ${cfg.showPill ? `<span class="pv-sc-pill">${isOn ? "ON" : "OFF"}</span>` : ""}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderPreviewDeviceCard(dev) {
+        const g = ui.group;
+        const color =
+          g.colorMode === "custom"
+            ? g.customColor
+            : dev.color || "var(--accent)";
+        const showBottom =
+          g.showAddr || g.showPing || (g.showAltBtn && dev.altLabel);
+        return `
+          <div class="pv-dev-card" style="--card-accent:${escapeHtml(color)}">
+            <div class="pv-dev-top">
+              ${g.showIcon ? `<div class="pv-dev-ico">${svgIcon(dev.icon || "chip", 20)}</div>` : ""}
+              <div class="pv-dev-info">
+                <div class="pv-dev-title-row">
+                  ${g.showDot ? `<span class="dot online"></span>` : ""}
+                  <div class="pv-dev-name">${escapeHtml(dev.name)}</div>
+                </div>
+                ${g.showNote ? `<div class="pv-dev-meta">${escapeHtml(dev.note || "ESP32 Node")}</div>` : ""}
+              </div>
+              ${g.showFavBtn ? `<span class="pv-dev-fav">${dev.fav ? "&#9733;" : "&#9734;"}</span>` : ""}
+            </div>
+            ${
+              showBottom
+                ? `<div class="pv-dev-bottom">
+                    <div style="display:flex;align-items:center;gap:5px;min-width:0">
+                      ${g.showAddr ? `<span class="pv-addr-pill">${escapeHtml(dev.ip || dev.mdns || "192.168.0.50")}</span>` : ""}
+                      ${g.showPing ? `<span class="pv-ping-pill">14ms</span>` : ""}
+                    </div>
+                    ${g.showAltBtn && dev.altLabel ? `<span class="pv-mini-btn">${escapeHtml(dev.altLabel)}</span>` : ""}
+                  </div>`
+                : ""
+            }
+          </div>
+        `;
+      }
+
+      function renderPreview() {
+        const frame = document.getElementById("previewFrame");
+        frame.setAttribute("data-card-style", ui.cardStyle);
+        frame.style.setProperty("--pv-radius", `${ui.radius}px`);
+        frame.style.setProperty(
+          "--pv-max-w",
+          ui.maxWidth ? `${ui.maxWidth}px` : "100%",
+        );
+
+        const data = getPreviewDataset();
+        const title = config.settings.title || "ACCESS POINT";
+        const sub = config.settings.subtitle || "ESP32 Central Gateway";
+
+        // 1. Header HTML
+        const headerHtml = `
+          <div class="pv-topbar">
+            <div class="pv-topbar-inner">
+              <div class="pv-brand">
+                <div class="pv-brand-ico">${svgIcon("chip", 19)}</div>
+                <div style="min-width:0">
+                  <h1>${escapeHtml(title)}</h1>
+                  <div class="pv-brand-sub">
+                    <span>${escapeHtml(sub)}</span>
+                    <span class="pv-pill"><span class="dot online"></span> ${data.devices.length}/${data.devices.length}</span>
+                    ${ui.header.showClock ? `<span class="pv-pill" style="font-family:monospace">08:30:12</span>` : ""}
+                  </div>
+                </div>
+              </div>
+              ${ui.header.showSearch ? `<div class="pv-search">Search devices...</div>` : ""}
+              <div class="pv-actions">
+                ${
+                  ui.header.showMapBtn
+                    ? `<div class="pv-map-btn"><svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+              <line x1="8" y1="2" x2="8" y2="18" />
+              <line x1="16" y1="6" x2="16" y2="22" />
+            </svg><span>Map View</span></div>`
+                    : ""
+                }
+                ${ui.header.showAddrToggle ? `<div class="seg-toggle"><span class="seg-btn active" style="padding:3px 7px;font-size:0.68rem">IP</span><span class="seg-btn" style="padding:3px 7px;font-size:0.68rem">DNS</span></div>` : ""}
+                <div class="pv-ico-btn">⚙</div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // 2. Section Builders
+        const sections = {};
+
+        // Favorites Section
+        const favCards = data.favorites
+          .map((fav) => {
+            const color =
+              ui.fav.colorMode === "custom"
+                ? ui.fav.customColor
+                : fav.color || "#38bdf8";
+            const scId = fav.shortcutIds?.[0];
+            if (scId && !fav.deviceIds?.length && !fav.groupIds?.length) {
+              const sc = data.shortcuts.find((s) => s.id === scId) || {
+                id: fav.id,
+                name: fav.name,
+                icon: fav.icon,
+                color,
+              };
+              return renderPreviewShortcutCard(
+                { ...sc, name: fav.name || sc.name, color },
+                ui.fav,
+                true,
+              );
+            }
+            const devId = fav.deviceIds?.[0];
+            const dev = devId ? data.devices.find((d) => d.id === devId) : null;
+            const subTxt = dev
+              ? dev.ip || dev.mdns
+              : `${(fav.deviceIds?.length || 0) + (fav.shortcutIds?.length || 0)} linked items`;
+            return `
+              <div class="pv-sc-card" style="--sc-color:${escapeHtml(color)}">
+                <div class="pv-sc-left">
+                  ${ui.fav.showIcon ? `<div class="pv-sc-ico">${svgIcon(fav.icon || "chip", 18)}</div>` : ""}
+                  <div style="min-width:0">
+                    <div class="pv-sc-title">
+                      ${ui.fav.showDot ? `<span class="dot online"></span>` : ""}
+                      <span class="txt">${escapeHtml(fav.name)}</span>
+                    </div>
+                    ${ui.fav.showSub ? `<div class="pv-sc-sub">${escapeHtml(subTxt)}</div>` : ""}
+                  </div>
+                </div>
+                ${ui.fav.showPill && !dev ? `<span class="pv-sc-pill">OPEN</span>` : ""}
+              </div>
+            `;
+          })
+          .join("");
+
+        sections.favorites = `
+          <div>
+            <div class="pv-sec-label"><span style="color:var(--star)">★</span> Favorites</div>
+            <div class="pv-sc-grid"
+              data-layout="${ui.fav.layout}"
+              data-size="${ui.fav.size}"
+              data-accent-pos="${ui.fav.accentPos}"
+              data-on-style="${ui.shortcut.onStyle}"
+              style="${colsStyle(ui.fav.colsDesktop, ui.fav.colsMobile, 200)}">
+              ${favCards}
+            </div>
+          </div>
+        `;
+
+        // Shortcuts Section
+        sections.shortcuts = `
+          <div>
+            <div class="pv-sec-label"><span style="color:var(--accent)">⚡</span> Shortcut Buttons</div>
+            <div class="pv-sc-grid"
+              data-layout="${ui.shortcut.layout}"
+              data-size="${ui.shortcut.size}"
+              data-accent-pos="${ui.shortcut.accentPos}"
+              data-on-style="${ui.shortcut.onStyle}"
+              style="${colsStyle(ui.shortcut.colsDesktop, ui.shortcut.colsMobile, 200)}">
+              ${data.shortcuts.map((s) => renderPreviewShortcutCard(s, ui.shortcut)).join("")}
+            </div>
+          </div>
+        `;
+
+        // Groups Section
+        const groupsHtml = data.groups
+          .map((g) => {
+            const devs = data.devices.filter((d) =>
+              Array.isArray(d.groups)
+                ? d.groups.includes(g.id)
+                : d.group === g.id,
+            );
+            if (!devs.length) return "";
+            const isCollapsed =
+              ui.group.collapsible && previewCollapsed.has(g.id);
+            return `
+              <div class="pv-group-block ${isCollapsed ? "collapsed" : ""}">
+                <div class="pv-group-head ${ui.group.collapsible ? "collapsible" : ""}"
+                     data-style="${ui.group.headerStyle}"
+                     onclick="togglePreviewGroup('${escapeHtml(g.id)}')">
+                  <span class="pv-group-bar" style="background:${escapeHtml(g.color || "#38bdf8")}"></span>
+                  <span class="pv-group-title">${escapeHtml(g.name)}</span>
+                  <span class="pv-tab-count">${devs.length}</span>
+                  ${ui.group.collapsible ? `<span style="margin-left:auto;font-size:0.75rem;color:var(--text-muted)">${isCollapsed ? "▸" : "▾"}</span>` : ""}
+                </div>
+                <div class="pv-group-body">
+                  <div class="pv-dev-grid"
+                    data-layout="${ui.group.layout}"
+                    data-size="${ui.group.size}"
+                    data-accent-pos="${ui.group.accentPos}"
+                    style="${colsStyle(ui.group.colsDesktop, ui.group.colsMobile, 245)}">
+                    ${devs.map(renderPreviewDeviceCard).join("")}
+                  </div>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+
+        sections.groups = `<div>${groupsHtml}</div>`;
+
+        // Footer HTML
+        const footerHtml = ui.header.showFooter
+          ? `<div class="pv-footer">Developer &copy; <strong>M.Maity</strong> | iotBrainStorm &bull; WiFi: -54 dBm (76%)</div>`
+          : "";
+
+        document.getElementById("previewMount").innerHTML = `
+          ${headerHtml}
+          <div class="pv-main">
+            ${ui.sectionOrder.map((k) => sections[k] || "").join("")}
+          </div>
+          ${footerHtml}
+        `;
+      }
+
+      /* ==========================================================================
+         SAVE TO LOCALSTORAGE & ESP32 NVS
+         ========================================================================== */
+      async function saveLayout() {
+        config.settings.uiLayout = ui;
+        config.settings.showIpOnCard = ui.group.showAddr;
+
+        const bytes = new TextEncoder().encode(JSON.stringify(config)).length;
+        if (bytes > NVS_MAX_BYTES) {
+          return showToast("Error: Config exceeds 16KB NVS limit!");
+        }
+
+        const btn = document.getElementById("saveLayoutBtn");
+        btn.disabled = true;
+        btn.textContent = "Saving...";
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+
+        try {
+          if (!isOfflinePreview) {
+            const res = await fetch("/api/config", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(config),
+            });
+            if (!res.ok) throw new Error();
+          }
+          isDirty = false;
+          showToast("Home Layout saved to ESP32!");
+        } catch {
+          showToast("Saved locally (ESP32 endpoint unreachable)");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Save to ESP32";
+        }
+      }
+
+      window.addEventListener("beforeunload", (e) => {
+        if (isDirty) {
+          e.preventDefault();
+          e.returnValue = "";
+        }
+      });
+
+      init();
+    </script>
+  </body>
+</html>

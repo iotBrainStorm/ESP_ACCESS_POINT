@@ -2791,6 +2791,8 @@
             );
           }
         } catch (_) {}
+        applyHubTheme();
+        startDesignShortcutPoller();
         applyHubStatesToShapes();
         renderCanvas();
         updateInspector();
@@ -2831,9 +2833,11 @@
         if (!dev) return showToast("Device not found in Hub config");
         const url = buildDeviceUrl(dev, customPath);
         if (url === "#") return showToast("Invalid device address");
-        if (hubCfg?.settings?.openNewTab)
+        if (hubCfg?.settings?.openNewTab) {
           window.open(url, "_blank", "noopener");
-        else window.open(url, "_blank", "noopener");
+        } else {
+          window.location.href = url;
+        }
       }
 
       // Maps real ESP32 shortcut states -> every linked shape & Main Switch on all floors
@@ -3179,12 +3183,24 @@
          ======================================================================== */
       function applyHubTheme() {
         try {
-          const hubRaw = JSON.parse(localStorage.getItem(HUB_CONFIG_KEY));
+          const hubRaw =
+            getHubConfig() || JSON.parse(localStorage.getItem(HUB_CONFIG_KEY));
           if (hubRaw?.settings?.theme) {
             document.documentElement.setAttribute(
               "data-theme",
               hubRaw.settings.theme,
             );
+          }
+          const acc = hubRaw?.settings?.accentColor || "";
+          if (acc) {
+            document.documentElement.style.setProperty("--accent", acc);
+            document.documentElement.style.setProperty(
+              "--accent-soft",
+              `color-mix(in srgb, ${acc} 16%, transparent)`,
+            );
+          } else {
+            document.documentElement.style.removeProperty("--accent");
+            document.documentElement.style.removeProperty("--accent-soft");
           }
         } catch (_) {}
       }
@@ -3788,7 +3804,10 @@
         )
           return;
         pushUndo();
+        const prevId = building?.id;
         building = createDefaultSampleBuilding();
+        building.id = prevId || "bldg_" + Date.now().toString(36);
+        building.floorSwitcher = getDefaultFloorSwitcher();
         activeFloorId = building.floors[0].id;
         clearSelection();
         syncBuildingInputs();
@@ -7648,16 +7667,28 @@
         t._timer = setTimeout(() => t.classList.remove("show"), 2200);
       }
 
-      // Real-time feedback polling every 2.5s (same interval as Home UI)
-      setInterval(() => {
-        syncAllDesignShortcuts(true);
-      }, 2500);
+      let designSyncTimer = null;
 
-      // Instant sync when a switch is toggled in index.html in another browser tab
+      function startDesignShortcutPoller() {
+        clearInterval(designSyncTimer);
+        const intervalMs = Math.max(
+          1000,
+          Number(getHubConfig()?.settings?.shortcutSyncMs) || 2500,
+        );
+        designSyncTimer = setInterval(() => {
+          syncAllDesignShortcuts(true);
+        }, intervalMs);
+      }
+
+      startDesignShortcutPoller();
+
+      // Instant sync when config or switch states change in another browser tab
       window.addEventListener("storage", (e) => {
         if (e.key === HUB_CONFIG_KEY && e.newValue) {
           try {
             cachedHubConfig = JSON.parse(e.newValue);
+            applyHubTheme();
+            startDesignShortcutPoller();
             if (applyHubStatesToShapes()) {
               renderCanvas();
               refreshOpenSimModal();

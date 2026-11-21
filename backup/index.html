@@ -1269,6 +1269,252 @@
           padding: 0 9px;
         }
       }
+
+      /* ==========================================================================
+   7. DYNAMIC HOME LAYOUT STUDIO OVERRIDES
+   ========================================================================== */
+      .topbar-inner,
+      .container,
+      .footer-inner {
+        max-width: var(--container-max, 1280px);
+      }
+
+      main.container {
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Global Card Surface Styles */
+      body[data-card-style="glass"] .shortcut-card,
+      body[data-card-style="glass"] .card {
+        background: color-mix(in srgb, var(--card) 62%, transparent);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-color: color-mix(in srgb, var(--text) 14%, transparent);
+      }
+      body[data-card-style="bordered"] .shortcut-card,
+      body[data-card-style="bordered"] .card {
+        background: transparent;
+        box-shadow: none;
+        border-width: 1.5px;
+      }
+      body[data-card-style="elevated"] .shortcut-card,
+      body[data-card-style="elevated"] .card {
+        border-color: transparent;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.36);
+      }
+      body[data-card-style="flat"] .shortcut-card,
+      body[data-card-style="flat"] .card {
+        box-shadow: none;
+      }
+
+      /* Dynamic Columns (Desktop & Mobile) */
+      .shortcut-grid[data-cols] {
+        grid-template-columns: var(
+          --cols-desk,
+          repeat(auto-fill, minmax(210px, 1fr))
+        );
+      }
+      .device-grid[data-cols]:not(.list-view) {
+        grid-template-columns: var(
+          --cols-desk,
+          repeat(auto-fill, minmax(265px, 1fr))
+        );
+      }
+      @media (max-width: 640px) {
+        .shortcut-grid[data-cols],
+        .device-grid[data-cols]:not(.list-view) {
+          grid-template-columns: var(--cols-mob, 1fr) !important;
+        }
+      }
+
+      /* Favorites & Shortcut Layout Modes */
+      .shortcut-grid[data-layout="strip"] {
+        display: flex;
+        overflow-x: auto;
+        gap: 10px;
+        padding-bottom: 4px;
+      }
+      .shortcut-grid[data-layout="strip"] .shortcut-card {
+        min-width: 195px;
+        flex-shrink: 0;
+      }
+      .shortcut-grid[data-layout="pill"] {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .shortcut-grid[data-layout="pill"] .shortcut-card {
+        border-radius: 999px;
+        padding: 7px 14px;
+        width: auto;
+      }
+      .shortcut-grid[data-layout="pill"] .shortcut-card::before {
+        display: none;
+      }
+      .shortcut-grid[data-layout="tile"] .shortcut-card {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 14px 10px;
+        gap: 8px;
+      }
+      .shortcut-grid[data-layout="tile"] .sc-left {
+        flex-direction: column;
+        gap: 6px;
+      }
+      .shortcut-grid[data-layout="tile"] .sc-title {
+        justify-content: center;
+      }
+
+      /* Accent Bar Positions & Active ON Styles */
+      .shortcut-grid[data-accent-pos="top"] .shortcut-card::before {
+        right: 0;
+        bottom: auto;
+        width: auto;
+        height: 3px;
+      }
+      .shortcut-grid[data-accent-pos="none"] .shortcut-card::before,
+      .shortcut-grid[data-accent-pos="tint"] .shortcut-card::before,
+      .device-grid[data-accent-pos="none"] .card::before,
+      .device-grid[data-accent-pos="tint"] .card::before {
+        display: none;
+      }
+      .shortcut-grid[data-accent-pos="tint"] .shortcut-card {
+        background: color-mix(
+          in srgb,
+          var(--sc-color, var(--accent)) 12%,
+          var(--card)
+        );
+      }
+      .device-grid[data-accent-pos="left"] .card::before {
+        right: auto;
+        bottom: 0;
+        width: 4px;
+        height: auto;
+      }
+      .device-grid[data-accent-pos="tint"] .card {
+        background: color-mix(
+          in srgb,
+          var(--card-accent, var(--accent)) 10%,
+          var(--card)
+        );
+      }
+      .shortcut-grid[data-on-style="solid"] .shortcut-card.on {
+        background: var(--sc-color, var(--ok));
+        color: #031525;
+      }
+      .shortcut-grid[data-on-style="solid"] .shortcut-card.on .sc-icon {
+        background: rgba(3, 21, 37, 0.14);
+        color: #031525;
+      }
+      .shortcut-grid[data-on-style="solid"] .shortcut-card.on .sc-pill {
+        background: #031525;
+        color: #ffffff;
+        border-color: transparent;
+      }
+      .shortcut-grid[data-on-style="solid"] .shortcut-card.on .sc-sub {
+        color: #031525;
+      }
+      .shortcut-grid[data-on-style="glow"] .shortcut-card.on {
+        box-shadow:
+          0 0 0 1px var(--sc-color, var(--ok)),
+          0 0 18px
+            color-mix(in srgb, var(--sc-color, var(--ok)) 42%, transparent);
+      }
+
+      /* Size Variants */
+      .shortcut-grid[data-size="sm"] .shortcut-card {
+        padding: 8px 10px;
+      }
+      .shortcut-grid[data-size="sm"] .sc-icon {
+        width: 30px;
+        height: 30px;
+      }
+      .shortcut-grid[data-size="sm"] .sc-title {
+        font-size: 0.82rem;
+      }
+      .shortcut-grid[data-size="lg"] .shortcut-card {
+        padding: 16px 18px;
+      }
+      .shortcut-grid[data-size="lg"] .sc-icon {
+        width: 44px;
+        height: 44px;
+      }
+
+      .device-grid[data-size="sm"] .card {
+        padding: 9px 11px;
+        gap: 8px;
+      }
+      .device-grid[data-size="sm"] .dev-icon {
+        width: 34px;
+        height: 34px;
+      }
+      .device-grid[data-size="sm"] .dev-name {
+        font-size: 0.86rem;
+      }
+      .device-grid[data-size="lg"] .card {
+        padding: 18px;
+        gap: 14px;
+      }
+      .device-grid[data-size="lg"] .dev-icon {
+        width: 48px;
+        height: 48px;
+      }
+
+      /* Device Tile Layout & Ping Latency Badge */
+      .device-grid[data-layout="tile"]:not(.list-view) .card {
+        align-items: center;
+        text-align: center;
+      }
+      .device-grid[data-layout="tile"]:not(.list-view) .card-top {
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+      }
+      .device-grid[data-layout="tile"]:not(.list-view) .dev-title-row {
+        justify-content: center;
+      }
+      .device-grid[data-layout="tile"]:not(.list-view) .fav-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+      }
+      .device-grid[data-layout="tile"]:not(.list-view) .card-bottom {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .ping-badge {
+        font-family: ui-monospace, monospace;
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: var(--ok);
+        background: rgba(34, 197, 94, 0.14);
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+
+      /* Group Header Styles & Collapsible Accordion */
+      .group-header[data-style="pill"] {
+        border-bottom: none;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 5px 12px;
+        width: fit-content;
+      }
+      .group-header[data-style="minimal"] {
+        border-bottom: none;
+        padding-bottom: 2px;
+      }
+      .group-header.collapsible {
+        cursor: pointer;
+        user-select: none;
+      }
+      .group-block.collapsed .group-body {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -1597,59 +1843,61 @@
       </section>
 
       <!-- Grid & Compact View Toolbar -->
-      <div class="toolbar" id="viewToolbar">
-        <div class="seg-toggle" title="Switch layout">
-          <button
-            class="seg-btn icon-only active"
-            id="gridViewBtn"
-            title="Grid View"
-            onclick="setViewMode('grid')"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+      <div id="groupsWrapper">
+        <div class="toolbar" id="viewToolbar">
+          <div class="seg-toggle" title="Switch layout">
+            <button
+              class="seg-btn icon-only active"
+              id="gridViewBtn"
+              title="Grid View"
+              onclick="setViewMode('grid')"
             >
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-            </svg>
-          </button>
-          <button
-            class="seg-btn icon-only"
-            id="listViewBtn"
-            title="Compact View"
-            onclick="setViewMode('list')"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+              </svg>
+            </button>
+            <button
+              class="seg-btn icon-only"
+              id="listViewBtn"
+              title="Compact View"
+              onclick="setViewMode('list')"
             >
-              <line x1="8" y1="6" x2="21" y2="6" />
-              <line x1="8" y1="12" x2="21" y2="12" />
-              <line x1="8" y1="18" x2="21" y2="18" />
-              <line x1="3" y1="6" x2="3.01" y2="6" />
-              <line x1="3" y1="12" x2="3.01" y2="12" />
-              <line x1="3" y1="18" x2="3.01" y2="18" />
-            </svg>
-          </button>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="8" y1="6" x2="21" y2="6" />
+                <line x1="8" y1="12" x2="21" y2="12" />
+                <line x1="8" y1="18" x2="21" y2="18" />
+                <line x1="3" y1="6" x2="3.01" y2="6" />
+                <line x1="3" y1="12" x2="3.01" y2="12" />
+                <line x1="3" y1="18" x2="3.01" y2="18" />
+              </svg>
+            </button>
+          </div>
         </div>
-      </div>
 
-      <!-- Devices Container -->
-      <div id="devicesContainer"></div>
+        <!-- Devices Container -->
+        <div id="devicesContainer"></div>
+      </div>
     </main>
 
     <!-- Multi-Item Favorite Card Modal -->
@@ -2080,6 +2328,107 @@
         });
       }
 
+      let shortcutSyncTimer = null;
+      let collapsedGroups = new Set(
+        JSON.parse(localStorage.getItem("hub_collapsed_groups") || "[]"),
+      );
+
+      function getUiLayout() {
+        const raw = config?.settings?.uiLayout || {};
+        return {
+          sectionOrder:
+            Array.isArray(raw.sectionOrder) && raw.sectionOrder.length === 3
+              ? raw.sectionOrder
+              : ["favorites", "shortcuts", "groups"],
+          cardStyle: raw.cardStyle || "default",
+          radius: Number(raw.radius) || 14,
+          maxWidth: raw.maxWidth !== undefined ? Number(raw.maxWidth) : 1280,
+          header: {
+            showSearch: true,
+            showClock: true,
+            showMapBtn: true,
+            showAddrToggle: true,
+            showFooter: true,
+            ...(raw.header || {}),
+          },
+          fav: {
+            layout: "grid",
+            size: "md",
+            colsDesktop: 0,
+            colsMobile: 1,
+            accentPos: "left",
+            colorMode: "item",
+            customColor: "#fbbf24",
+            showIcon: true,
+            showDot: true,
+            showSub: true,
+            showLock: true,
+            showPill: true,
+            ...(raw.fav || {}),
+          },
+          shortcut: {
+            layout: "row",
+            size: "md",
+            colsDesktop: 0,
+            colsMobile: 1,
+            accentPos: "left",
+            onStyle: "tint",
+            colorMode: "item",
+            customColor: "#38bdf8",
+            showIcon: true,
+            showDot: true,
+            showLock: true,
+            showPill: true,
+            ...(raw.shortcut || {}),
+          },
+          group: {
+            headerStyle: "bar",
+            collapsible: false,
+            layout: "card",
+            size: "md",
+            colsDesktop: 0,
+            colsMobile: 1,
+            accentPos: "top",
+            colorMode: "item",
+            customColor: "#38bdf8",
+            showIcon: true,
+            showDot: true,
+            showNote: true,
+            showFavBtn: true,
+            showAddr: true,
+            showPing: false,
+            showAltBtn: true,
+            ...(raw.group || {}),
+          },
+        };
+      }
+
+      function gridColVars(colsDesk, colsMob, minPx) {
+        const desk =
+          colsDesk > 0
+            ? `repeat(${colsDesk}, minmax(0, 1fr))`
+            : `repeat(auto-fill, minmax(${minPx}px, 1fr))`;
+        const mob = colsMob === 2 ? "repeat(2, minmax(0, 1fr))" : "1fr";
+        return `--cols-desk:${desk};--cols-mob:${mob}`;
+      }
+
+      function toggleGroupCollapse(gid) {
+        if (!getUiLayout().group.collapsible) return;
+        if (collapsedGroups.has(gid)) collapsedGroups.delete(gid);
+        else collapsedGroups.add(gid);
+        localStorage.setItem(
+          "hub_collapsed_groups",
+          JSON.stringify([...collapsedGroups]),
+        );
+        renderDevices();
+      }
+
+      function triggerHaptic() {
+        if (config?.settings?.hapticFeedback !== false && navigator.vibrate) {
+          navigator.vibrate(12);
+        }
+      }
+
       function sanitizeConfig(raw) {
         const defAdmin = getDefaultAdminConfig();
         const fallback = {
@@ -2096,6 +2445,12 @@
             enableShortcuts: true,
             enableGroups: true,
             enableFavorites: true,
+            accentColor: "",
+            shortcutSyncMs: 2500,
+            defaultViewMode: "grid",
+            hapticFeedback: true,
+            confirmShortcutToggle: false,
+            uiLayout: null,
           },
           network: {
             mode: "dhcp",
@@ -2527,6 +2882,12 @@
 
       function applySettingsUI() {
         const s = config.settings;
+
+        // Resolve default view mode before toggling toolbar buttons
+        if (!localStorage.getItem("hub_view_mode") && s.defaultViewMode) {
+          viewMode = s.defaultViewMode;
+        }
+
         document.documentElement.setAttribute("data-theme", s.theme || "dark");
         document.title = s.title || "ACCESS POINT";
         document.getElementById("hubTitle").textContent =
@@ -2545,6 +2906,66 @@
         document
           .getElementById("listViewBtn")
           .classList.toggle("active", viewMode === "list");
+        const ui = getUiLayout();
+
+        // Accent color & global radius/width/surface
+        const acc = s.accentColor || "";
+        if (acc) {
+          document.documentElement.style.setProperty("--accent", acc);
+          document.documentElement.style.setProperty(
+            "--accent-soft",
+            `color-mix(in srgb, ${acc} 16%, transparent)`,
+          );
+        } else {
+          document.documentElement.style.removeProperty("--accent");
+          document.documentElement.style.removeProperty("--accent-soft");
+        }
+        document.documentElement.style.setProperty(
+          "--radius",
+          `${ui.radius}px`,
+        );
+        document.documentElement.style.setProperty(
+          "--container-max",
+          ui.maxWidth ? `${ui.maxWidth}px` : "100%",
+        );
+        document.body.setAttribute("data-card-style", ui.cardStyle);
+
+        // Header & footer visibility
+        document.querySelector(".search-wrap").style.display = ui.header
+          .showSearch
+          ? ""
+          : "none";
+        document.getElementById("homeClock").style.display = ui.header.showClock
+          ? ""
+          : "none";
+        document.getElementById("mapViewBtn").style.display = ui.header
+          .showMapBtn
+          ? ""
+          : "none";
+        document.getElementById("modeIpBtn").parentElement.style.display = ui
+          .header.showAddrToggle
+          ? ""
+          : "none";
+        document.querySelector("footer").style.display = ui.header.showFooter
+          ? ""
+          : "none";
+
+        // Section ordering
+        const orderMap = {
+          favorites: document.getElementById("favSection"),
+          shortcuts: document.getElementById("shortcutSection"),
+          groups: document.getElementById("groupsWrapper"),
+        };
+        ui.sectionOrder.forEach((key, idx) => {
+          if (orderMap[key]) orderMap[key].style.order = idx;
+        });
+
+        // Dynamic shortcut sync interval
+        clearInterval(shortcutSyncTimer);
+        const syncInterval = Math.max(1000, Number(s.shortcutSyncMs) || 2500);
+        shortcutSyncTimer = setInterval(() => {
+          if (config?.shortcuts?.length) syncAllShortcuts(true);
+        }, syncInterval);
       }
 
       function setAddressMode(useMdns) {
@@ -2595,6 +3016,11 @@
         if (event) event.stopPropagation();
         const sc = config.shortcuts.find((s) => s.id === id);
         if (!sc || shortcutBusy[id]) return;
+        triggerHaptic();
+        if (config.settings.confirmShortcutToggle && !sc.locked) {
+          if (!confirm(`Toggle "${sc.name}" ${sc.state ? "OFF" : "ON"}?`))
+            return;
+        }
         if (sc.locked) {
           const ok = await promptVerification(
             sc.lockRole || "admin",
@@ -2937,64 +3363,86 @@
          8. UI RENDERING (FAVORITES, SHORTCUTS, DEVICES & MODALS)
          ========================================================================== */
       function createShortcutHtml(sc) {
+        const ui = getUiLayout().shortcut;
         const idSafe = escapeHtml(sc.id);
-        const colorSafe = escapeHtml(sc.color || "#38bdf8");
+        const colorSafe = escapeHtml(
+          ui.colorMode === "custom" ? ui.customColor : sc.color || "#38bdf8",
+        );
         const isBusy = !!shortcutBusy[sc.id];
         const isOn = !!sc.state;
         const st = shortcutStatus[sc.id] || "checking";
         const isLocked = !!sc.locked;
 
         return `
-          <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" data-sc-card-id="${idSafe}" style="--sc-color:${colorSafe}" onclick="triggerShortcut('${idSafe}', event)">
-            <div class="sc-left">
-              <div class="sc-icon">${svgIcon(sc.icon || "switch", 19)}</div>
-              <div style="min-width:0">
-                <div class="sc-title">
-                  <span class="dot ${st}" data-sc-status-id="${idSafe}" title="Status: ${st}"></span>
-                  <span class="sc-title-text">${escapeHtml(sc.name)}</span>
-                </div>
-              </div>
-            </div>
-            <div class="sc-right">
-              <span class="sc-lock-ico ${isLocked ? "locked" : ""}" title="${isLocked ? "Locked" : "Unlocked"}">
-                ${svgIcon(isLocked ? "lock" : "unlock", 13)}
-              </span>
-              <span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>
-            </div>
+    <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" data-sc-card-id="${idSafe}" style="--sc-color:${colorSafe}" onclick="triggerShortcut('${idSafe}', event)">
+      <div class="sc-left">
+        ${ui.showIcon ? `<div class="sc-icon">${svgIcon(sc.icon || "switch", 19)}</div>` : ""}
+        <div style="min-width:0">
+          <div class="sc-title">
+            ${ui.showDot ? `<span class="dot ${st}" data-sc-status-id="${idSafe}" title="Status: ${st}"></span>` : ""}
+            <span class="sc-title-text">${escapeHtml(sc.name)}</span>
           </div>
-        `;
+        </div>
+      </div>
+      <div class="sc-right">
+        ${ui.showLock ? `<span class="sc-lock-ico ${isLocked ? "locked" : ""}" title="${isLocked ? "Locked" : "Unlocked"}">${svgIcon(isLocked ? "lock" : "unlock", 13)}</span>` : ""}
+        ${ui.showPill ? `<span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>` : ""}
+      </div>
+    </div>
+  `;
       }
 
       function createCardHtml(dev) {
+        const ui = getUiLayout().group;
         const st = deviceStatus[dev.id] || "checking";
         const addr = getDisplayAddress(dev);
-        const showAddr = config.settings.showIpOnCard !== false;
+        const showAddr = ui.showAddr && config.settings.showIpOnCard !== false;
         const idSafe = escapeHtml(dev.id);
         const altPathSafe = escapeHtml(dev.altPath || "");
+        const colorSafe = escapeHtml(
+          ui.colorMode === "custom"
+            ? ui.customColor
+            : dev.color || "var(--accent)",
+        );
+        const hasBottom =
+          showAddr ||
+          ui.showPing ||
+          (ui.showAltBtn && dev.altLabel && dev.altPath);
 
         return `
-        <article class="card" style="--card-accent:${escapeHtml(dev.color || "var(--accent)")}" onclick="openDeviceById('${idSafe}')">
-          <div class="card-top">
-            <div class="dev-icon">${svgIcon(dev.icon, 21)}</div>
-            <div class="dev-info">
-              <div class="dev-title-row">
-                <span class="dot ${st}" data-status-id="${idSafe}" title="Status: ${st}"></span>
-                <h2 class="dev-name">${escapeHtml(dev.name)}</h2>
-              </div>
-              <div class="dev-meta">${escapeHtml(dev.note || getGroupName(dev))}</div>
-            </div>
-            <button class="fav-btn ${dev.fav ? "active" : ""}" title="Pin to Favorites" onclick="toggleFavorite(event, '${idSafe}')">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="${dev.fav ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            </button>
+    <article class="card" style="--card-accent:${colorSafe}" onclick="openDeviceById('${idSafe}')">
+      <div class="card-top">
+        ${ui.showIcon ? `<div class="dev-icon">${svgIcon(dev.icon, 21)}</div>` : ""}
+        <div class="dev-info">
+          <div class="dev-title-row">
+            ${ui.showDot ? `<span class="dot ${st}" data-status-id="${idSafe}" title="Status: ${st}"></span>` : ""}
+            <h2 class="dev-name">${escapeHtml(dev.name)}</h2>
           </div>
-          <div class="card-bottom">
-            ${showAddr ? `<span class="addr-pill" title="Tap to copy address" onclick="copyAddress(event, '${escapeHtml(addr)}')">${escapeHtml(addr)}</span>` : "<span></span>"}
-            <div class="card-links">
-              ${dev.altLabel && dev.altPath ? `<button class="mini-btn" onclick="openDeviceById('${idSafe}', '${altPathSafe}', event)">${escapeHtml(dev.altLabel)}</button>` : ""}
-            </div>
-          </div>
-        </article>
-      `;
+          ${ui.showNote ? `<div class="dev-meta">${escapeHtml(dev.note || getGroupName(dev))}</div>` : ""}
+        </div>
+        ${
+          ui.showFavBtn
+            ? `<button class="fav-btn ${dev.fav ? "active" : ""}" title="Pin to Favorites" onclick="toggleFavorite(event, '${idSafe}')">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="${dev.fav ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>`
+            : ""
+        }
+      </div>
+      ${
+        hasBottom
+          ? `<div class="card-bottom">
+        <div style="display:flex;align-items:center;gap:6px;min-width:0">
+          ${showAddr ? `<span class="addr-pill" title="Tap to copy address" onclick="copyAddress(event, '${escapeHtml(addr)}')">${escapeHtml(addr)}</span>` : ""}
+          ${ui.showPing ? `<span class="ping-badge" data-ping-id="${idSafe}" style="display:none"></span>` : ""}
+        </div>
+        <div class="card-links">
+          ${ui.showAltBtn && dev.altLabel && dev.altPath ? `<button class="mini-btn" onclick="openDeviceById('${idSafe}', '${altPathSafe}', event)">${escapeHtml(dev.altLabel)}</button>` : ""}
+        </div>
+      </div>`
+          : ""
+      }
+    </article>
+  `;
       }
 
       function renderFavorites() {
@@ -3008,10 +3456,26 @@
         }
 
         sec.style.display = "block";
+        const uiFav = getUiLayout().fav;
+        strip.dataset.cols = "1";
+        strip.dataset.layout = uiFav.layout;
+        strip.dataset.size = uiFav.size;
+        strip.dataset.accentPos = uiFav.accentPos;
+        strip.dataset.onStyle = getUiLayout().shortcut.onStyle;
+        strip.style.cssText = gridColVars(
+          uiFav.colsDesktop,
+          uiFav.colsMobile,
+          210,
+        );
+
         strip.innerHTML = visibleFavs
           .map((fav) => {
             const fIdSafe = escapeHtml(fav.id);
-            const colorSafe = escapeHtml(fav.color || "#38bdf8");
+            const colorSafe = escapeHtml(
+              uiFav.colorMode === "custom"
+                ? uiFav.customColor
+                : fav.color || "#38bdf8",
+            );
             const dIds = (fav.deviceIds || []).filter((id) =>
               config.devices.some((d) => d.id === id),
             );
@@ -3029,23 +3493,30 @@
               const isBusy = !!shortcutBusy[sc.id];
               const isOn = !!sc.state;
               const st = shortcutStatus[sc.id] || "checking";
+              const showRight = uiFav.showLock || uiFav.showPill;
               return `
                 <div class="shortcut-card ${isOn ? "on" : ""} ${isBusy ? "busy" : ""}" data-sc-card-id="${scIdSafe}" style="--sc-color:${colorSafe}" onclick="handleFavoriteClick('${fIdSafe}')">
                   <div class="sc-left">
-                    <div class="sc-icon">${svgIcon(fav.icon || sc.icon || "switch", 19)}</div>
+                    ${uiFav.showIcon ? `<div class="sc-icon">${svgIcon(fav.icon || sc.icon || "switch", 19)}</div>` : ""}
                     <div style="min-width:0">
                       <div class="sc-title">
-                        <span class="dot ${st}" data-sc-status-id="${scIdSafe}" title="Status: ${st}"></span>
+                        ${uiFav.showDot ? `<span class="dot ${st}" data-sc-status-id="${scIdSafe}" title="Status: ${st}"></span>` : ""}
                         <span class="sc-title-text">${escapeHtml(fav.name || sc.name)}</span>
                       </div>
                     </div>
                   </div>
-                  <div class="sc-right">
-                    <span class="sc-lock-ico ${sc.locked ? "locked" : ""}" title="${sc.locked ? "Locked" : "Unlocked"}">
-                      ${svgIcon(sc.locked ? "lock" : "unlock", 13)}
-                    </span>
-                    <span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>
-                  </div>
+                  ${
+                    showRight
+                      ? `<div class="sc-right">
+                          ${
+                            uiFav.showLock
+                              ? `<span class="sc-lock-ico ${sc.locked ? "locked" : ""}" title="${sc.locked ? "Locked" : "Unlocked"}">${svgIcon(sc.locked ? "lock" : "unlock", 13)}</span>`
+                              : ""
+                          }
+                          ${uiFav.showPill ? `<span class="sc-pill">${isBusy ? "..." : isOn ? "ON" : "OFF"}</span>` : ""}
+                        </div>`
+                      : ""
+                  }
                 </div>
               `;
             }
@@ -3057,13 +3528,13 @@
               return `
                 <div class="shortcut-card" style="--sc-color:${colorSafe}" onclick="handleFavoriteClick('${fIdSafe}')">
                   <div class="sc-left">
-                    <div class="sc-icon">${svgIcon(fav.icon || dev.icon || "chip", 19)}</div>
+                    ${uiFav.showIcon ? `<div class="sc-icon">${svgIcon(fav.icon || dev.icon || "chip", 19)}</div>` : ""}
                     <div style="min-width:0">
                       <div class="sc-title">
-                        <span class="dot ${st}" data-status-id="${escapeHtml(dev.id)}" title="Status: ${st}"></span>
+                        ${uiFav.showDot ? `<span class="dot ${st}" data-status-id="${escapeHtml(dev.id)}" title="Status: ${st}"></span>` : ""}
                         <span class="sc-title-text">${escapeHtml(fav.name || dev.name)}</span>
                       </div>
-                      <div class="sc-sub">${escapeHtml(getDisplayAddress(dev))}</div>
+                      ${uiFav.showSub ? `<div class="sc-sub">${escapeHtml(getDisplayAddress(dev))}</div>` : ""}
                     </div>
                   </div>
                 </div>
@@ -3092,16 +3563,16 @@
             return `
               <div class="shortcut-card" style="--sc-color:${colorSafe}" onclick="handleFavoriteClick('${fIdSafe}')">
                 <div class="sc-left">
-                  <div class="sc-icon">${svgIcon(fav.icon || "chip", 19)}</div>
+                  ${uiFav.showIcon ? `<div class="sc-icon">${svgIcon(fav.icon || "chip", 19)}</div>` : ""}
                   <div style="min-width:0">
                     <div class="sc-title">
-                      <span class="dot ${bundleSt}" data-fav-bundle-id="${fIdSafe}"></span>
+                      ${uiFav.showDot ? `<span class="dot ${bundleSt}" data-fav-bundle-id="${fIdSafe}"></span>` : ""}
                       <span class="sc-title-text">${escapeHtml(fav.name)}</span>
                     </div>
-                    <div class="sc-sub">${totalItems} linked item${totalItems > 1 ? "s" : ""}</div>
+                    ${uiFav.showSub ? `<div class="sc-sub">${totalItems} linked item${totalItems > 1 ? "s" : ""}</div>` : ""}
                   </div>
                 </div>
-                <span class="sc-pill">OPEN</span>
+                ${uiFav.showPill ? `<span class="sc-pill">OPEN</span>` : ""}
               </div>
             `;
           })
@@ -3338,6 +3809,17 @@
         }
 
         sec.style.display = "block";
+        const uiSc = getUiLayout().shortcut;
+        grid.dataset.cols = "1";
+        grid.dataset.layout = uiSc.layout;
+        grid.dataset.size = uiSc.size;
+        grid.dataset.accentPos = uiSc.accentPos;
+        grid.dataset.onStyle = uiSc.onStyle;
+        grid.style.cssText = gridColVars(
+          uiSc.colsDesktop,
+          uiSc.colsMobile,
+          210,
+        );
         grid.innerHTML = filtered.map(createShortcutHtml).join("");
       }
 
@@ -3369,37 +3851,54 @@
           );
         });
 
-        const gridClass = `device-grid ${viewMode === "list" ? "list-view" : ""}`;
         let html = "";
+        const uiGrp = getUiLayout().group;
+        const uiSc = getUiLayout().shortcut;
+        const isList = viewMode === "list" || uiGrp.layout === "compact";
+        const gridClass = `device-grid ${isList ? "list-view" : ""}`;
+        const devGridAttrs = `data-cols="1" data-layout="${uiGrp.layout}" data-size="${uiGrp.size}" data-accent-pos="${uiGrp.accentPos}" style="${gridColVars(uiGrp.colsDesktop, uiGrp.colsMobile, 265)}"`;
 
         config.groups.forEach((g) => {
           if (g.hidden) return;
+
           const groupDevs = visibleDevices.filter((d) =>
             getItemGroups(d).includes(g.id),
           );
-          const groupShortcuts = (config.shortcuts || []).filter(
-            (s) =>
-              !s.hidden &&
-              getItemGroups(s).includes(g.id) &&
-              (!query ||
-                (s.name && s.name.toLowerCase().includes(query)) ||
-                (s.host && s.host.toLowerCase().includes(query))),
-          );
+          const groupShortcuts =
+            config.settings.enableShortcuts === false
+              ? []
+              : (config.shortcuts || []).filter((s) => {
+                  if (s.hidden || !getItemGroups(s).includes(g.id)) {
+                    return false;
+                  }
+                  if (!query) return true;
+                  return (
+                    (s.name && s.name.toLowerCase().includes(query)) ||
+                    (s.host && s.host.toLowerCase().includes(query)) ||
+                    (g.name && g.name.toLowerCase().includes(query))
+                  );
+                });
 
-          if (!groupDevs.length && !groupShortcuts.length) return;
           const totalCount = groupDevs.length + groupShortcuts.length;
+          if (!totalCount) return;
+
+          const scGridAttrs = `data-cols="1" data-layout="${uiSc.layout}" data-size="${uiSc.size}" data-accent-pos="${uiSc.accentPos}" data-on-style="${uiSc.onStyle}" style="${gridColVars(uiSc.colsDesktop, uiSc.colsMobile, 210)};margin-bottom:${groupDevs.length ? "12px" : "0"}"`;
+          const isCollapsed = uiGrp.collapsible && collapsedGroups.has(g.id);
 
           html += `
-          <section class="group-block" id="group-block-${escapeHtml(g.id)}">
-            <div class="group-header">
-              <span class="group-bar" style="background:${escapeHtml(g.color)}"></span>
-              <h3 class="group-title">${escapeHtml(g.name)}</h3>
-              <span class="tab-count">${totalCount}</span>
-            </div>
-            ${groupShortcuts.length ? `<div class="shortcut-grid" style="margin-bottom:${groupDevs.length ? "12px" : "0"}">${groupShortcuts.map(createShortcutHtml).join("")}</div>` : ""}
-            ${groupDevs.length ? `<div class="${gridClass}">${groupDevs.map(createCardHtml).join("")}</div>` : ""}
-          </section>
-        `;
+            <section class="group-block ${isCollapsed ? "collapsed" : ""}" id="group-block-${escapeHtml(g.id)}">
+              <div class="group-header ${uiGrp.collapsible ? "collapsible" : ""}" data-style="${uiGrp.headerStyle}" onclick="toggleGroupCollapse('${escapeHtml(g.id)}')">
+                <span class="group-bar" style="background:${escapeHtml(g.color)}"></span>
+                <h3 class="group-title">${escapeHtml(g.name)}</h3>
+                <span class="tab-count">${totalCount}</span>
+                ${uiGrp.collapsible ? `<span style="margin-left:auto;font-size:0.78rem;color:var(--text-muted)">${isCollapsed ? "&#9656;" : "&#9662;"}</span>` : ""}
+              </div>
+              <div class="group-body">
+                ${groupShortcuts.length ? `<div class="shortcut-grid" ${scGridAttrs}>${groupShortcuts.map(createShortcutHtml).join("")}</div>` : ""}
+                ${groupDevs.length ? `<div class="${gridClass}" ${devGridAttrs}>${groupDevs.map(createCardHtml).join("")}</div>` : ""}
+              </div>
+            </section>
+          `;
         });
 
         if (!html) {
@@ -3525,12 +4024,6 @@
       });
 
       setInterval(updateHomeClock, 1000);
-
-      setInterval(() => {
-        if (config && config.shortcuts && config.shortcuts.length) {
-          syncAllShortcuts(true);
-        }
-      }, 2500);
 
       setInterval(() => {
         if (!isOfflinePreview) loadTelemetry();
