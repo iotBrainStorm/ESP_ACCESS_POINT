@@ -2107,13 +2107,14 @@
                 preview in Mobile / Desktop views
               </div>
             </div>
-            <a
-              href="layout.html"
+            <button
+              type="button"
               class="btn btn-primary"
-              style="white-space: nowrap; text-decoration: none"
+              style="white-space: nowrap"
+              onclick="openLayoutPage()"
             >
               Go to Layout
-            </a>
+            </button>
           </div>
         </div>
 
@@ -5937,7 +5938,23 @@
         }
       }
 
+      function isDesktopMode() {
+        return window.innerWidth >= 960;
+      }
+
+      function openLayoutPage() {
+        if (!isDesktopMode()) {
+          showToast("Desktop view is mandatory to open Layout Studio.");
+          return;
+        }
+        window.location.href = "layout.html";
+      }
+
       async function openDesignListModal() {
+        if (!isDesktopMode()) {
+          showToast("Desktop view is mandatory to open Design Editor.");
+          return;
+        }
         const listEl = document.getElementById("savedDesignsList");
         listEl.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">Loading saved designs...</div>`;
         document.getElementById("designListModal").classList.add("open");

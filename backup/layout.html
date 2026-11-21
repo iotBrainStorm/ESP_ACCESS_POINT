@@ -461,6 +461,11 @@
         border-color: var(--accent);
         background: var(--accent-soft);
       }
+      .preset-btn.active {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        box-shadow: 0 0 0 1px var(--accent);
+      }
 
       .order-list {
         display: flex;
@@ -660,6 +665,99 @@
         color: var(--text);
         display: grid;
         place-items: center;
+      }
+
+      /* pv-brand options */
+      .pv-topbar-inner[data-brand-align="center"] {
+        justify-content: center;
+      }
+      .pv-topbar-inner[data-brand-align="center"] .pv-brand {
+        margin-right: 0;
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+      }
+      .pv-topbar-inner[data-brand-align="center"] .pv-brand-sub {
+        justify-content: center;
+      }
+      .pv-brand[data-size="sm"] .pv-brand-ico {
+        width: 28px;
+        height: 28px;
+      }
+      .pv-brand[data-size="sm"] h1 {
+        font-size: 0.85rem;
+      }
+      .pv-brand[data-size="lg"] .pv-brand-ico {
+        width: 42px;
+        height: 42px;
+      }
+      .pv-brand[data-size="lg"] h1 {
+        font-size: 1.15rem;
+      }
+
+      .pv-brand[data-icon-style="solid"] .pv-brand-ico {
+        background: var(--accent);
+        color: #031525;
+      }
+      .pv-brand[data-icon-style="circle"] .pv-brand-ico {
+        border-radius: 50%;
+      }
+      .pv-brand[data-icon-style="outline"] .pv-brand-ico {
+        background: transparent;
+        border: 1.5px solid var(--accent);
+      }
+
+      /* pv-actions options */
+      .pv-actions[data-gap="tight"] {
+        gap: 4px;
+      }
+      .pv-actions[data-gap="wide"] {
+        gap: 12px;
+      }
+
+      .pv-actions[data-shape="pill"] .pv-map-btn,
+      .pv-actions[data-shape="pill"] .pv-ico-btn,
+      .pv-actions[data-shape="pill"] .seg-toggle,
+      .pv-actions[data-shape="pill"] .seg-btn {
+        border-radius: 999px;
+      }
+
+      .pv-actions[data-shape="square"] .pv-map-btn,
+      .pv-actions[data-shape="square"] .pv-ico-btn,
+      .pv-actions[data-shape="square"] .seg-toggle,
+      .pv-actions[data-shape="square"] .seg-btn {
+        border-radius: 4px;
+      }
+
+      .pv-actions[data-size="sm"] .pv-map-btn,
+      .pv-actions[data-size="sm"] .pv-ico-btn {
+        height: 28px;
+        min-width: 28px;
+        font-size: 0.68rem;
+      }
+      .pv-actions[data-size="lg"] .pv-map-btn,
+      .pv-actions[data-size="lg"] .pv-ico-btn {
+        height: 38px;
+        min-width: 38px;
+        font-size: 0.8rem;
+      }
+      .pv-actions[data-size="sm"] .pv-ico-btn {
+        width: 28px;
+      }
+      .pv-actions[data-size="lg"] .pv-ico-btn {
+        width: 38px;
+      }
+
+      .pv-actions[data-map-style="solid"] .pv-map-btn {
+        background: var(--accent);
+        color: #031525;
+        border-color: var(--accent);
+      }
+      .pv-actions[data-map-style="icon"] .pv-map-btn span {
+        display: none;
+      }
+      .pv-actions[data-map-style="icon"] .pv-map-btn {
+        padding: 0 8px;
       }
 
       .pv-main {
@@ -1338,18 +1436,37 @@
           <!-- TAB 1: GLOBAL & SECTIONS -->
           <div class="ctrl-panel active" id="panel-global">
             <div class="ctrl-card">
-              <div class="ctrl-card-title">Quick Layout Presets</div>
+              <div class="ctrl-card-title">
+                <span>Quick Layout Presets</span>
+                <span class="badge" id="activePresetBadge">Default</span>
+              </div>
               <div class="preset-grid">
-                <button class="preset-btn" onclick="applyPreset('default')">
+                <button
+                  class="preset-btn"
+                  data-preset="default"
+                  onclick="applyPreset('default')"
+                >
                   Default Slate<span>Balanced cards &amp; grids</span>
                 </button>
-                <button class="preset-btn" onclick="applyPreset('tablet')">
+                <button
+                  class="preset-btn"
+                  data-preset="tablet"
+                  onclick="applyPreset('tablet')"
+                >
                   Wall Tablet<span>Square tiles, bold glow</span>
                 </button>
-                <button class="preset-btn" onclick="applyPreset('compact')">
+                <button
+                  class="preset-btn"
+                  data-preset="compact"
+                  onclick="applyPreset('compact')"
+                >
                   Compact Mobile<span>2-col dense touch grid</span>
                 </button>
-                <button class="preset-btn" onclick="applyPreset('glass')">
+                <button
+                  class="preset-btn"
+                  data-preset="glass"
+                  onclick="applyPreset('glass')"
+                >
                   Minimal Glass<span>Clean pills &amp; frosted UI</span>
                 </button>
               </div>
@@ -1384,10 +1501,10 @@
                     class="select"
                     onchange="setUi('maxWidth', Number(this.value))"
                   >
-                    <option value="1040">Compact (1040px)</option>
-                    <option value="1280">Standard (1280px)</option>
-                    <option value="1480">Wide (1480px)</option>
-                    <option value="0">Full Width (100%)</option>
+                    <option value="1040">Compact</option>
+                    <option value="1280">Standard</option>
+                    <option value="1480">Wide</option>
+                    <option value="0">Full Width</option>
                   </select>
                 </div>
               </div>
@@ -1413,15 +1530,72 @@
               </div>
             </div>
 
+            <!-- Brand Section (pv-brand) Options -->
             <div class="ctrl-card">
-              <div class="ctrl-card-title">Header &amp; Footer Elements</div>
+              <div class="ctrl-card-title">Header Brand</div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Brand Alignment</label>
+                  <select
+                    id="hdrBrandAlign"
+                    class="select"
+                    onchange="setHeader('brandAlign', this.value)"
+                  >
+                    <option value="left">Left (Default)</option>
+                    <option value="center">Centered</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Brand Size</label>
+                  <select
+                    id="hdrBrandSize"
+                    class="select"
+                    onchange="setHeader('brandSize', this.value)"
+                  >
+                    <option value="sm">Compact</option>
+                    <option value="md">Medium (Default)</option>
+                    <option value="lg">Large</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label>Brand Icon Style</label>
+                <select
+                  id="hdrBrandIconStyle"
+                  class="select"
+                  onchange="setHeader('brandIconStyle', this.value)"
+                >
+                  <option value="soft">Soft Accent Box (Default)</option>
+                  <option value="solid">Solid Accent Box</option>
+                  <option value="circle">Soft Circle</option>
+                  <option value="outline">Outlined Border</option>
+                </select>
+              </div>
               <div class="toggle-row">
-                <span>Show Search Bar</span>
+                <span>Show Brand Icon</span>
                 <input
                   type="checkbox"
                   class="switch"
-                  id="hdrSearch"
-                  onchange="setHeader('showSearch', this.checked)"
+                  id="hdrBrandIcon"
+                  onchange="setHeader('showBrandIcon', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Subtitle Text</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrSubtitle"
+                  onchange="setHeader('showSubtitle', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Online Status Pill</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrStatusPill"
+                  onchange="setHeader('showStatusPill', this.checked)"
                 />
               </div>
               <div class="toggle-row">
@@ -1431,6 +1605,72 @@
                   class="switch"
                   id="hdrClock"
                   onchange="setHeader('showClock', this.checked)"
+                />
+              </div>
+            </div>
+
+            <!-- Actions Section (pv-actions) Options -->
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Header Actions &amp; Footer</div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Action Button Shape</label>
+                  <select
+                    id="hdrActionShape"
+                    class="select"
+                    onchange="setHeader('actionShape', this.value)"
+                  >
+                    <option value="rounded">Rounded (Default)</option>
+                    <option value="pill">Full Pill</option>
+                    <option value="square">Sharp Square</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Action Button Size</label>
+                  <select
+                    id="hdrActionSize"
+                    class="select"
+                    onchange="setHeader('actionSize', this.value)"
+                  >
+                    <option value="sm">Compact</option>
+                    <option value="md">Medium (Default)</option>
+                    <option value="lg">Large Touch</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Map Button Style</label>
+                  <select
+                    id="hdrMapStyle"
+                    class="select"
+                    onchange="setHeader('mapBtnStyle', this.value)"
+                  >
+                    <option value="soft">Soft Accent + Label</option>
+                    <option value="solid">Solid Accent + Label</option>
+                    <option value="icon">Icon Only</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Actions Spacing</label>
+                  <select
+                    id="hdrActionGap"
+                    class="select"
+                    onchange="setHeader('actionGap', this.value)"
+                  >
+                    <option value="tight">Tight (4px)</option>
+                    <option value="normal">Normal (8px)</option>
+                    <option value="wide">Wide (12px)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="toggle-row">
+                <span>Show Search Bar</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrSearch"
+                  onchange="setHeader('showSearch', this.checked)"
                 />
               </div>
               <div class="toggle-row">
@@ -1449,6 +1689,15 @@
                   class="switch"
                   id="hdrAddr"
                   onchange="setHeader('showAddrToggle', this.checked)"
+                />
+              </div>
+              <div class="toggle-row">
+                <span>Show Ping / Refresh Button</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrRefresh"
+                  onchange="setHeader('showRefreshBtn', this.checked)"
                 />
               </div>
               <div class="toggle-row">
@@ -2160,6 +2409,7 @@
 
       function getDefaultLayoutConfig() {
         return {
+          activePreset: "default",
           sectionOrder: ["favorites", "shortcuts", "groups"],
           cardStyle: "default",
           radius: 14,
@@ -2169,7 +2419,18 @@
             showClock: true,
             showMapBtn: true,
             showAddrToggle: true,
+            showRefreshBtn: true,
             showFooter: true,
+            showBrandIcon: true,
+            showSubtitle: true,
+            showStatusPill: true,
+            brandAlign: "left",
+            brandSize: "md",
+            brandIconStyle: "soft",
+            actionShape: "rounded",
+            actionSize: "md",
+            actionGap: "normal",
+            mapBtnStyle: "soft",
           },
           fav: {
             layout: "grid",
@@ -2465,6 +2726,17 @@
       }
 
       async function init() {
+        if (window.innerWidth < 960) {
+          document.body.innerHTML = `
+    <div style="margin:auto;max-width:360px;padding:24px;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:16px">
+      <h3 style="margin-bottom:8px">Desktop Required</h3>
+      <p style="font-size:0.84rem;color:var(--text-muted);margin-bottom:16px">
+        Layout Studio requires a Desktop screen (or enable "Desktop site" in your browser).
+      </p>
+      <a href="config.html" class="btn btn-primary" style="text-decoration:none">&larr; Back to Config</a>
+    </div>`;
+          return;
+        }
         try {
           const res = await fetch("/api/config", { cache: "no-store" });
           if (!res.ok) throw new Error();
@@ -2613,24 +2885,30 @@
 
       function setUi(key, val) {
         ui[key] = val;
+        ui.activePreset = "custom";
         if (key === "radius")
           document.getElementById("radiusVal").textContent = `${val}px`;
+        syncActivePresetUI();
         markDirty();
         renderPreview();
       }
 
       function setHeader(key, val) {
         ui.header[key] = val;
+        ui.activePreset = "custom";
+        syncActivePresetUI();
         markDirty();
         renderPreview();
       }
 
       function setCard(section, key, val) {
         ui[section][key] = val;
+        ui.activePreset = "custom";
         if (key === "colorMode") syncColorModeVisibility();
         if (key === "showAddr" && section === "group") {
           config.settings.showIpOnCard = val;
         }
+        syncActivePresetUI();
         markDirty();
         renderPreview();
       }
@@ -2642,7 +2920,9 @@
           ui.sectionOrder[target],
           ui.sectionOrder[idx],
         ];
+        ui.activePreset = "custom";
         renderSectionOrderList();
+        syncActivePresetUI();
         markDirty();
         renderPreview();
       }
@@ -2697,6 +2977,22 @@
         document.getElementById("hdrMap").checked = ui.header.showMapBtn;
         document.getElementById("hdrAddr").checked = ui.header.showAddrToggle;
         document.getElementById("hdrFooter").checked = ui.header.showFooter;
+        document.getElementById("hdrBrandAlign").value = ui.header.brandAlign;
+        document.getElementById("hdrBrandSize").value = ui.header.brandSize;
+        document.getElementById("hdrBrandIconStyle").value =
+          ui.header.brandIconStyle;
+        document.getElementById("hdrBrandIcon").checked =
+          ui.header.showBrandIcon;
+        document.getElementById("hdrSubtitle").checked = ui.header.showSubtitle;
+        document.getElementById("hdrStatusPill").checked =
+          ui.header.showStatusPill;
+
+        document.getElementById("hdrActionShape").value = ui.header.actionShape;
+        document.getElementById("hdrActionSize").value = ui.header.actionSize;
+        document.getElementById("hdrActionGap").value = ui.header.actionGap;
+        document.getElementById("hdrMapStyle").value = ui.header.mapBtnStyle;
+        document.getElementById("hdrRefresh").checked =
+          ui.header.showRefreshBtn;
 
         // Favorites
         document.getElementById("favLayout").value = ui.fav.layout;
@@ -2768,6 +3064,23 @@
         );
 
         syncColorModeVisibility();
+        syncActivePresetUI();
+      }
+
+      function syncActivePresetUI() {
+        const active = ui.activePreset || "custom";
+        document.querySelectorAll(".preset-btn[data-preset]").forEach((btn) => {
+          btn.classList.toggle("active", btn.dataset.preset === active);
+        });
+        const labels = {
+          default: "Default Slate",
+          tablet: "Wall Tablet",
+          compact: "Compact Mobile",
+          glass: "Minimal Glass",
+          custom: "Custom",
+        };
+        const badge = document.getElementById("activePresetBadge");
+        if (badge) badge.textContent = labels[active] || "Custom";
       }
 
       /* ==========================================================================
@@ -2814,6 +3127,7 @@
           base.group.headerStyle = "pill";
           base.group.accentPos = "none";
         }
+        base.activePreset = name;
         ui = base;
         syncControlsFromState();
         markDirty();
@@ -2943,46 +3257,31 @@
         const sub = config.settings.subtitle || "ESP32 Central Gateway";
 
         // 1. Header HTML
+        const h = ui.header;
         const headerHtml = `
-          <div class="pv-topbar">
-            <div class="pv-topbar-inner">
-              <div class="pv-brand">
-                <div class="pv-brand-ico">${svgIcon("chip", 19)}</div>
-                <div style="min-width:0">
-                  <h1>${escapeHtml(title)}</h1>
-                  <div class="pv-brand-sub">
-                    <span>${escapeHtml(sub)}</span>
-                    <span class="pv-pill"><span class="dot online"></span> ${data.devices.length}/${data.devices.length}</span>
-                    ${ui.header.showClock ? `<span class="pv-pill" style="font-family:monospace">08:30:12</span>` : ""}
-                  </div>
-                </div>
-              </div>
-              ${ui.header.showSearch ? `<div class="pv-search">Search devices...</div>` : ""}
-              <div class="pv-actions">
-                ${
-                  ui.header.showMapBtn
-                    ? `<div class="pv-map-btn"><svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
-              <line x1="8" y1="2" x2="8" y2="18" />
-              <line x1="16" y1="6" x2="16" y2="22" />
-            </svg><span>Map View</span></div>`
-                    : ""
-                }
-                ${ui.header.showAddrToggle ? `<div class="seg-toggle"><span class="seg-btn active" style="padding:3px 7px;font-size:0.68rem">IP</span><span class="seg-btn" style="padding:3px 7px;font-size:0.68rem">DNS</span></div>` : ""}
-                <div class="pv-ico-btn">⚙</div>
-              </div>
-            </div>
+  <div class="pv-topbar">
+    <div class="pv-topbar-inner" data-brand-align="${h.brandAlign}">
+      <div class="pv-brand" data-size="${h.brandSize}" data-icon-style="${h.brandIconStyle}">
+        ${h.showBrandIcon ? `<div class="pv-brand-ico">${svgIcon("chip", 19)}</div>` : ""}
+        <div style="min-width:0">
+          <h1>${escapeHtml(title)}</h1>
+          <div class="pv-brand-sub">
+            ${h.showSubtitle ? `<span>${escapeHtml(sub)}</span>` : ""}
+            ${h.showStatusPill ? `<span class="pv-pill"><span class="dot online"></span> ${data.devices.length}/${data.devices.length}</span>` : ""}
+            ${h.showClock ? `<span class="pv-pill" style="font-family:monospace">08:30:12</span>` : ""}
           </div>
-        `;
+        </div>
+      </div>
+      ${h.showSearch ? `<div class="pv-search">Search devices...</div>` : ""}
+      <div class="pv-actions" data-shape="${h.actionShape}" data-size="${h.actionSize}" data-gap="${h.actionGap}" data-map-style="${h.mapBtnStyle}">
+        ${h.showMapBtn ? `<div class="pv-map-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg><span>Map View</span></div>` : ""}
+        ${h.showAddrToggle ? `<div class="seg-toggle"><span class="seg-btn active" style="padding:3px 7px;font-size:0.68rem">IP</span><span class="seg-btn" style="padding:3px 7px;font-size:0.68rem">DNS</span></div>` : ""}
+        ${h.showRefreshBtn ? `<div class="pv-ico-btn">↻</div>` : ""}
+        <div class="pv-ico-btn">⚙</div>
+      </div>
+    </div>
+  </div>
+`;
 
         // 2. Section Builders
         const sections = {};

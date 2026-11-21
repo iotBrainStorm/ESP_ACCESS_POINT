@@ -3698,6 +3698,18 @@
         const isNew = params.get("new") === "1";
         isLiveMapMode = params.get("mode") === "live";
 
+        if (!isLiveMapMode && window.innerWidth < 960) {
+          document.body.innerHTML = `
+    <div style="margin:auto;max-width:360px;padding:24px;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:16px">
+      <h3 style="margin-bottom:8px">Desktop Required</h3>
+      <p style="font-size:0.84rem;color:var(--text-muted);margin-bottom:16px">
+        Blueprint Designer requires a Desktop screen. Use Map View from Home for mobile control.
+      </p>
+      <a href="config.html" class="btn btn-primary" style="text-decoration:none">&larr; Back to Config</a>
+    </div>`;
+          return;
+        }
+
         let allDesigns = getLocalDesignsList();
         try {
           const res = await fetch("/api/design", { cache: "no-store" });
@@ -4541,12 +4553,15 @@
         fs.locked = !fs.locked;
         renderCanvas();
         updateInspector();
+        showToast(
+          fs.locked ? "Floor Switcher locked" : "Floor Switcher unlocked",
+        );
       }
 
       function updateFloorNavProp(key, val) {
         const fs = getFloorSwitcher();
-        if (fs.locked && ["x", "y", "w", "btnH", "gap"].includes(key)) {
-          return showToast("Floor Switcher is locked");
+        if (fs.locked) {
+          return showToast("Floor Switcher is locked (Unlock first)");
         }
         fs[key] = val;
         renderCanvas();
@@ -5761,42 +5776,28 @@
           )
             return;
 
-          // Arrow Keys: Move selected shapes & text
+          // Arrow Keys: Move Floor Switcher (or warn if locked)
           if (
             ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
               e.key,
             ) &&
-            selectedShapeIds.size &&
+            floorNavSelected &&
             appMode === "design"
           ) {
             e.preventDefault();
-            const unlocked = getSelectedShapesList().filter((s) => !s.locked);
-            if (!unlocked.length) {
-              showToast("Item is locked (Click Unlock or press L to move)");
+            const fs = getFloorSwitcher();
+            if (fs.locked) {
+              showToast("Floor Switcher is locked (Click Unlock or press L)");
               return;
             }
             if (!e.repeat) pushUndo();
             const step = e.shiftKey ? 1 : snapSize || 20;
-            let dx = 0;
-            let dy = 0;
-            if (e.key === "ArrowLeft") dx = -step;
-            if (e.key === "ArrowRight") dx = step;
-            if (e.key === "ArrowUp") dy = -step;
-            if (e.key === "ArrowDown") dy = step;
-
-            unlocked.forEach((s) => {
-              if (s.type === "line") {
-                s.x1 += dx;
-                s.y1 += dy;
-                s.x2 += dx;
-                s.y2 += dy;
-              } else {
-                s.x += dx;
-                s.y += dy;
-              }
-            });
+            if (e.key === "ArrowLeft") fs.x = Math.max(0, fs.x - step);
+            if (e.key === "ArrowRight") fs.x += step;
+            if (e.key === "ArrowUp") fs.y = Math.max(0, fs.y - step);
+            if (e.key === "ArrowDown") fs.y += step;
             renderCanvas();
-            syncInspectorGeometryInputs();
+            updateInspector();
             return;
           }
 
@@ -5841,7 +5842,7 @@
             !e.ctrlKey &&
             !e.metaKey &&
             e.key.toLowerCase() === "l" &&
-            selectedShapeIds.size
+            (selectedShapeIds.size || floorNavSelected)
           ) {
             e.preventDefault();
             toggleLockSelected();
@@ -6000,9 +6001,17 @@
          5. LOCK / UNLOCK & ROTATE ACTIONS
          ======================================================================== */
       function syncTopLockButton() {
-        const list = getSelectedShapesList();
         const btn = document.getElementById("topLockBtn");
         const icon = document.getElementById("topLockIcon");
+
+        if (floorNavSelected && getFloorSwitcher().enabled) {
+          const locked = !!getFloorSwitcher().locked;
+          btn.className = locked ? "btn btn-warn" : "btn";
+          icon.innerHTML = locked ? "&#128274;" : "&#128275;";
+          return;
+        }
+
+        const list = getSelectedShapesList();
         if (!list.length) {
           btn.className = "btn";
           icon.innerHTML = "&#128275;";
@@ -6014,6 +6023,10 @@
       }
 
       function toggleLockSelected() {
+        if (floorNavSelected && getFloorSwitcher().enabled) {
+          toggleFloorNavLock();
+          return;
+        }
         const list = getSelectedShapesList();
         if (!list.length)
           return showToast("Select at least one shape to Lock / Unlock");
@@ -6588,7 +6601,15 @@
           fnLockBtn.className = fs.locked
             ? "btn btn-sm btn-warn"
             : "btn btn-sm";
-          ["fnX", "fnY", "fnW", "fnBtnH", "fnGap"].forEach((id) => {
+          [
+            "fnOrientation",
+            "fnX",
+            "fnY",
+            "fnW",
+            "fnBtnH",
+            "fnGap",
+            "fnFontSize",
+          ].forEach((id) => {
             document.getElementById(id).disabled = !!fs.locked;
           });
           renderFloorNavSwatches(fs.color || "#38bdf8");
@@ -7270,8 +7291,7 @@
 
         const simText = document.getElementById("simStatusText");
         if (simText) {
-          simText.textContent =
-            "Live Map Active — Tap any linked room, switch, or device";
+          simText.textContent = "Live Map Active";
         }
 
         setAppMode("sim", true);

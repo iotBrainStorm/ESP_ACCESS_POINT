@@ -319,6 +319,98 @@
         display: none;
       }
 
+      .topbar-inner[data-brand-align="center"] {
+        justify-content: center;
+      }
+      .topbar-inner[data-brand-align="center"] .brand {
+        margin-right: 0;
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+      }
+      .topbar-inner[data-brand-align="center"] .brand-sub {
+        justify-content: center;
+      }
+
+      .brand[data-size="sm"] .brand-icon {
+        width: 30px;
+        height: 30px;
+      }
+      .brand[data-size="sm"] h1 {
+        font-size: 0.92rem;
+      }
+      .brand[data-size="lg"] .brand-icon {
+        width: 46px;
+        height: 46px;
+      }
+      .brand[data-size="lg"] h1 {
+        font-size: 1.24rem;
+      }
+
+      .brand[data-icon-style="solid"] .brand-icon {
+        background: var(--accent);
+        color: #031525;
+      }
+      .brand[data-icon-style="circle"] .brand-icon {
+        border-radius: 50%;
+      }
+      .brand[data-icon-style="outline"] .brand-icon {
+        background: transparent;
+        border: 1.5px solid var(--accent);
+      }
+
+      .header-actions[data-gap="tight"] {
+        gap: 4px;
+      }
+      .header-actions[data-gap="wide"] {
+        gap: 12px;
+      }
+
+      .header-actions[data-shape="pill"] .map-view-btn,
+      .header-actions[data-shape="pill"] .icon-btn,
+      .header-actions[data-shape="pill"] .seg-toggle,
+      .header-actions[data-shape="pill"] .seg-btn {
+        border-radius: 999px;
+      }
+
+      .header-actions[data-shape="square"] .map-view-btn,
+      .header-actions[data-shape="square"] .icon-btn,
+      .header-actions[data-shape="square"] .seg-toggle,
+      .header-actions[data-shape="square"] .seg-btn {
+        border-radius: 4px;
+      }
+
+      .header-actions[data-size="sm"] .map-view-btn,
+      .header-actions[data-size="sm"] .icon-btn {
+        height: 30px;
+        min-width: 30px;
+        font-size: 0.72rem;
+      }
+      .header-actions[data-size="sm"] .icon-btn {
+        width: 30px;
+      }
+      .header-actions[data-size="lg"] .map-view-btn,
+      .header-actions[data-size="lg"] .icon-btn {
+        height: 42px;
+        min-width: 42px;
+        font-size: 0.84rem;
+      }
+      .header-actions[data-size="lg"] .icon-btn {
+        width: 42px;
+      }
+
+      .header-actions[data-map-style="solid"] .map-view-btn {
+        background: var(--accent);
+        color: #031525;
+        border-color: var(--accent);
+      }
+      .header-actions[data-map-style="icon"] .map-view-btn .map-btn-label {
+        display: none;
+      }
+      .header-actions[data-map-style="icon"] .map-view-btn {
+        padding: 0 9px;
+      }
+
       /* ==========================================================================
          3. MAIN CONTAINER, FAVORITES & SHORTCUTS
          ========================================================================== */
@@ -731,6 +823,8 @@
 
       .card-links {
         display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
         align-items: center;
         gap: 6px;
         margin-left: auto;
@@ -1480,10 +1574,24 @@
         top: 8px;
         right: 8px;
       }
+      .device-grid[data-layout="tile"]:not(.list-view) .dev-info {
+        width: 100%;
+      }
       .device-grid[data-layout="tile"]:not(.list-view) .card-bottom {
         width: 100%;
+        flex-direction: column;
+        align-items: center;
         justify-content: center;
-        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .device-grid[data-layout="tile"]:not(.list-view) .card-addr-wrap {
+        justify-content: center;
+        max-width: 100%;
+      }
+      .device-grid[data-layout="tile"]:not(.list-view) .card-links {
+        margin-left: 0;
+        justify-content: center;
+        /* width: 100%; */
       }
       .ping-badge {
         font-family: ui-monospace, monospace;
@@ -2348,7 +2456,18 @@
             showClock: true,
             showMapBtn: true,
             showAddrToggle: true,
+            showRefreshBtn: true,
             showFooter: true,
+            showBrandIcon: true,
+            showSubtitle: true,
+            showStatusPill: true,
+            brandAlign: "left",
+            brandSize: "md",
+            brandIconStyle: "soft",
+            actionShape: "rounded",
+            actionSize: "md",
+            actionGap: "normal",
+            mapBtnStyle: "soft",
             ...(raw.header || {}),
           },
           fav: {
@@ -2950,6 +3069,31 @@
           ? ""
           : "none";
 
+        const hdr = ui.header;
+        const topbarInner = document.querySelector(".topbar-inner");
+        const brandEl = document.querySelector(".brand");
+        const actionsEl = document.querySelector(".header-actions");
+
+        topbarInner.dataset.brandAlign = hdr.brandAlign;
+        brandEl.dataset.size = hdr.brandSize;
+        brandEl.dataset.iconStyle = hdr.brandIconStyle;
+        document.querySelector(".brand-icon").style.display = hdr.showBrandIcon
+          ? ""
+          : "none";
+        document.getElementById("hubSubtitle").style.display = hdr.showSubtitle
+          ? ""
+          : "none";
+        document.getElementById("summaryDot").parentElement.style.display =
+          hdr.showStatusPill ? "" : "none";
+
+        actionsEl.dataset.shape = hdr.actionShape;
+        actionsEl.dataset.size = hdr.actionSize;
+        actionsEl.dataset.gap = hdr.actionGap;
+        actionsEl.dataset.mapStyle = hdr.mapBtnStyle;
+        document.getElementById("refreshBtn").style.display = hdr.showRefreshBtn
+          ? ""
+          : "none";
+
         // Section ordering
         const orderMap = {
           favorites: document.getElementById("favSection"),
@@ -3404,10 +3548,8 @@
             ? ui.customColor
             : dev.color || "var(--accent)",
         );
-        const hasBottom =
-          showAddr ||
-          ui.showPing ||
-          (ui.showAltBtn && dev.altLabel && dev.altPath);
+        const hasAltBtn = ui.showAltBtn && dev.altLabel && dev.altPath;
+        const hasBottom = showAddr || ui.showPing || hasAltBtn;
 
         return `
     <article class="card" style="--card-accent:${colorSafe}" onclick="openDeviceById('${idSafe}')">
@@ -3431,13 +3573,21 @@
       ${
         hasBottom
           ? `<div class="card-bottom">
-        <div style="display:flex;align-items:center;gap:6px;min-width:0">
-          ${showAddr ? `<span class="addr-pill" title="Tap to copy address" onclick="copyAddress(event, '${escapeHtml(addr)}')">${escapeHtml(addr)}</span>` : ""}
-          ${ui.showPing ? `<span class="ping-badge" data-ping-id="${idSafe}" style="display:none"></span>` : ""}
-        </div>
-        <div class="card-links">
-          ${ui.showAltBtn && dev.altLabel && dev.altPath ? `<button class="mini-btn" onclick="openDeviceById('${idSafe}', '${altPathSafe}', event)">${escapeHtml(dev.altLabel)}</button>` : ""}
-        </div>
+        ${
+          showAddr || ui.showPing
+            ? `<div class="card-addr-wrap" style="display:flex;align-items:center;gap:6px;min-width:0">
+                ${showAddr ? `<span class="addr-pill" title="Tap to copy address" onclick="copyAddress(event, '${escapeHtml(addr)}')">${escapeHtml(addr)}</span>` : ""}
+                ${ui.showPing ? `<span class="ping-badge" data-ping-id="${idSafe}" style="display:none"></span>` : ""}
+              </div>`
+            : ""
+        }
+        ${
+          hasAltBtn
+            ? `<div class="card-links">
+                <button class="mini-btn" onclick="openDeviceById('${idSafe}', '${altPathSafe}', event)">${escapeHtml(dev.altLabel)}</button>
+              </div>`
+            : ""
+        }
       </div>`
           : ""
       }
