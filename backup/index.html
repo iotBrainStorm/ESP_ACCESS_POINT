@@ -90,7 +90,7 @@
         display: flex;
         flex-direction: column;
         line-height: 1.45;
-        overflow-x: hidden;
+        overflow-x: clip;
       }
 
       body.modal-open {
@@ -115,7 +115,7 @@
       }
 
       /* ==========================================================================
-         2. HEADER & NAVIGATION BAR
+         2. HEADER AND NAVIGATION BAR
          ========================================================================== */
       .topbar {
         position: sticky;
@@ -126,6 +126,65 @@
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         border-bottom: 1px solid var(--border);
+        transition: 0.18s ease;
+      }
+      .topbar[data-sticky="false"] {
+        position: relative;
+      }
+      .topbar[data-style="solid"] {
+        background: var(--bg-elev);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+      }
+      .topbar[data-style="minimal"] {
+        background: transparent;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border-bottom-color: transparent;
+      }
+      .topbar[data-style="floating"] {
+        background: transparent;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border-bottom: none;
+        padding: 12px 16px 0;
+      }
+      .topbar[data-style="floating"] .topbar-inner {
+        background: color-mix(in srgb, var(--bg-elev) 90%, transparent);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--border);
+        border-radius: var(--radius, 14px);
+        box-shadow: var(--shadow);
+      }
+      .topbar[data-divider="accent"] {
+        border-bottom: 1.5px solid
+          color-mix(in srgb, var(--accent) 55%, transparent);
+        box-shadow: 0 2px 14px var(--accent-soft);
+      }
+      .topbar[data-divider="shadow"] {
+        border-bottom: none;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+      }
+      .topbar[data-divider="none"] {
+        border-bottom: none;
+        box-shadow: none;
+      }
+      .topbar[data-style="floating"][data-divider] {
+        border-bottom: none;
+        box-shadow: none;
+      }
+      .topbar[data-style="floating"][data-divider="accent"] .topbar-inner {
+        border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+        box-shadow: 0 4px 18px var(--accent-soft);
+      }
+      .topbar[data-style="floating"][data-divider="shadow"] .topbar-inner {
+        border-color: transparent;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+      }
+      .topbar[data-style="floating"][data-divider="none"] .topbar-inner {
+        border-color: transparent;
+        box-shadow: none;
       }
 
       .topbar-inner {
@@ -137,13 +196,68 @@
         align-items: center;
         gap: 12px;
       }
+      .topbar-inner[data-padding="sm"] {
+        padding: 8px 14px;
+      }
+      .topbar-inner[data-padding="lg"] {
+        padding: 18px 20px;
+      }
+      .topbar-inner[data-row-gap="tight"] {
+        gap: 6px;
+      }
+      .topbar-inner[data-row-gap="wide"] {
+        gap: 18px;
+      }
 
+      /* Universal New Row & Row Alignment for all children */
+      .topbar-inner > [data-new-row="true"] {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+      .topbar-inner > [data-new-row="true"][data-align="left"] {
+        justify-content: flex-start;
+      }
+      .topbar-inner > [data-new-row="true"][data-align="center"] {
+        justify-content: center;
+      }
+      .topbar-inner > [data-new-row="true"][data-align="right"] {
+        justify-content: flex-end;
+      }
+
+      /* 1. Brand */
       .brand {
         display: flex;
         align-items: center;
         gap: 10px;
-        margin-right: auto;
         min-width: 0;
+      }
+      .brand[data-align="center"] {
+        text-align: center;
+      }
+      .brand[data-align="center"] .brand-sub {
+        justify-content: center;
+      }
+      .brand[data-align="right"] {
+        text-align: right;
+      }
+      .brand[data-align="right"] .brand-sub {
+        justify-content: flex-end;
+      }
+      .brand[data-stack="column"] {
+        flex-direction: column;
+        gap: 6px;
+      }
+      .brand[data-stack="column"][data-align="left"] {
+        align-items: flex-start;
+      }
+      .brand[data-stack="column"][data-align="center"] {
+        align-items: center;
+      }
+      .brand[data-stack="column"][data-align="right"] {
+        align-items: flex-end;
       }
 
       .brand-icon {
@@ -156,6 +270,44 @@
         place-items: center;
         flex-shrink: 0;
       }
+      .brand[data-icon-size="sm"] .brand-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+      }
+      .brand[data-icon-size="sm"] .brand-icon svg {
+        width: 16px;
+        height: 16px;
+      }
+      .brand[data-icon-size="md"] .brand-icon {
+        width: 38px;
+        height: 38px;
+      }
+      .brand[data-icon-size="md"] .brand-icon svg {
+        width: 22px;
+        height: 22px;
+      }
+      .brand[data-icon-size="lg"] .brand-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+      }
+      .brand[data-icon-size="lg"] .brand-icon svg {
+        width: 26px;
+        height: 26px;
+      }
+
+      .brand[data-icon-style="solid"] .brand-icon {
+        background: var(--accent);
+        color: #031525;
+      }
+      .brand[data-icon-style="circle"] .brand-icon {
+        border-radius: 50%;
+      }
+      .brand[data-icon-style="outline"] .brand-icon {
+        background: transparent;
+        border: 1.5px solid var(--accent);
+      }
 
       .brand h1 {
         font-size: 1.08rem;
@@ -164,6 +316,18 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+      .brand[data-size="sm"] h1 {
+        font-size: 0.92rem;
+      }
+      .brand[data-size="sm"] .brand-sub {
+        font-size: 0.69rem;
+      }
+      .brand[data-size="lg"] h1 {
+        font-size: 1.28rem;
+      }
+      .brand[data-size="lg"] .brand-sub {
+        font-size: 0.82rem;
       }
 
       .brand-sub {
@@ -208,11 +372,175 @@
         animation: pulse 1s infinite;
       }
 
+      /* 2. Search Bar */
+      .search-wrap {
+        display: flex;
+        align-items: center;
+        flex: 1 1 220px;
+        max-width: 340px;
+        min-width: 0;
+      }
+      .search-wrap[data-width="sm"] {
+        max-width: 220px;
+      }
+      .search-wrap[data-width="full"] {
+        max-width: 100%;
+      }
+      .search-wrap[data-style="icon"]:not(.expanded) {
+        flex: 0 0 auto;
+        max-width: none;
+      }
+
+      .search-box {
+        position: relative;
+        width: 100%;
+        display: flex;
+        align-items: center;
+      }
+      .search-wrap[data-new-row="true"] .search-box {
+        max-width: 440px;
+      }
+      .search-wrap[data-new-row="true"][data-width="sm"] .search-box {
+        max-width: 260px;
+      }
+      .search-wrap[data-new-row="true"][data-width="full"] .search-box {
+        max-width: 100%;
+      }
+
+      .search-icon-trigger {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 34px;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        display: grid;
+        place-items: center;
+        pointer-events: none;
+        cursor: pointer;
+        border-radius: 10px;
+        transition: 0.15s;
+      }
+
+      .search-input {
+        width: 100%;
+        height: 36px;
+        padding: 0 32px 0 34px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--text);
+        font-size: 0.85rem;
+        outline: none;
+        transition: 0.15s;
+      }
+      .search-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+
+      .search-wrap[data-size="sm"] .search-input {
+        height: 30px;
+        font-size: 0.78rem;
+        padding: 0 28px 0 30px;
+      }
+      .search-wrap[data-size="sm"] .search-icon-trigger {
+        width: 30px;
+      }
+      .search-wrap[data-size="lg"] .search-input {
+        height: 42px;
+        font-size: 0.92rem;
+        padding: 0 36px 0 40px;
+      }
+      .search-wrap[data-size="lg"] .search-icon-trigger {
+        width: 40px;
+      }
+
+      .search-wrap[data-style="pill"] .search-input {
+        border-radius: 999px;
+      }
+      .search-wrap[data-style="minimal"] .search-input {
+        background: transparent;
+        border: none;
+        border-bottom: 1.5px solid var(--border);
+        border-radius: 0;
+      }
+      .search-wrap[data-style="minimal"] .search-input:focus {
+        box-shadow: none;
+        border-bottom-color: var(--accent);
+      }
+
+      /* Icon-Only Expandable Search Mode */
+      .search-wrap[data-style="icon"]:not(.expanded) .search-box {
+        width: 36px;
+        height: 36px;
+        max-width: 36px;
+      }
+      .search-wrap[data-style="icon"][data-size="sm"]:not(.expanded)
+        .search-box {
+        width: 30px;
+        height: 30px;
+        max-width: 30px;
+      }
+      .search-wrap[data-style="icon"][data-size="lg"]:not(.expanded)
+        .search-box {
+        width: 42px;
+        height: 42px;
+        max-width: 42px;
+      }
+      .search-wrap[data-style="icon"]:not(.expanded) .search-input,
+      .search-wrap[data-style="icon"]:not(.expanded) .search-clear {
+        display: none !important;
+      }
+      .search-wrap[data-style="icon"]:not(.expanded) .search-icon-trigger {
+        position: static;
+        width: 100%;
+        height: 100%;
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--text);
+        pointer-events: auto;
+      }
+      .search-wrap[data-style="icon"]:not(.expanded)
+        .search-icon-trigger:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .search-wrap[data-style="icon"].expanded {
+        flex: 1 1 200px;
+        max-width: 280px;
+      }
+
+      .search-clear {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 1.1rem;
+        line-height: 1;
+        padding: 4px;
+        display: none;
+      }
+
+      /* 3. Header Actions */
       .header-actions {
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
         gap: 8px;
         flex-shrink: 0;
+      }
+      .header-actions[data-gap="tight"] {
+        gap: 4px;
+      }
+      .header-actions[data-gap="wide"] {
+        gap: 12px;
       }
 
       .seg-toggle {
@@ -222,7 +550,6 @@
         border-radius: 10px;
         padding: 2px;
       }
-
       .seg-btn {
         border: none;
         background: transparent;
@@ -237,11 +564,9 @@
         align-items: center;
         justify-content: center;
       }
-
       .seg-btn.icon-only {
         padding: 5px 8px;
       }
-
       .seg-btn.active {
         background: var(--accent);
         color: #031525;
@@ -261,7 +586,6 @@
         transition: 0.15s;
         flex-shrink: 0;
       }
-
       .icon-btn:hover {
         border-color: var(--accent);
         color: var(--accent);
@@ -270,100 +594,20 @@
         animation: spin 0.8s linear infinite;
       }
 
-      /* Search Bar */
-      .search-wrap {
-        position: relative;
-        flex: 1 1 240px;
-        max-width: 340px;
-      }
-
-      .search-wrap svg {
-        position: absolute;
-        left: 11px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--text-muted);
-        pointer-events: none;
-      }
-
-      .search-input {
-        width: 100%;
-        height: 36px;
-        padding: 0 32px 0 34px;
-        border-radius: 10px;
-        border: 1px solid var(--border);
-        background: var(--card);
-        color: var(--text);
-        font-size: 0.85rem;
-        outline: none;
-        transition: 0.15s;
-      }
-
-      .search-input:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--accent-soft);
-      }
-
-      .search-clear {
-        position: absolute;
-        right: 8px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: none;
-        border: none;
-        color: var(--text-muted);
-        cursor: pointer;
-        font-size: 1.1rem;
-        line-height: 1;
-        padding: 4px;
-        display: none;
-      }
-
-      .topbar-inner[data-brand-align="center"] {
-        justify-content: center;
-      }
-      .topbar-inner[data-brand-align="center"] .brand {
-        margin-right: 0;
-        width: 100%;
-        justify-content: center;
-        text-align: center;
-      }
-      .topbar-inner[data-brand-align="center"] .brand-sub {
-        justify-content: center;
-      }
-
-      .brand[data-size="sm"] .brand-icon {
-        width: 30px;
-        height: 30px;
-      }
-      .brand[data-size="sm"] h1 {
-        font-size: 0.92rem;
-      }
-      .brand[data-size="lg"] .brand-icon {
-        width: 46px;
-        height: 46px;
-      }
-      .brand[data-size="lg"] h1 {
-        font-size: 1.24rem;
-      }
-
-      .brand[data-icon-style="solid"] .brand-icon {
-        background: var(--accent);
-        color: #031525;
-      }
-      .brand[data-icon-style="circle"] .brand-icon {
-        border-radius: 50%;
-      }
-      .brand[data-icon-style="outline"] .brand-icon {
+      .header-actions[data-style="ghost"] .icon-btn,
+      .header-actions[data-style="ghost"] .seg-toggle {
         background: transparent;
-        border: 1.5px solid var(--accent);
+        border-color: transparent;
       }
-
-      .header-actions[data-gap="tight"] {
-        gap: 4px;
+      .header-actions[data-style="ghost"] .icon-btn:hover {
+        background: var(--card);
+        border-color: var(--border);
       }
-      .header-actions[data-gap="wide"] {
-        gap: 12px;
+      .header-actions[data-style="tinted"] .icon-btn,
+      .header-actions[data-style="tinted"] .seg-toggle {
+        background: var(--accent-soft);
+        border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+        color: var(--accent);
       }
 
       .header-actions[data-shape="pill"] .map-view-btn,
@@ -372,7 +616,6 @@
       .header-actions[data-shape="pill"] .seg-btn {
         border-radius: 999px;
       }
-
       .header-actions[data-shape="square"] .map-view-btn,
       .header-actions[data-shape="square"] .icon-btn,
       .header-actions[data-shape="square"] .seg-toggle,
@@ -389,6 +632,10 @@
       .header-actions[data-size="sm"] .icon-btn {
         width: 30px;
       }
+      .header-actions[data-size="sm"] .seg-btn {
+        padding: 3px 7px;
+        font-size: 0.7rem;
+      }
       .header-actions[data-size="lg"] .map-view-btn,
       .header-actions[data-size="lg"] .icon-btn {
         height: 42px;
@@ -397,6 +644,10 @@
       }
       .header-actions[data-size="lg"] .icon-btn {
         width: 42px;
+      }
+      .header-actions[data-size="lg"] .seg-btn {
+        padding: 7px 12px;
+        font-size: 0.82rem;
       }
 
       .header-actions[data-map-style="solid"] .map-view-btn {
@@ -1223,6 +1474,22 @@
         line-height: 1.3;
       }
 
+      .map-view-btn:hover #mapCountPill,
+      .map-view-btn:hover .map-count-pill,
+      .header-actions[data-map-style="solid"] .map-view-btn #mapCountPill {
+        background: #031525;
+        color: #ffffff;
+        border-color: #031525;
+      }
+
+      .header-actions[data-map-style="solid"]
+        .map-view-btn:hover
+        #mapCountPill {
+        background: #ffffff;
+        color: #031525;
+        border-color: #ffffff;
+      }
+
       /* Building Picker Modal Cards */
       .bldg-list {
         display: flex;
@@ -1323,8 +1590,7 @@
         .brand h1 {
           font-size: 0.98rem;
         }
-        .search-wrap {
-          order: 3;
+        .search-wrap:not([data-style="icon"]) {
           max-width: 100%;
           flex: 1 1 100%;
         }
@@ -1786,27 +2052,37 @@
           </div>
         </div>
 
-        <div class="search-wrap">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-          <input
-            type="text"
-            id="searchInput"
-            class="search-input"
-            placeholder="Search"
-          />
-          <button id="clearSearch" class="search-clear" title="Clear">
-            &times;
-          </button>
+        <div class="search-wrap" id="searchWrap">
+          <div class="search-box">
+            <button
+              type="button"
+              class="search-icon-trigger"
+              id="searchIconTrigger"
+              title="Search devices"
+              onclick="toggleIconSearch()"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </button>
+            <input
+              type="text"
+              id="searchInput"
+              class="search-input"
+              placeholder="Search"
+            />
+            <button id="clearSearch" class="search-clear" title="Clear">
+              &times;
+            </button>
+          </div>
         </div>
 
         <div class="header-actions">
@@ -2451,25 +2727,53 @@
           cardStyle: raw.cardStyle || "default",
           radius: Number(raw.radius) || 14,
           maxWidth: raw.maxWidth !== undefined ? Number(raw.maxWidth) : 1280,
-          header: {
-            showSearch: true,
-            showClock: true,
-            showMapBtn: true,
-            showAddrToggle: true,
-            showRefreshBtn: true,
-            showFooter: true,
-            showBrandIcon: true,
-            showSubtitle: true,
-            showStatusPill: true,
-            brandAlign: "left",
-            brandSize: "md",
-            brandIconStyle: "soft",
-            actionShape: "rounded",
-            actionSize: "md",
-            actionGap: "normal",
-            mapBtnStyle: "soft",
-            ...(raw.header || {}),
-          },
+          header: (() => {
+            const rawHdr = raw.header || {};
+            const validOrder =
+              Array.isArray(rawHdr.order) &&
+              rawHdr.order.length === 3 &&
+              ["brand", "search", "actions"].every((k) =>
+                rawHdr.order.includes(k),
+              )
+                ? rawHdr.order
+                : ["brand", "search", "actions"];
+            return {
+              style: "glass",
+              padding: "md",
+              rowGap: "normal",
+              divider: "border",
+              sticky: true,
+              brandNewRow: false,
+              brandAlign: "left",
+              brandSize: "md",
+              brandIconSize: "md",
+              brandIconStyle: "soft",
+              brandStack: "row",
+              showBrandIcon: true,
+              showSubtitle: true,
+              showStatusPill: true,
+              showClock: true,
+              showSearch: true,
+              searchNewRow: false,
+              searchAlign: "center",
+              searchSize: "md",
+              searchStyle: "rounded",
+              searchWidth: "md",
+              actionsNewRow: false,
+              actionsAlign: "right",
+              actionSize: "md",
+              actionShape: "rounded",
+              actionStyle: "default",
+              actionGap: "normal",
+              mapBtnStyle: "soft",
+              showMapBtn: true,
+              showAddrToggle: true,
+              showRefreshBtn: true,
+              showFooter: true,
+              ...rawHdr,
+              order: validOrder,
+            };
+          })(),
           fav: {
             layout: "grid",
             size: "md",
@@ -2999,6 +3303,45 @@
         } catch (_) {}
       }
 
+      function applyTopbarFlexMargins(container) {
+        if (!container) return;
+        const visible = Array.from(container.children).filter(
+          (el) => el.style.display !== "none",
+        );
+        visible.forEach((el, idx) => {
+          if (el.dataset.newRow === "true") {
+            el.style.marginLeft = "0";
+            el.style.marginRight = "0";
+            return;
+          }
+          const prev = visible[idx - 1];
+          const next = visible[idx + 1];
+          const prevInline = prev && prev.dataset.newRow !== "true";
+          const nextInline = next && next.dataset.newRow !== "true";
+          const align = el.dataset.align || "left";
+
+          if (align === "left") {
+            el.style.marginLeft = "0";
+            el.style.marginRight =
+              nextInline && next.dataset.align === "left" ? "0" : "auto";
+          } else if (align === "center") {
+            el.style.marginLeft = "auto";
+            el.style.marginRight = "auto";
+          } else {
+            el.style.marginLeft =
+              prevInline && prev.dataset.align === "right" ? "0" : "auto";
+            el.style.marginRight = "0";
+          }
+        });
+      }
+
+      function toggleIconSearch() {
+        const wrap = document.getElementById("searchWrap");
+        if (!wrap || wrap.dataset.style !== "icon") return;
+        wrap.classList.add("expanded");
+        searchInput.focus();
+      }
+
       function applySettingsUI() {
         const s = config.settings;
 
@@ -3049,34 +3392,37 @@
         );
         document.body.setAttribute("data-card-style", ui.cardStyle);
 
-        // Header & footer visibility
-        document.querySelector(".search-wrap").style.display = ui.header
-          .showSearch
-          ? ""
-          : "none";
-        document.getElementById("homeClock").style.display = ui.header.showClock
-          ? ""
-          : "none";
-        document.getElementById("mapViewBtn").style.display = ui.header
-          .showMapBtn
-          ? ""
-          : "none";
-        document.getElementById("modeIpBtn").parentElement.style.display = ui
-          .header.showAddrToggle
-          ? ""
-          : "none";
-        document.querySelector("footer").style.display = ui.header.showFooter
-          ? ""
-          : "none";
-
+        // Header container, children order, visibility & styles
         const hdr = ui.header;
+        const topbarEl = document.querySelector(".topbar");
         const topbarInner = document.querySelector(".topbar-inner");
         const brandEl = document.querySelector(".brand");
+        const searchWrap = document.getElementById("searchWrap");
         const actionsEl = document.querySelector(".header-actions");
 
-        topbarInner.dataset.brandAlign = hdr.brandAlign;
+        topbarEl.dataset.style = hdr.style;
+        topbarEl.dataset.divider = hdr.divider;
+        topbarEl.dataset.sticky = String(hdr.sticky);
+        topbarInner.dataset.padding = hdr.padding;
+        topbarInner.dataset.rowGap = hdr.rowGap;
+
+        // Apply child order in DOM
+        const childMap = {
+          brand: brandEl,
+          search: searchWrap,
+          actions: actionsEl,
+        };
+        hdr.order.forEach((key) => {
+          if (childMap[key]) topbarInner.appendChild(childMap[key]);
+        });
+
+        // Child 1: Brand
+        brandEl.dataset.newRow = String(hdr.brandNewRow);
+        brandEl.dataset.align = hdr.brandAlign;
         brandEl.dataset.size = hdr.brandSize;
+        brandEl.dataset.iconSize = hdr.brandIconSize;
         brandEl.dataset.iconStyle = hdr.brandIconStyle;
+        brandEl.dataset.stack = hdr.brandStack;
         document.querySelector(".brand-icon").style.display = hdr.showBrandIcon
           ? ""
           : "none";
@@ -3085,14 +3431,40 @@
           : "none";
         document.getElementById("summaryDot").parentElement.style.display =
           hdr.showStatusPill ? "" : "none";
+        document.getElementById("homeClock").style.display = hdr.showClock
+          ? ""
+          : "none";
 
-        actionsEl.dataset.shape = hdr.actionShape;
+        // Child 2: Search Bar
+        searchWrap.style.display = hdr.showSearch ? "" : "none";
+        searchWrap.dataset.newRow = String(hdr.searchNewRow);
+        searchWrap.dataset.align = hdr.searchAlign;
+        searchWrap.dataset.size = hdr.searchSize;
+        searchWrap.dataset.style = hdr.searchStyle;
+        searchWrap.dataset.width = hdr.searchWidth;
+        if (hdr.searchStyle !== "icon") searchWrap.classList.remove("expanded");
+
+        // Child 3: Header Actions & Footer
+        actionsEl.dataset.newRow = String(hdr.actionsNewRow);
+        actionsEl.dataset.align = hdr.actionsAlign;
         actionsEl.dataset.size = hdr.actionSize;
+        actionsEl.dataset.shape = hdr.actionShape;
+        actionsEl.dataset.style = hdr.actionStyle;
         actionsEl.dataset.gap = hdr.actionGap;
         actionsEl.dataset.mapStyle = hdr.mapBtnStyle;
+        document.getElementById("mapViewBtn").style.display = hdr.showMapBtn
+          ? ""
+          : "none";
+        document.getElementById("modeIpBtn").parentElement.style.display =
+          hdr.showAddrToggle ? "" : "none";
         document.getElementById("refreshBtn").style.display = hdr.showRefreshBtn
           ? ""
           : "none";
+        document.querySelector("footer").style.display = hdr.showFooter
+          ? ""
+          : "none";
+
+        applyTopbarFlexMargins(topbarInner);
 
         // Section ordering
         const orderMap = {
@@ -3118,7 +3490,7 @@
         applySettingsUI();
         renderAll();
         showToast(
-          useMdns ? "Switched to mDNS (.local)" : "Switched to IPv4 Addresses",
+          useMdns ? "Switched to Hostname" : "Switched to IPv4 Addresses",
         );
       }
 
@@ -4139,6 +4511,19 @@
         renderDevices();
       });
 
+      searchInput.addEventListener("blur", () => {
+        setTimeout(() => {
+          const wrap = document.getElementById("searchWrap");
+          if (
+            wrap?.dataset.style === "icon" &&
+            document.activeElement !== searchInput &&
+            !searchInput.value.trim()
+          ) {
+            wrap.classList.remove("expanded");
+          }
+        }, 120);
+      });
+
       clearSearch.addEventListener("click", () => {
         searchInput.value = "";
         clearSearch.style.display = "none";
@@ -4158,12 +4543,14 @@
         }
         if (e.key === "/" && document.activeElement !== searchInput) {
           e.preventDefault();
+          document.getElementById("searchWrap")?.classList.add("expanded");
           searchInput.focus();
         } else if (e.key === "Escape") {
           closeMapBuildingModal();
           closeFavCardModal();
           closeAuthModal();
           if (document.activeElement === searchInput) {
+            document.getElementById("searchWrap")?.classList.remove("expanded");
             searchInput.value = "";
             clearSearch.style.display = "none";
             renderShortcuts();

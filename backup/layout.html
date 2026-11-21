@@ -55,6 +55,8 @@
         --shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
       }
 
+      html,
+      body,
       *,
       *::before,
       *::after {
@@ -62,6 +64,14 @@
         margin: 0;
         padding: 0;
         -webkit-tap-highlight-color: transparent;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+      }
+
+      *::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
       }
 
       html,
@@ -279,7 +289,6 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
-        scrollbar-width: thin;
       }
 
       .ctrl-panel {
@@ -528,7 +537,7 @@
         border: 1px solid var(--border);
         border-radius: 16px;
         box-shadow: 0 20px 55px rgba(0, 0, 0, 0.45);
-        overflow: hidden;
+        overflow: clip;
         display: flex;
         flex-direction: column;
         min-height: 620px;
@@ -566,8 +575,70 @@
          ========================================================================== */
       .pv-topbar {
         background: color-mix(in srgb, var(--bg-elev) 90%, transparent);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         border-bottom: 1px solid var(--border);
+        transition: 0.18s ease;
       }
+      .pv-topbar[data-sticky="true"] {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+      }
+      .pv-topbar[data-style="solid"] {
+        background: var(--bg-elev);
+        backdrop-filter: none;
+      }
+      .pv-topbar[data-style="minimal"] {
+        background: transparent;
+        backdrop-filter: none;
+        border-bottom-color: transparent;
+      }
+      .pv-topbar[data-style="floating"] {
+        background: transparent;
+        backdrop-filter: none;
+        border-bottom: none;
+        padding: 10px 12px 0;
+      }
+      .pv-topbar[data-style="floating"] .pv-topbar-inner {
+        background: color-mix(in srgb, var(--bg-elev) 92%, transparent);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--border);
+        border-radius: var(--pv-radius, 14px);
+        box-shadow: var(--shadow);
+      }
+      .pv-topbar[data-divider="accent"] {
+        border-bottom: 1.5px solid
+          color-mix(in srgb, var(--accent) 55%, transparent);
+        box-shadow: 0 2px 14px var(--accent-soft);
+      }
+      .pv-topbar[data-divider="shadow"] {
+        border-bottom: none;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+      }
+      .pv-topbar[data-divider="none"] {
+        border-bottom: none;
+        box-shadow: none;
+      }
+      .pv-topbar[data-style="floating"][data-divider] {
+        border-bottom: none;
+        box-shadow: none;
+      }
+      .pv-topbar[data-style="floating"][data-divider="accent"]
+        .pv-topbar-inner {
+        border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+        box-shadow: 0 4px 18px var(--accent-soft);
+      }
+      .pv-topbar[data-style="floating"][data-divider="shadow"]
+        .pv-topbar-inner {
+        border-color: transparent;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+      }
+      .pv-topbar[data-style="floating"][data-divider="none"] .pv-topbar-inner {
+        border-color: transparent;
+        box-shadow: none;
+      }
+
       .pv-topbar-inner {
         max-width: var(--pv-max-w, 1280px);
         margin: 0 auto;
@@ -577,16 +648,73 @@
         align-items: center;
         gap: 10px;
       }
+      .pv-topbar-inner[data-padding="sm"] {
+        padding: 7px 12px;
+      }
+      .pv-topbar-inner[data-padding="lg"] {
+        padding: 16px 18px;
+      }
+      .pv-topbar-inner[data-row-gap="tight"] {
+        gap: 6px;
+      }
+      .pv-topbar-inner[data-row-gap="wide"] {
+        gap: 16px;
+      }
+
+      /* Universal New Row + Alignment for all topbar children */
+      .pv-topbar-inner > [data-new-row="true"] {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+      .pv-topbar-inner > [data-new-row="true"][data-align="left"] {
+        justify-content: flex-start;
+      }
+      .pv-topbar-inner > [data-new-row="true"][data-align="center"] {
+        justify-content: center;
+      }
+      .pv-topbar-inner > [data-new-row="true"][data-align="right"] {
+        justify-content: flex-end;
+      }
+
+      /* 1. Brand Child */
       .pv-brand {
         display: flex;
         align-items: center;
         gap: 9px;
-        margin-right: auto;
         min-width: 0;
       }
+      .pv-brand[data-align="center"] {
+        text-align: center;
+      }
+      .pv-brand[data-align="center"] .pv-brand-sub {
+        justify-content: center;
+      }
+      .pv-brand[data-align="right"] {
+        text-align: right;
+      }
+      .pv-brand[data-align="right"] .pv-brand-sub {
+        justify-content: flex-end;
+      }
+      .pv-brand[data-stack="column"] {
+        flex-direction: column;
+        gap: 6px;
+      }
+      .pv-brand[data-stack="column"][data-align="left"] {
+        align-items: flex-start;
+      }
+      .pv-brand[data-stack="column"][data-align="center"] {
+        align-items: center;
+      }
+      .pv-brand[data-stack="column"][data-align="right"] {
+        align-items: flex-end;
+      }
+
       .pv-brand-ico {
-        width: 34px;
-        height: 34px;
+        width: 36px;
+        height: 36px;
         border-radius: 9px;
         background: var(--accent-soft);
         color: var(--accent);
@@ -594,105 +722,31 @@
         place-items: center;
         flex-shrink: 0;
       }
-      .pv-brand h1 {
-        font-size: 0.96rem;
-        font-weight: 800;
-      }
-      .pv-brand-sub {
-        font-size: 0.7rem;
-        color: var(--text-muted);
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        flex-wrap: wrap;
-      }
-      .pv-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 2px 7px;
-        border-radius: 999px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        font-size: 0.68rem;
-        font-weight: 600;
-      }
-      .pv-search {
-        flex: 1 1 180px;
-        max-width: 260px;
-        height: 32px;
-        border-radius: 9px;
-        border: 1px solid var(--border);
-        background: var(--card);
-        color: var(--text-muted);
-        padding: 0 10px;
-        display: flex;
-        align-items: center;
-        font-size: 0.78rem;
-      }
-      .preview-frame.mobile-mode .pv-search {
-        order: 3;
-        flex: 1 1 100%;
-        max-width: 100%;
-      }
-      .pv-actions {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .pv-map-btn {
-        height: 32px;
-        padding: 0 10px;
-        border-radius: 9px;
-        border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--border));
-        background: var(--accent-soft);
-        color: var(--accent);
-        font-size: 0.72rem;
-        font-weight: 700;
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-      }
-      .preview-frame.mobile-mode .pv-map-btn span {
-        display: none;
-      }
-      .pv-ico-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 9px;
-        border: 1px solid var(--border);
-        background: var(--card);
-        color: var(--text);
-        display: grid;
-        place-items: center;
-      }
-
-      /* pv-brand options */
-      .pv-topbar-inner[data-brand-align="center"] {
-        justify-content: center;
-      }
-      .pv-topbar-inner[data-brand-align="center"] .pv-brand {
-        margin-right: 0;
-        width: 100%;
-        justify-content: center;
-        text-align: center;
-      }
-      .pv-topbar-inner[data-brand-align="center"] .pv-brand-sub {
-        justify-content: center;
-      }
-      .pv-brand[data-size="sm"] .pv-brand-ico {
+      .pv-brand[data-icon-size="sm"] .pv-brand-ico {
         width: 28px;
         height: 28px;
+        border-radius: 7px;
       }
-      .pv-brand[data-size="sm"] h1 {
-        font-size: 0.85rem;
+      .pv-brand[data-icon-size="sm"] .pv-brand-ico svg {
+        width: 15px;
+        height: 15px;
       }
-      .pv-brand[data-size="lg"] .pv-brand-ico {
-        width: 42px;
-        height: 42px;
+      .pv-brand[data-icon-size="md"] .pv-brand-ico {
+        width: 36px;
+        height: 36px;
       }
-      .pv-brand[data-size="lg"] h1 {
-        font-size: 1.15rem;
+      .pv-brand[data-icon-size="md"] .pv-brand-ico svg {
+        width: 20px;
+        height: 20px;
+      }
+      .pv-brand[data-icon-size="lg"] .pv-brand-ico {
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+      }
+      .pv-brand[data-icon-size="lg"] .pv-brand-ico svg {
+        width: 25px;
+        height: 25px;
       }
 
       .pv-brand[data-icon-style="solid"] .pv-brand-ico {
@@ -707,12 +761,209 @@
         border: 1.5px solid var(--accent);
       }
 
-      /* pv-actions options */
+      .pv-brand h1 {
+        font-size: 0.98rem;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+      .pv-brand-sub {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-top: 2px;
+      }
+      .pv-brand[data-size="sm"] h1 {
+        font-size: 0.84rem;
+      }
+      .pv-brand[data-size="sm"] .pv-brand-sub {
+        font-size: 0.64rem;
+      }
+      .pv-brand[data-size="lg"] h1 {
+        font-size: 1.22rem;
+      }
+      .pv-brand[data-size="lg"] .pv-brand-sub {
+        font-size: 0.78rem;
+      }
+
+      .pv-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        font-size: 0.68rem;
+        font-weight: 600;
+      }
+
+      /* 2. Search Bar Child */
+      .pv-search-wrap {
+        display: flex;
+        align-items: center;
+        flex: 1 1 180px;
+        max-width: 280px;
+        min-width: 0;
+      }
+      .pv-search-wrap[data-width="sm"] {
+        max-width: 200px;
+      }
+      .pv-search-wrap[data-width="full"] {
+        max-width: 100%;
+      }
+      .pv-search-wrap[data-style="icon"] {
+        flex: 0 0 auto;
+        max-width: none;
+      }
+      .pv-search-box {
+        width: 100%;
+        height: 34px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--text-muted);
+        padding: 0 11px;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 0.78rem;
+        transition: 0.15s;
+      }
+      .pv-search-wrap[data-new-row="true"] .pv-search-box {
+        max-width: 380px;
+      }
+      .pv-search-wrap[data-new-row="true"][data-width="sm"] .pv-search-box {
+        max-width: 240px;
+      }
+      .pv-search-wrap[data-new-row="true"][data-width="full"] .pv-search-box {
+        max-width: 100%;
+      }
+      .pv-search-wrap[data-size="sm"] .pv-search-box {
+        height: 28px;
+        font-size: 0.72rem;
+        padding: 0 8px;
+      }
+      .pv-search-wrap[data-size="lg"] .pv-search-box {
+        height: 40px;
+        font-size: 0.86rem;
+        padding: 0 14px;
+      }
+      .pv-search-wrap[data-style="pill"] .pv-search-box {
+        border-radius: 999px;
+      }
+      .pv-search-wrap[data-style="minimal"] .pv-search-box {
+        background: transparent;
+        border: none;
+        border-bottom: 1.5px solid var(--border);
+        border-radius: 0;
+        padding-left: 2px;
+      }
+      .pv-search-wrap[data-style="icon"] .pv-search-box {
+        width: 34px;
+        max-width: 34px;
+        padding: 0;
+        justify-content: center;
+        color: var(--text);
+      }
+      .pv-search-wrap[data-style="icon"][data-size="sm"] .pv-search-box {
+        width: 28px;
+        max-width: 28px;
+      }
+      .pv-search-wrap[data-style="icon"][data-size="lg"] .pv-search-box {
+        width: 40px;
+        max-width: 40px;
+      }
+      .pv-search-wrap[data-style="icon"] .pv-search-placeholder {
+        display: none;
+      }
+      .preview-frame.mobile-mode .pv-search-wrap:not([data-style="icon"]) {
+        flex: 1 1 100%;
+        max-width: 100%;
+      }
+
+      /* 3. Header Actions Child */
+      .pv-actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        flex-shrink: 0;
+      }
       .pv-actions[data-gap="tight"] {
         gap: 4px;
       }
       .pv-actions[data-gap="wide"] {
         gap: 12px;
+      }
+
+      .pv-map-btn {
+        height: 34px;
+        padding: 0 10px;
+        border-radius: 9px;
+        border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--border));
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        transition: 0.15s;
+      }
+      .pv-map-btn:hover {
+        background: var(--accent);
+        color: #031525;
+        border-color: var(--accent);
+      }
+      .pv-map-count-pill {
+        font-size: 0.64rem;
+        padding: 1px 5px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--bg) 70%, transparent);
+        border: 1px solid currentColor;
+        line-height: 1.25;
+      }
+      .pv-map-btn:hover .pv-map-count-pill,
+      .pv-actions[data-map-style="solid"] .pv-map-btn .pv-map-count-pill {
+        background: #031525;
+        color: #ffffff;
+        border-color: #031525;
+      }
+      .pv-actions[data-map-style="solid"] .pv-map-btn:hover .pv-map-count-pill {
+        background: #ffffff;
+        color: #031525;
+        border-color: #ffffff;
+      }
+      .preview-frame.mobile-mode .pv-map-btn .pv-map-lbl {
+        display: none;
+      }
+
+      .pv-ico-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--text);
+        display: grid;
+        place-items: center;
+        transition: 0.15s;
+      }
+
+      .pv-actions[data-style="ghost"] .pv-ico-btn,
+      .pv-actions[data-style="ghost"] .seg-toggle {
+        background: transparent;
+        border-color: transparent;
+      }
+      .pv-actions[data-style="tinted"] .pv-ico-btn,
+      .pv-actions[data-style="tinted"] .seg-toggle {
+        background: var(--accent-soft);
+        border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+        color: var(--accent);
       }
 
       .pv-actions[data-shape="pill"] .pv-map-btn,
@@ -721,7 +972,6 @@
       .pv-actions[data-shape="pill"] .seg-btn {
         border-radius: 999px;
       }
-
       .pv-actions[data-shape="square"] .pv-map-btn,
       .pv-actions[data-shape="square"] .pv-ico-btn,
       .pv-actions[data-shape="square"] .seg-toggle,
@@ -735,17 +985,29 @@
         min-width: 28px;
         font-size: 0.68rem;
       }
-      .pv-actions[data-size="lg"] .pv-map-btn,
-      .pv-actions[data-size="lg"] .pv-ico-btn {
-        height: 38px;
-        min-width: 38px;
-        font-size: 0.8rem;
-      }
       .pv-actions[data-size="sm"] .pv-ico-btn {
         width: 28px;
       }
+      .pv-actions[data-size="lg"] .pv-map-btn,
       .pv-actions[data-size="lg"] .pv-ico-btn {
-        width: 38px;
+        height: 40px;
+        min-width: 40px;
+        font-size: 0.8rem;
+      }
+      .pv-actions[data-size="lg"] .pv-ico-btn {
+        width: 40px;
+      }
+      .pv-actions .seg-btn {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+      }
+      .pv-actions[data-size="sm"] .seg-btn {
+        padding: 2px 6px;
+        font-size: 0.64rem;
+      }
+      .pv-actions[data-size="lg"] .seg-btn {
+        padding: 7px 11px;
+        font-size: 0.78rem;
       }
 
       .pv-actions[data-map-style="solid"] .pv-map-btn {
@@ -753,7 +1015,7 @@
         color: #031525;
         border-color: var(--accent);
       }
-      .pv-actions[data-map-style="icon"] .pv-map-btn span {
+      .pv-actions[data-map-style="icon"] .pv-map-btn .pv-map-lbl {
         display: none;
       }
       .pv-actions[data-map-style="icon"] .pv-map-btn {
@@ -1530,21 +1792,107 @@
               </div>
             </div>
 
-            <!-- Brand Section (pv-brand) Options -->
+            <!-- Topbar Container (pv-topbar-inner) Options -->
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Topbar Container</div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Topbar Style</label>
+                  <select
+                    id="hdrStyle"
+                    class="select"
+                    onchange="setHeader('style', this.value)"
+                  >
+                    <option value="glass">Frosted Glass (Default)</option>
+                    <option value="solid">Solid Bar</option>
+                    <option value="floating">Floating Card</option>
+                    <option value="minimal">Clean Minimal</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Topbar Padding</label>
+                  <select
+                    id="hdrPadding"
+                    class="select"
+                    onchange="setHeader('padding', this.value)"
+                  >
+                    <option value="sm">Compact</option>
+                    <option value="md">Medium (Default)</option>
+                    <option value="lg">Large</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Bottom Divider</label>
+                  <select
+                    id="hdrDivider"
+                    class="select"
+                    onchange="setHeader('divider', this.value)"
+                  >
+                    <option value="border">Subtle Border (Default)</option>
+                    <option value="accent">Accent Glow Line</option>
+                    <option value="shadow">Soft Shadow</option>
+                    <option value="none">None</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Row / Item Gap</label>
+                  <select
+                    id="hdrRowGap"
+                    class="select"
+                    onchange="setHeader('rowGap', this.value)"
+                  >
+                    <option value="tight">Tight</option>
+                    <option value="normal">Normal (Default)</option>
+                    <option value="wide">Wide</option>
+                  </select>
+                </div>
+              </div>
+              <div class="toggle-row">
+                <span>Sticky Topbar on Scroll</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrSticky"
+                  onchange="setHeader('sticky', this.checked)"
+                />
+              </div>
+              <div class="field" style="margin-top: 8px">
+                <label>Topbar Elements Order</label>
+                <div class="order-list" id="headerOrderList"></div>
+              </div>
+            </div>
+
+            <!-- Child 1: Brand Section (pv-brand) Options -->
             <div class="ctrl-card">
               <div class="ctrl-card-title">Header Brand</div>
               <div class="field-row">
                 <div class="field">
-                  <label>Brand Alignment</label>
+                  <label>Row Assignment</label>
+                  <select
+                    id="hdrBrandNewRow"
+                    class="select"
+                    onchange="setHeader('brandNewRow', this.value === '1')"
+                  >
+                    <option value="0">Same Row</option>
+                    <option value="1">New Row</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Row Alignment</label>
                   <select
                     id="hdrBrandAlign"
                     class="select"
                     onchange="setHeader('brandAlign', this.value)"
                   >
-                    <option value="left">Left (Default)</option>
-                    <option value="center">Centered</option>
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
                   </select>
                 </div>
+              </div>
+              <div class="field-row">
                 <div class="field">
                   <label>Brand Size</label>
                   <select
@@ -1557,19 +1905,44 @@
                     <option value="lg">Large</option>
                   </select>
                 </div>
+                <div class="field">
+                  <label>Brand Icon Size</label>
+                  <select
+                    id="hdrBrandIconSize"
+                    class="select"
+                    onchange="setHeader('brandIconSize', this.value)"
+                  >
+                    <option value="sm">Compact</option>
+                    <option value="md">Medium (Default)</option>
+                    <option value="lg">Large</option>
+                  </select>
+                </div>
               </div>
-              <div class="field">
-                <label>Brand Icon Style</label>
-                <select
-                  id="hdrBrandIconStyle"
-                  class="select"
-                  onchange="setHeader('brandIconStyle', this.value)"
-                >
-                  <option value="soft">Soft Accent Box (Default)</option>
-                  <option value="solid">Solid Accent Box</option>
-                  <option value="circle">Soft Circle</option>
-                  <option value="outline">Outlined Border</option>
-                </select>
+              <div class="field-row">
+                <div class="field">
+                  <label>Brand Icon Style</label>
+                  <select
+                    id="hdrBrandIconStyle"
+                    class="select"
+                    onchange="setHeader('brandIconStyle', this.value)"
+                  >
+                    <option value="soft">Soft Accent Box</option>
+                    <option value="solid">Solid Accent Box</option>
+                    <option value="circle">Soft Circle</option>
+                    <option value="outline">Outlined Border</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Brand Layout</label>
+                  <select
+                    id="hdrBrandStack"
+                    class="select"
+                    onchange="setHeader('brandStack', this.value)"
+                  >
+                    <option value="row">Horizontal (Icon Left)</option>
+                    <option value="column">Stacked (Icon Top)</option>
+                  </select>
+                </div>
               </div>
               <div class="toggle-row">
                 <span>Show Brand Icon</span>
@@ -1609,12 +1982,127 @@
               </div>
             </div>
 
-            <!-- Actions Section (pv-actions) Options -->
+            <!-- Child 2: Search Bar (pv-search-wrap) Options -->
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Header Search Bar</div>
+              <div class="toggle-row" style="margin-bottom: 8px">
+                <span>Show Search Bar</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrSearch"
+                  onchange="setHeader('showSearch', this.checked)"
+                />
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Row Assignment</label>
+                  <select
+                    id="hdrSearchNewRow"
+                    class="select"
+                    onchange="setHeader('searchNewRow', this.value === '1')"
+                  >
+                    <option value="0">Same Row</option>
+                    <option value="1">New Row</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Row Alignment</label>
+                  <select
+                    id="hdrSearchAlign"
+                    class="select"
+                    onchange="setHeader('searchAlign', this.value)"
+                  >
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Search Size</label>
+                  <select
+                    id="hdrSearchSize"
+                    class="select"
+                    onchange="setHeader('searchSize', this.value)"
+                  >
+                    <option value="sm">Compact</option>
+                    <option value="md">Medium (Default)</option>
+                    <option value="lg">Large</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Search Style</label>
+                  <select
+                    id="hdrSearchStyle"
+                    class="select"
+                    onchange="setHeader('searchStyle', this.value)"
+                  >
+                    <option value="rounded">Rounded Input</option>
+                    <option value="pill">Pill Input</option>
+                    <option value="minimal">Minimal Line</option>
+                    <option value="icon">Icon Only</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label>Search Bar Width</label>
+                <select
+                  id="hdrSearchWidth"
+                  class="select"
+                  onchange="setHeader('searchWidth', this.value)"
+                >
+                  <option value="sm">Compact</option>
+                  <option value="md">Standard (Default)</option>
+                  <option value="full">Full Width</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Child 3: Actions Section (pv-actions) & Footer Options -->
             <div class="ctrl-card">
               <div class="ctrl-card-title">Header Actions &amp; Footer</div>
               <div class="field-row">
                 <div class="field">
-                  <label>Action Button Shape</label>
+                  <label>Row Assignment</label>
+                  <select
+                    id="hdrActionsNewRow"
+                    class="select"
+                    onchange="setHeader('actionsNewRow', this.value === '1')"
+                  >
+                    <option value="0">Same Row</option>
+                    <option value="1">New Row</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Row Alignment</label>
+                  <select
+                    id="hdrActionsAlign"
+                    class="select"
+                    onchange="setHeader('actionsAlign', this.value)"
+                  >
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Action Size</label>
+                  <select
+                    id="hdrActionSize"
+                    class="select"
+                    onchange="setHeader('actionSize', this.value)"
+                  >
+                    <option value="sm">Compact</option>
+                    <option value="md">Medium (Default)</option>
+                    <option value="lg">Large</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Button Shape</label>
                   <select
                     id="hdrActionShape"
                     class="select"
@@ -1625,30 +2113,18 @@
                     <option value="square">Sharp Square</option>
                   </select>
                 </div>
-                <div class="field">
-                  <label>Action Button Size</label>
-                  <select
-                    id="hdrActionSize"
-                    class="select"
-                    onchange="setHeader('actionSize', this.value)"
-                  >
-                    <option value="sm">Compact</option>
-                    <option value="md">Medium (Default)</option>
-                    <option value="lg">Large Touch</option>
-                  </select>
-                </div>
               </div>
               <div class="field-row">
                 <div class="field">
-                  <label>Map Button Style</label>
+                  <label>Button Surface</label>
                   <select
-                    id="hdrMapStyle"
+                    id="hdrActionStyle"
                     class="select"
-                    onchange="setHeader('mapBtnStyle', this.value)"
+                    onchange="setHeader('actionStyle', this.value)"
                   >
-                    <option value="soft">Soft Accent + Label</option>
-                    <option value="solid">Solid Accent + Label</option>
-                    <option value="icon">Icon Only</option>
+                    <option value="default">Default Card</option>
+                    <option value="ghost">Minimal Ghost</option>
+                    <option value="tinted">Soft Accent Tint</option>
                   </select>
                 </div>
                 <div class="field">
@@ -1664,14 +2140,17 @@
                   </select>
                 </div>
               </div>
-              <div class="toggle-row">
-                <span>Show Search Bar</span>
-                <input
-                  type="checkbox"
-                  class="switch"
-                  id="hdrSearch"
-                  onchange="setHeader('showSearch', this.checked)"
-                />
+              <div class="field">
+                <label>Map Button Style</label>
+                <select
+                  id="hdrMapStyle"
+                  class="select"
+                  onchange="setHeader('mapBtnStyle', this.value)"
+                >
+                  <option value="soft">Soft Accent + Label</option>
+                  <option value="solid">Solid Accent + Label</option>
+                  <option value="icon">Icon Only</option>
+                </select>
               </div>
               <div class="toggle-row">
                 <span>Show Map View Button</span>
@@ -2415,22 +2894,39 @@
           radius: 14,
           maxWidth: 1280,
           header: {
-            showSearch: true,
+            style: "glass",
+            padding: "md",
+            rowGap: "normal",
+            divider: "border",
+            sticky: true,
+            order: ["brand", "search", "actions"],
+            brandNewRow: false,
+            brandAlign: "left",
+            brandSize: "md",
+            brandIconSize: "md",
+            brandIconStyle: "soft",
+            brandStack: "row",
+            showBrandIcon: true,
+            showSubtitle: true,
+            showStatusPill: true,
             showClock: true,
+            showSearch: true,
+            searchNewRow: false,
+            searchAlign: "center",
+            searchSize: "md",
+            searchStyle: "rounded",
+            searchWidth: "md",
+            actionsNewRow: false,
+            actionsAlign: "right",
+            actionSize: "md",
+            actionShape: "rounded",
+            actionStyle: "default",
+            actionGap: "normal",
+            mapBtnStyle: "soft",
             showMapBtn: true,
             showAddrToggle: true,
             showRefreshBtn: true,
             showFooter: true,
-            showBrandIcon: true,
-            showSubtitle: true,
-            showStatusPill: true,
-            brandAlign: "left",
-            brandSize: "md",
-            brandIconStyle: "soft",
-            actionShape: "rounded",
-            actionSize: "md",
-            actionGap: "normal",
-            mapBtnStyle: "soft",
           },
           fav: {
             layout: "grid",
@@ -2488,11 +2984,18 @@
           Array.isArray(raw.sectionOrder) && raw.sectionOrder.length === 3
             ? raw.sectionOrder
             : def.sectionOrder;
+        const hdrRaw = raw.header || {};
+        const hdrOrder =
+          Array.isArray(hdrRaw.order) &&
+          hdrRaw.order.length === 3 &&
+          ["brand", "search", "actions"].every((k) => hdrRaw.order.includes(k))
+            ? hdrRaw.order
+            : def.header.order;
         return {
           ...def,
           ...raw,
           sectionOrder: order,
-          header: { ...def.header, ...(raw.header || {}) },
+          header: { ...def.header, ...hdrRaw, order: hdrOrder },
           fav: { ...def.fav, ...(raw.fav || {}) },
           shortcut: { ...def.shortcut, ...(raw.shortcut || {}) },
           group: { ...def.group, ...(raw.group || {}) },
@@ -2896,9 +3399,82 @@
       function setHeader(key, val) {
         ui.header[key] = val;
         ui.activePreset = "custom";
+        if (key === "searchStyle") {
+          const wEl = document.getElementById("hdrSearchWidth");
+          if (wEl) wEl.disabled = val === "icon";
+        }
         syncActivePresetUI();
         markDirty();
         renderPreview();
+      }
+
+      function moveHeaderOrder(idx, dir) {
+        const target = idx + dir;
+        if (target < 0 || target >= ui.header.order.length) return;
+        [ui.header.order[idx], ui.header.order[target]] = [
+          ui.header.order[target],
+          ui.header.order[idx],
+        ];
+        ui.activePreset = "custom";
+        renderHeaderOrderList();
+        syncActivePresetUI();
+        markDirty();
+        renderPreview();
+      }
+
+      function renderHeaderOrderList() {
+        const el = document.getElementById("headerOrderList");
+        if (!el) return;
+        const labels = {
+          brand: "Brand & Status",
+          search: "Search Bar",
+          actions: "Header Actions",
+        };
+        el.innerHTML = ui.header.order
+          .map(
+            (key, i) => `
+            <div class="order-item">
+              <span>${labels[key] || key}</span>
+              <div style="display:flex;gap:4px">
+                <button class="btn btn-sm" ${i === 0 ? "disabled" : ""} onclick="moveHeaderOrder(${i}, -1)">&uarr;</button>
+                <button class="btn btn-sm" ${i === ui.header.order.length - 1 ? "disabled" : ""} onclick="moveHeaderOrder(${i}, 1)">&darr;</button>
+              </div>
+            </div>
+          `,
+          )
+          .join("");
+      }
+
+      function applyTopbarFlexMargins(container) {
+        if (!container) return;
+        const visible = Array.from(container.children).filter(
+          (el) => el.style.display !== "none",
+        );
+        visible.forEach((el, idx) => {
+          if (el.dataset.newRow === "true") {
+            el.style.marginLeft = "0";
+            el.style.marginRight = "0";
+            return;
+          }
+          const prev = visible[idx - 1];
+          const next = visible[idx + 1];
+          const prevInline = prev && prev.dataset.newRow !== "true";
+          const nextInline = next && next.dataset.newRow !== "true";
+          const align = el.dataset.align || "left";
+
+          if (align === "left") {
+            el.style.marginLeft = "0";
+            el.style.marginRight =
+              nextInline && next.dataset.align === "left" ? "0" : "auto";
+          } else if (align === "center") {
+            el.style.marginLeft = "auto";
+            el.style.marginRight = "auto";
+          } else {
+            el.style.marginLeft =
+              prevInline && prev.dataset.align === "right" ? "0" : "auto";
+            el.style.marginRight = "0";
+          }
+        });
       }
 
       function setCard(section, key, val) {
@@ -2972,27 +3548,51 @@
           true,
         );
 
-        document.getElementById("hdrSearch").checked = ui.header.showSearch;
-        document.getElementById("hdrClock").checked = ui.header.showClock;
-        document.getElementById("hdrMap").checked = ui.header.showMapBtn;
-        document.getElementById("hdrAddr").checked = ui.header.showAddrToggle;
-        document.getElementById("hdrFooter").checked = ui.header.showFooter;
-        document.getElementById("hdrBrandAlign").value = ui.header.brandAlign;
-        document.getElementById("hdrBrandSize").value = ui.header.brandSize;
-        document.getElementById("hdrBrandIconStyle").value =
-          ui.header.brandIconStyle;
-        document.getElementById("hdrBrandIcon").checked =
-          ui.header.showBrandIcon;
-        document.getElementById("hdrSubtitle").checked = ui.header.showSubtitle;
-        document.getElementById("hdrStatusPill").checked =
-          ui.header.showStatusPill;
+        renderHeaderOrderList();
+        const h = ui.header;
+        document.getElementById("hdrStyle").value = h.style;
+        document.getElementById("hdrPadding").value = h.padding;
+        document.getElementById("hdrRowGap").value = h.rowGap;
+        document.getElementById("hdrDivider").value = h.divider;
+        document.getElementById("hdrSticky").checked = h.sticky;
 
-        document.getElementById("hdrActionShape").value = ui.header.actionShape;
-        document.getElementById("hdrActionSize").value = ui.header.actionSize;
-        document.getElementById("hdrActionGap").value = ui.header.actionGap;
-        document.getElementById("hdrMapStyle").value = ui.header.mapBtnStyle;
-        document.getElementById("hdrRefresh").checked =
-          ui.header.showRefreshBtn;
+        document.getElementById("hdrBrandNewRow").value = h.brandNewRow
+          ? "1"
+          : "0";
+        document.getElementById("hdrBrandAlign").value = h.brandAlign;
+        document.getElementById("hdrBrandSize").value = h.brandSize;
+        document.getElementById("hdrBrandIconSize").value = h.brandIconSize;
+        document.getElementById("hdrBrandIconStyle").value = h.brandIconStyle;
+        document.getElementById("hdrBrandStack").value = h.brandStack;
+        document.getElementById("hdrBrandIcon").checked = h.showBrandIcon;
+        document.getElementById("hdrSubtitle").checked = h.showSubtitle;
+        document.getElementById("hdrStatusPill").checked = h.showStatusPill;
+        document.getElementById("hdrClock").checked = h.showClock;
+
+        document.getElementById("hdrSearch").checked = h.showSearch;
+        document.getElementById("hdrSearchNewRow").value = h.searchNewRow
+          ? "1"
+          : "0";
+        document.getElementById("hdrSearchAlign").value = h.searchAlign;
+        document.getElementById("hdrSearchSize").value = h.searchSize;
+        document.getElementById("hdrSearchStyle").value = h.searchStyle;
+        document.getElementById("hdrSearchWidth").value = h.searchWidth;
+        document.getElementById("hdrSearchWidth").disabled =
+          h.searchStyle === "icon";
+
+        document.getElementById("hdrActionsNewRow").value = h.actionsNewRow
+          ? "1"
+          : "0";
+        document.getElementById("hdrActionsAlign").value = h.actionsAlign;
+        document.getElementById("hdrActionSize").value = h.actionSize;
+        document.getElementById("hdrActionShape").value = h.actionShape;
+        document.getElementById("hdrActionStyle").value = h.actionStyle;
+        document.getElementById("hdrActionGap").value = h.actionGap;
+        document.getElementById("hdrMapStyle").value = h.mapBtnStyle;
+        document.getElementById("hdrMap").checked = h.showMapBtn;
+        document.getElementById("hdrAddr").checked = h.showAddrToggle;
+        document.getElementById("hdrRefresh").checked = h.showRefreshBtn;
+        document.getElementById("hdrFooter").checked = h.showFooter;
 
         // Favorites
         document.getElementById("favLayout").value = ui.fav.layout;
@@ -3091,6 +3691,15 @@
         if (name === "tablet") {
           base.cardStyle = "elevated";
           base.radius = 18;
+          base.header.style = "floating";
+          base.header.padding = "lg";
+          base.header.brandNewRow = true;
+          base.header.brandAlign = "center";
+          base.header.brandSize = "lg";
+          base.header.brandIconSize = "lg";
+          base.header.actionsNewRow = true;
+          base.header.actionsAlign = "center";
+          base.header.actionSize = "lg";
           base.header.showSearch = false;
           base.header.showFooter = false;
           base.fav.layout = "tile";
@@ -3107,6 +3716,14 @@
         } else if (name === "compact") {
           base.cardStyle = "flat";
           base.radius = 10;
+          base.header.padding = "sm";
+          base.header.rowGap = "tight";
+          base.header.brandSize = "sm";
+          base.header.brandIconSize = "sm";
+          base.header.searchStyle = "icon";
+          base.header.searchSize = "sm";
+          base.header.actionSize = "sm";
+          base.header.actionGap = "tight";
           base.fav.layout = "strip";
           base.fav.size = "sm";
           base.shortcut.size = "sm";
@@ -3120,6 +3737,11 @@
         } else if (name === "glass") {
           base.cardStyle = "glass";
           base.radius = 20;
+          base.header.style = "floating";
+          base.header.divider = "accent";
+          base.header.brandIconStyle = "circle";
+          base.header.searchStyle = "pill";
+          base.header.actionShape = "pill";
           base.fav.layout = "pill";
           base.fav.accentPos = "none";
           base.shortcut.accentPos = "tint";
@@ -3258,30 +3880,73 @@
 
         // 1. Header HTML
         const h = ui.header;
+        const headerChildren = {
+          brand: `
+            <div class="pv-brand"
+                 data-new-row="${h.brandNewRow}"
+                 data-align="${h.brandAlign}"
+                 data-size="${h.brandSize}"
+                 data-icon-size="${h.brandIconSize}"
+                 data-icon-style="${h.brandIconStyle}"
+                 data-stack="${h.brandStack}">
+              ${h.showBrandIcon ? `<div class="pv-brand-ico">${svgIcon("chip", 20)}</div>` : ""}
+              <div style="min-width:0">
+                <h1>${escapeHtml(title)}</h1>
+                <div class="pv-brand-sub">
+                  ${h.showSubtitle ? `<span>${escapeHtml(sub)}</span>` : ""}
+                  ${h.showStatusPill ? `<span class="pv-pill"><span class="dot online"></span> ${data.devices.length}/${data.devices.length}</span>` : ""}
+                  ${h.showClock ? `<span class="pv-pill" style="font-family:monospace">08:30:12</span>` : ""}
+                </div>
+              </div>
+            </div>
+          `,
+          search: h.showSearch
+            ? `
+            <div class="pv-search-wrap"
+                 data-new-row="${h.searchNewRow}"
+                 data-align="${h.searchAlign}"
+                 data-size="${h.searchSize}"
+                 data-style="${h.searchStyle}"
+                 data-width="${h.searchWidth}">
+              <div class="pv-search-box">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <span class="pv-search-placeholder">Search devices...</span>
+              </div>
+            </div>
+          `
+            : "",
+          actions: `
+            <div class="pv-actions"
+                 data-new-row="${h.actionsNewRow}"
+                 data-align="${h.actionsAlign}"
+                 data-size="${h.actionSize}"
+                 data-shape="${h.actionShape}"
+                 data-style="${h.actionStyle}"
+                 data-gap="${h.actionGap}"
+                 data-map-style="${h.mapBtnStyle}">
+              ${h.showMapBtn ? `<div class="pv-map-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg><span class="pv-map-lbl">Map View</span><span class="pv-map-count-pill">2</span></div>` : ""}
+              ${h.showAddrToggle ? `<div class="seg-toggle"><span class="seg-btn active">IP</span><span class="seg-btn">DNS</span></div>` : ""}
+              ${h.showRefreshBtn ? `<div class="pv-ico-btn">↻</div>` : ""}
+              <div class="pv-ico-btn">⚙</div>
+            </div>
+          `,
+        };
+
         const headerHtml = `
-  <div class="pv-topbar">
-    <div class="pv-topbar-inner" data-brand-align="${h.brandAlign}">
-      <div class="pv-brand" data-size="${h.brandSize}" data-icon-style="${h.brandIconStyle}">
-        ${h.showBrandIcon ? `<div class="pv-brand-ico">${svgIcon("chip", 19)}</div>` : ""}
-        <div style="min-width:0">
-          <h1>${escapeHtml(title)}</h1>
-          <div class="pv-brand-sub">
-            ${h.showSubtitle ? `<span>${escapeHtml(sub)}</span>` : ""}
-            ${h.showStatusPill ? `<span class="pv-pill"><span class="dot online"></span> ${data.devices.length}/${data.devices.length}</span>` : ""}
-            ${h.showClock ? `<span class="pv-pill" style="font-family:monospace">08:30:12</span>` : ""}
+          <div class="pv-topbar"
+               data-style="${h.style}"
+               data-divider="${h.divider}"
+               data-sticky="${h.sticky}">
+            <div class="pv-topbar-inner"
+                 data-padding="${h.padding}"
+                 data-row-gap="${h.rowGap}">
+              ${h.order.map((k) => headerChildren[k] || "").join("")}
+            </div>
           </div>
-        </div>
-      </div>
-      ${h.showSearch ? `<div class="pv-search">Search devices...</div>` : ""}
-      <div class="pv-actions" data-shape="${h.actionShape}" data-size="${h.actionSize}" data-gap="${h.actionGap}" data-map-style="${h.mapBtnStyle}">
-        ${h.showMapBtn ? `<div class="pv-map-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg><span>Map View</span></div>` : ""}
-        ${h.showAddrToggle ? `<div class="seg-toggle"><span class="seg-btn active" style="padding:3px 7px;font-size:0.68rem">IP</span><span class="seg-btn" style="padding:3px 7px;font-size:0.68rem">DNS</span></div>` : ""}
-        ${h.showRefreshBtn ? `<div class="pv-ico-btn">↻</div>` : ""}
-        <div class="pv-ico-btn">⚙</div>
-      </div>
-    </div>
-  </div>
-`;
+        `;
 
         // 2. Section Builders
         const sections = {};
@@ -3408,6 +4073,9 @@
           </div>
           ${footerHtml}
         `;
+        applyTopbarFlexMargins(
+          document.querySelector("#previewMount .pv-topbar-inner"),
+        );
       }
 
       /* ==========================================================================
