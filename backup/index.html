@@ -1094,6 +1094,130 @@
         transform: translateX(-50%) translateY(0);
       }
 
+      /* Map View Toggle Button */
+      .map-view-btn {
+        height: 36px;
+        padding: 0 12px;
+        border-radius: 10px;
+        border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--border));
+        background: var(--accent-soft);
+        color: var(--accent);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: 0.16s ease;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      .map-view-btn:hover {
+        background: var(--accent);
+        color: #031525;
+        border-color: var(--accent);
+        box-shadow: 0 4px 14px var(--accent-soft);
+      }
+
+      .map-count-pill {
+        font-size: 0.66rem;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--bg) 70%, transparent);
+        border: 1px solid currentColor;
+        line-height: 1.3;
+      }
+
+      /* Building Picker Modal Cards */
+      .bldg-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .bldg-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 13px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        cursor: pointer;
+        transition: 0.16s ease;
+      }
+
+      .bldg-card:hover {
+        border-color: var(--accent);
+        background: var(--card-hover);
+        transform: translateY(-1px);
+      }
+
+      .bldg-card-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .bldg-card-left {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        min-width: 0;
+      }
+
+      .bldg-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+      }
+
+      .bldg-title {
+        font-size: 0.94rem;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .bldg-meta {
+        font-size: 0.74rem;
+        color: var(--text-muted);
+      }
+
+      .bldg-floors-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+      }
+
+      .bldg-floor-chip {
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        cursor: pointer;
+        transition: 0.15s;
+      }
+
+      .bldg-floor-chip:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-soft);
+      }
+
       /* ==========================================================================
          6. RESPONSIVE BREAKPOINTS
          ========================================================================== */
@@ -1137,6 +1261,12 @@
         .seg-btn {
           padding: 5px 8px;
           font-size: 0.72rem;
+        }
+        .map-view-btn .map-btn-label {
+          display: none;
+        }
+        .map-view-btn {
+          padding: 0 9px;
         }
       }
     </style>
@@ -1290,7 +1420,7 @@
               <span id="hubSubtitle">ESP32 Central Gateway</span>
               <span class="status-pill">
                 <span class="dot checking" id="summaryDot"></span>
-                <span id="onlineCounter">0 / 0 Online</span>
+                <span id="onlineCounter">0 / 0</span>
               </span>
               <span
                 class="status-pill"
@@ -1326,6 +1456,34 @@
         </div>
 
         <div class="header-actions">
+          <button
+            type="button"
+            class="map-view-btn"
+            id="mapViewBtn"
+            title="Open Live Home Schematic"
+            onclick="openMapView()"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+              <line x1="8" y1="2" x2="8" y2="18" />
+              <line x1="16" y1="6" x2="16" y2="22" />
+            </svg>
+            <span class="map-btn-label">Map View</span>
+            <span
+              class="map-count-pill"
+              id="mapCountPill"
+              style="display: none"
+            ></span>
+          </button>
           <div
             class="seg-toggle"
             title="Switch primary address mode (IP vs mDNS)"
@@ -1511,6 +1669,34 @@
       </div>
     </div>
 
+    <!-- Building List Modal (Opens when 2+ buildings exist) -->
+    <div
+      class="modal-backdrop"
+      id="mapBuildingModal"
+      onclick="if (event.target === this) closeMapBuildingModal();"
+    >
+      <div class="modal">
+        <div class="modal-head">
+          <div>
+            <h3 style="margin: 0">Select Building</h3>
+            <div
+              style="
+                font-size: 0.74rem;
+                color: var(--text-muted);
+                margin-top: 2px;
+              "
+            >
+              Tap a building or jump straight to a specific floor
+            </div>
+          </div>
+          <button class="mini-btn" onclick="closeMapBuildingModal()">
+            &times;
+          </button>
+        </div>
+        <div class="bldg-list" id="mapBuildingList"></div>
+      </div>
+    </div>
+
     <!-- Two-Line Footer -->
     <footer>
       <div class="footer-inner">
@@ -1540,6 +1726,8 @@
       const STORAGE_KEY = "esp_iot_hub_config_v1";
       const LOCKOUT_STORAGE_KEY = "esp_iot_hub_lockout_v1";
       const KEY_SALT = "esp32_nvs_hub_v1_secret";
+      const DESIGN_STORAGE_KEY = "esp_iot_hub_building_design_v1";
+      let savedBuildings = [];
 
       const ICONS = {
         chip: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',
@@ -2663,7 +2851,7 @@
         );
 
         document.getElementById("onlineCounter").textContent =
-          `${online} / ${total} Online`;
+          `${online} / ${total}`;
 
         const summaryDot = document.getElementById("summaryDot");
         if (checking) {
@@ -2989,6 +3177,138 @@
         syncModalScrollLock();
       }
 
+      function normalizeBuildingsList(raw) {
+        if (!raw) return [];
+        const list = Array.isArray(raw)
+          ? raw
+          : raw.floors && Array.isArray(raw.floors)
+            ? [raw]
+            : [];
+        return list.filter(
+          (b) => b && Array.isArray(b.floors) && b.floors.length > 0,
+        );
+      }
+
+      async function loadSavedBuildings() {
+        if (!isOfflinePreview) {
+          try {
+            const res = await fetch("/api/design", { cache: "no-store" });
+            if (res.ok) {
+              const list = normalizeBuildingsList(await res.json());
+              savedBuildings = list;
+              localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(list));
+              updateMapViewBadge();
+              return list;
+            }
+          } catch (_) {}
+        }
+        try {
+          savedBuildings = normalizeBuildingsList(
+            JSON.parse(localStorage.getItem(DESIGN_STORAGE_KEY)),
+          );
+        } catch {
+          savedBuildings = [];
+        }
+        updateMapViewBadge();
+        return savedBuildings;
+      }
+
+      function updateMapViewBadge() {
+        const pill = document.getElementById("mapCountPill");
+        if (!pill) return;
+        if (savedBuildings.length > 1) {
+          pill.textContent = savedBuildings.length;
+          pill.style.display = "inline-block";
+        } else {
+          pill.style.display = "none";
+        }
+      }
+
+      function openLiveSchematic(buildingId, floorId = null, event = null) {
+        if (event) event.stopPropagation();
+        let url = `design.html?id=${encodeURIComponent(buildingId)}&mode=live`;
+        if (floorId) url += `&floor=${encodeURIComponent(floorId)}`;
+        window.location.href = url;
+      }
+
+      async function openMapView() {
+        const list = await loadSavedBuildings();
+
+        // 1 Building -> open Live Schematic directly
+        if (list.length === 1) {
+          openLiveSchematic(list[0].id);
+          return;
+        }
+
+        const box = document.getElementById("mapBuildingList");
+
+        // 0 Buildings -> friendly prompt to create one
+        if (!list.length) {
+          box.innerHTML = `
+            <div class="empty" style="padding:28px 14px">
+              <h3>No Building Blueprint Yet</h3>
+              <p>Create your first 2D smart home schematic to control lights and devices visually.</p>
+              <a href="design.html?new=1" class="btn-primary">+ Create Blueprint</a>
+            </div>
+          `;
+        } else {
+          // 2+ Buildings -> interactive cards with direct floor jump chips
+          box.innerHTML = list
+            .map((b) => {
+              const floorCount = b.floors.length;
+              const linkedCount = b.floors.reduce(
+                (sum, fl) =>
+                  sum +
+                  (fl.shapes || []).filter(
+                    (s) => s.link && s.link.type !== "none",
+                  ).length,
+                0,
+              );
+              const bIdSafe = escapeHtml(b.id);
+              const floorChips = b.floors
+                .map(
+                  (fl) => `
+                  <button
+                    type="button"
+                    class="bldg-floor-chip"
+                    onclick="openLiveSchematic('${bIdSafe}', '${escapeHtml(fl.id)}', event)"
+                  >
+                    ${escapeHtml(fl.code || fl.name)} &bull; ${escapeHtml(fl.name)}
+                  </button>
+                `,
+                )
+                .join("");
+
+              return `
+                <div class="bldg-card" onclick="openLiveSchematic('${bIdSafe}')">
+                  <div class="bldg-card-top">
+                    <div class="bldg-card-left">
+                      <div class="bldg-icon">${svgIcon("home", 20)}</div>
+                      <div style="min-width:0">
+                        <div class="bldg-title">${escapeHtml(b.name || "Smart Home")}</div>
+                        <div class="bldg-meta">
+                          ${floorCount} Floor${floorCount > 1 ? "s" : ""} &bull; ${linkedCount} Smart Control${linkedCount === 1 ? "" : "s"}
+                        </div>
+                      </div>
+                    </div>
+                    <span class="mini-btn" style="color:var(--accent);border-color:var(--accent)">Open &rarr;</span>
+                  </div>
+                  <div class="bldg-floors-row">${floorChips}</div>
+                </div>
+              `;
+            })
+            .join("");
+        }
+
+        document.getElementById("mapBuildingModal").classList.add("open");
+        syncModalScrollLock();
+      }
+
+      function closeMapBuildingModal() {
+        document.getElementById("mapBuildingModal").classList.remove("open");
+        syncModalScrollLock();
+      }
+
       function renderShortcuts() {
         const sec = document.getElementById("shortcutSection");
         const grid = document.getElementById("shortcutGrid");
@@ -3159,6 +3479,7 @@
         }
         document.body.classList.add("auth-ready");
         renderAll();
+        loadSavedBuildings();
         if (config.settings.autoPing) pingAllDevices();
       }
 
@@ -3190,6 +3511,7 @@
           e.preventDefault();
           searchInput.focus();
         } else if (e.key === "Escape") {
+          closeMapBuildingModal();
           closeFavCardModal();
           closeAuthModal();
           if (document.activeElement === searchInput) {
