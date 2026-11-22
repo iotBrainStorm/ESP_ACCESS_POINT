@@ -1426,7 +1426,14 @@
       <section class="panel" id="tab-scanner">
         <div class="panel-header">
           <h2>Discover Local Devices (<span id="scanCountLabel">0</span>)</h2>
-          <div style="display: flex; gap: 8px">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <button
+              class="btn"
+              id="detectNetBtn"
+              onclick="autoDetectScannerNetwork(true)"
+            >
+              Detect
+            </button>
             <button
               class="btn"
               id="resetScanBtn"
@@ -1461,11 +1468,36 @@
               id="scanRangePreview"
               style="color: var(--accent); font-family: monospace"
             >
-              Range: 192.168.0.1 – 192.168.0.255 : 80 (.local)
+              Detecting gateway &amp; subnet...
             </span>
           </div>
 
           <div class="form-grid">
+            <div class="field">
+              <label>Gateway IP</label>
+              <input
+                type="text"
+                id="scanGateway"
+                class="input"
+                style="font-family: monospace"
+                placeholder="192.168.1.1"
+                oninput="onManualGatewayOrMaskEdit()"
+              />
+            </div>
+
+            <div class="field">
+              <label>Subnet Mask</label>
+              <input
+                type="text"
+                id="scanSubnetMask"
+                class="input"
+                style="font-family: monospace"
+                value="255.255.255.0"
+                placeholder="255.255.255.0"
+                oninput="onManualGatewayOrMaskEdit()"
+              />
+            </div>
+
             <div class="field">
               <label>IP Range</label>
               <div style="display: flex; align-items: center; gap: 6px">
@@ -1477,7 +1509,10 @@
                   min="1"
                   max="254"
                   value="1"
-                  oninput="updateScanPreview()"
+                  oninput="
+                    scannerUserEdited = true;
+                    updateScanPreview();
+                  "
                 />
                 <span style="color: var(--text-muted); font-weight: 700"
                   >to</span
@@ -1490,20 +1525,35 @@
                   min="1"
                   max="254"
                   value="254"
-                  oninput="updateScanPreview()"
+                  oninput="
+                    scannerUserEdited = true;
+                    updateScanPreview();
+                  "
                 />
               </div>
             </div>
 
+            <div class="field">
+              <label>Scan Strategy</label>
+              <select
+                id="scanSpeedMode"
+                class="select"
+                onchange="updateScanPreview()"
+              >
+                <option value="smart" selected>Fast Smart Scan</option>
+                <option value="deep">Deep Multi-Port Scan</option>
+              </select>
+            </div>
+
             <div class="field" style="grid-column: span 2">
-              <label>Target Ports (Comma-Separated, Simultaneous Scan)</label>
+              <label>Target Ports</label>
               <input
                 type="text"
                 id="scanPort"
                 class="input"
                 style="font-family: monospace"
-                value="80, 443, 502, 1880, 3000, 8086, 6052, 1883, 8883, 8123, 8080, 8266"
-                placeholder="80, 443, 502, 1880, 3000, 8086, 6052, 1883, 8883"
+                value="80, 8080, 1880, 8123, 3000, 6052, 8086, 8266, 502, 1883, 8883"
+                placeholder="80, 8080, 1880, 8123, 3000"
                 oninput="updateScanPreview()"
               />
             </div>
@@ -1515,10 +1565,8 @@
                 class="select"
                 onchange="updateScanPreview()"
               >
-                <option value="iot" selected>
-                  IoT &amp; Smart Services Only (Skip PC/Phone/Cam)
-                </option>
-                <option value="all">All Responding Network Hosts</option>
+                <option value="iot" selected>IoT &amp; HTTP Nodes</option>
+                <option value="all">All Hosts</option>
               </select>
             </div>
 
@@ -2817,6 +2865,14 @@
       let scanAbortCtrl = null;
       let scannerInitialized = false;
       let lastScannedList = [];
+      let scannerUserEdited = false;
+      let gatewayDetectPromise = null;
+      let liveNetInfo = {
+        ip: "",
+        gateway: "",
+        subnet: "",
+        source: "",
+      };
 
       // Active Modal Item IDs
       let editingDeviceId = null;
@@ -3651,6 +3707,15 @@
             const stRes = await fetch("/api/status", { cache: "no-store" });
             if (stRes.ok) {
               const stData = await stRes.json();
+              if (stData.ip && isValidIpv4(stData.ip))
+                liveNetInfo.ip = stData.ip;
+              if (stData.gateway && isValidIpv4(stData.gateway))
+                liveNetInfo.gateway = stData.gateway;
+              if (stData.subnet && isValidIpv4(stData.subnet))
+                liveNetInfo.subnet = stData.subnet;
+              if (liveNetInfo.gateway || liveNetInfo.ip)
+                liveNetInfo.source = "ESP32";
+
               if (
                 stData.bootId &&
                 getLockoutData().bootSession !== String(stData.bootId)
@@ -5026,24 +5091,22 @@
         const net = ensureNetObject();
         const gwEl = document.getElementById("wifiLiveGw");
         const macEl = document.getElementById("wifiLiveMac");
-        if (!gwEl.textContent || gwEl.textContent.trim() === "--") {
-          gwEl.textContent = net.gateway || "192.168.0.1";
-        }
-        if (!macEl.textContent || macEl.textContent.trim() === "--") {
-          macEl.textContent = "A0:B7:65:FE:12:9C";
-        }
 
         if (isOfflinePreview) {
           const rssi = -52;
+          const detectedGw =
+            liveNetInfo.gateway || net.gateway || "192.168.1.1";
+          const detectedIp =
+            liveNetInfo.ip ||
+            (net.mode === "static" && net.staticIp
+              ? net.staticIp
+              : "Preview Mode");
           document.getElementById("wifiLiveRssi").textContent =
             `Signal: ${rssi} dBm (${rssiToPct(rssi)}%)`;
           document.getElementById("wifiLiveSsid").textContent =
-            "Home_Fiber_2.4G";
-          document.getElementById("wifiLiveIp").textContent =
-            net.mode === "static" && net.staticIp
-              ? net.staticIp
-              : "192.168.0.105";
-          gwEl.textContent = net.gateway || "192.168.0.1";
+            "Live Server Preview";
+          document.getElementById("wifiLiveIp").textContent = detectedIp;
+          gwEl.textContent = detectedGw;
           macEl.textContent = "A0:B7:65:FE:12:9C";
           return;
         }
@@ -5051,6 +5114,12 @@
           const res = await fetch("/api/status", { cache: "no-store" });
           if (!res.ok) return;
           const d = await res.json();
+          if (d.ip && isValidIpv4(d.ip)) liveNetInfo.ip = d.ip;
+          if (d.gateway && isValidIpv4(d.gateway))
+            liveNetInfo.gateway = d.gateway;
+          if (d.subnet && isValidIpv4(d.subnet)) liveNetInfo.subnet = d.subnet;
+          liveNetInfo.source = "ESP32";
+
           if (d.rssi !== undefined) {
             document.getElementById("wifiLiveRssi").textContent =
               `Signal: ${d.rssi} dBm (${rssiToPct(d.rssi)}%)`;
@@ -5058,9 +5127,11 @@
           document.getElementById("wifiLiveSsid").textContent =
             d.ssid || "Connected";
           document.getElementById("wifiLiveIp").textContent =
-            d.ip || location.hostname || "192.168.0.105";
-          gwEl.textContent = d.gateway || net.gateway || "192.168.0.1";
-          macEl.textContent = d.mac || "A0:B7:65:FE:12:9C";
+            d.ip || location.hostname || "0.0.0.0";
+          gwEl.textContent = d.gateway || net.gateway || "192.168.1.1";
+          macEl.textContent = d.mac || "00:00:00:00:00:00";
+
+          if (!scannerUserEdited) syncScannerWithGateway(false);
         } catch (_) {}
       }
 
@@ -5150,7 +5221,7 @@
          12. TAB 6: LAN IOT DEVICE SCANNER
          ============================================================================ */
       const DEFAULT_SCAN_PORTS =
-        "80, 443, 502, 1880, 3000, 8086, 6052, 1883, 8883, 8123, 8080, 8266";
+        "80, 8080, 1880, 8123, 3000, 6052, 8086, 8266, 502, 1883, 8883";
 
       const PORT_SERVICE_MAP = {
         80: { label: "HTTP Web / ESP", proto: "http", dedicatedIoT: false },
@@ -5194,35 +5265,422 @@
         "synology",
       ];
 
+      // Common router / hotspot / ESP AP gateways for auto-detection on VS Code Live Server (127.0.0.1)
+      const COMMON_GATEWAYS = [
+        "192.168.1.1",
+        "192.168.0.1",
+        "192.168.29.1",
+        "192.168.31.1",
+        "192.168.2.1",
+        "192.168.10.1",
+        "192.168.100.1",
+        "192.168.43.1",
+        "192.168.137.1",
+        "192.168.4.1",
+        "192.168.50.1",
+        "192.168.68.1",
+        "10.0.0.1",
+        "172.20.10.1",
+        "192.168.1.254",
+        "192.168.0.254",
+      ];
+
+      function sleepMs(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
       function parseScanPorts(raw) {
         const parsed = String(raw || DEFAULT_SCAN_PORTS)
           .split(/[,\s;]+/)
           .map((p) => Number(p.trim()))
           .filter((p) => Number.isInteger(p) && p >= 1 && p <= 65535);
-        return [...new Set(parsed)].length
-          ? [...new Set(parsed)]
-          : [
-              80, 443, 502, 1880, 3000, 8086, 6052, 1883, 8883, 8123, 8080,
-              8266,
-            ];
+        const unique = [...new Set(parsed)];
+        return unique.length ? unique : [80, 8080, 1880, 8123, 3000];
+      }
+
+      function ipv4ToInt(ip) {
+        if (!isValidIpv4(ip)) return null;
+        const p = ip.trim().split(".").map(Number);
+        return (((p[0] << 24) >>> 0) | (p[1] << 16) | (p[2] << 8) | p[3]) >>> 0;
+      }
+
+      function intToIpv4(num) {
+        return [
+          (num >>> 24) & 255,
+          (num >>> 16) & 255,
+          (num >>> 8) & 255,
+          num & 255,
+        ].join(".");
+      }
+
+      function isValidSubnetMask(mask) {
+        const m = ipv4ToInt(mask);
+        if (m === null || m === 0 || m === 0xffffffff) return false;
+        const inv = ~m >>> 0;
+        return ((inv + 1) & inv) === 0;
+      }
+
+      function maskToCidr(mask) {
+        const m = ipv4ToInt(mask);
+        if (m === null) return 24;
+        let bits = 0;
+        let v = m;
+        while (v) {
+          bits += v & 1;
+          v >>>= 1;
+        }
+        return bits;
+      }
+
+      function inferDefaultMaskFromGateway(gwIp) {
+        if (!isValidIpv4(gwIp)) return "255.255.255.0";
+        const first = Number(gwIp.split(".")[0]);
+        // Home/LAN subnets almost universally use /24; keep /24 safe for scanning
+        if (first === 192 || first === 10 || first === 172) {
+          return "255.255.255.0";
+        }
+        return "255.255.255.0";
+      }
+
+      function deriveSubnetFromGateway(gatewayIp, subnetMask) {
+        const gwInt = ipv4ToInt(gatewayIp);
+        if (gwInt === null) return null;
+
+        const mask = isValidSubnetMask(subnetMask)
+          ? subnetMask.trim()
+          : inferDefaultMaskFromGateway(gatewayIp);
+        const maskInt = ipv4ToInt(mask);
+        const netInt = (gwInt & maskInt) >>> 0;
+        const bcastInt = (netInt | (~maskInt >>> 0)) >>> 0;
+
+        const firstUsable = (netInt + 1) >>> 0;
+        const lastUsable = (bcastInt - 1) >>> 0;
+        const prefix = intToIpv4(gwInt).split(".").slice(0, 3).join(".");
+        const blockStartInt = ipv4ToInt(`${prefix}.1`);
+        const blockEndInt = ipv4ToInt(`${prefix}.254`);
+
+        const clampedStart = Math.max(firstUsable, blockStartInt);
+        const clampedEnd = Math.min(lastUsable, blockEndInt);
+
+        return {
+          gateway: intToIpv4(gwInt),
+          subnetMask: mask,
+          cidr: maskToCidr(mask),
+          network: intToIpv4(netInt),
+          prefix,
+          startHost: clampedStart & 255,
+          endHost: clampedEnd & 255,
+        };
       }
 
       function getActiveGatewayIp() {
+        const typedGw = document.getElementById("scanGateway")?.value?.trim();
+        if (isValidIpv4(typedGw)) return typedGw;
+        if (isValidIpv4(liveNetInfo.gateway)) return liveNetInfo.gateway;
+        if (
+          isValidIpv4(location.hostname) &&
+          !location.hostname.startsWith("127.")
+        ) {
+          return location.hostname.split(".").slice(0, 3).join(".") + ".1";
+        }
         const net = ensureNetObject();
-        const liveGw = document
-          .getElementById("wifiLiveGw")
-          ?.textContent?.trim();
-        if (liveGw && isValidIpv4(liveGw)) return liveGw;
-        if (net.gateway && isValidIpv4(net.gateway)) return net.gateway.trim();
-        return "192.168.0.1";
+        if (isValidIpv4(net.gateway)) return net.gateway.trim();
+        return "192.168.1.1";
+      }
+
+      function getActiveSubnetMask() {
+        const typedMask = document
+          .getElementById("scanSubnetMask")
+          ?.value?.trim();
+        if (isValidSubnetMask(typedMask)) return typedMask;
+        if (isValidSubnetMask(liveNetInfo.subnet)) return liveNetInfo.subnet;
+        const net = ensureNetObject();
+        if (isValidSubnetMask(net.subnet)) return net.subnet.trim();
+        return inferDefaultMaskFromGateway(getActiveGatewayIp());
       }
 
       function getGatewayPrefix() {
         const gw = getActiveGatewayIp();
-        const parts = gw.split(".");
-        return parts.length === 4
-          ? `${parts[0]}.${parts[1]}.${parts[2]}`
-          : "192.168.0";
+        return gw.split(".").slice(0, 3).join(".");
+      }
+
+      // Bonus hint: try WebRTC ICE candidate for local LAN IP when on 127.0.0.1
+      function tryGetLocalIpViaWebRtc(timeoutMs = 700) {
+        return new Promise((resolve) => {
+          try {
+            const RTCPeer =
+              window.RTCPeerConnection || window.webkitRTCPeerConnection;
+            if (!RTCPeer) return resolve(null);
+            const pc = new RTCPeer({ iceServers: [] });
+            let settled = false;
+            const done = (ip) => {
+              if (settled) return;
+              settled = true;
+              try {
+                pc.close();
+              } catch (_) {}
+              resolve(ip);
+            };
+            const timer = setTimeout(() => done(null), timeoutMs);
+            pc.createDataChannel("lan");
+            pc.onicecandidate = (e) => {
+              const cand = e?.candidate?.candidate;
+              if (!cand) return;
+              const match = cand.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+              if (
+                match &&
+                isValidIpv4(match[1]) &&
+                !match[1].startsWith("127.") &&
+                !match[1].startsWith("0.")
+              ) {
+                clearTimeout(timer);
+                done(match[1]);
+              }
+            };
+            pc.createOffer()
+              .then((offer) => pc.setLocalDescription(offer))
+              .catch(() => {
+                clearTimeout(timer);
+                done(null);
+              });
+          } catch {
+            resolve(null);
+          }
+        });
+      }
+
+      // Lightweight probe: resolves on ANY HTTP status (200/301/401/404/405/500) without downloading heavy HTML
+      async function probeHttpEndpoint(
+        host,
+        port,
+        timeoutMs = 850,
+        parentSignal = null,
+        path = "/favicon.ico",
+      ) {
+        const info = PORT_SERVICE_MAP[port];
+        if (info && (info.proto === "tcp" || info.proto === "https")) {
+          return { open: false, alive: false, ms: null, skipped: true };
+        }
+
+        const ctrl = new AbortController();
+        let timedOut = false;
+        const timer = setTimeout(() => {
+          timedOut = true;
+          ctrl.abort();
+        }, timeoutMs);
+
+        const onAbort = () => ctrl.abort();
+        if (parentSignal) {
+          if (parentSignal.aborted) {
+            clearTimeout(timer);
+            return { open: false, alive: false, ms: null };
+          }
+          parentSignal.addEventListener("abort", onAbort, { once: true });
+        }
+
+        const start = performance.now();
+        try {
+          await fetch(`http://${host}:${port}${path}`, {
+            mode: "no-cors",
+            cache: "no-store",
+            credentials: "omit",
+            signal: ctrl.signal,
+          });
+          const ms = Math.max(1, Math.round(performance.now() - start));
+          return { open: true, alive: true, ms };
+        } catch {
+          const elapsed = performance.now() - start;
+          if (parentSignal?.aborted) {
+            return { open: false, alive: false, ms: null };
+          }
+          // Fast rejection well below timeout indicates a live LAN host sending TCP RST
+          const isFastRst = !timedOut && elapsed >= 2 && elapsed < 250;
+          return {
+            open: false,
+            alive: isFastRst,
+            ms: isFastRst ? Math.round(elapsed) : null,
+          };
+        } finally {
+          clearTimeout(timer);
+          if (parentSignal) parentSignal.removeEventListener("abort", onAbort);
+        }
+      }
+
+      async function autoDetectScannerNetwork(showFeedback = false) {
+        if (gatewayDetectPromise) return gatewayDetectPromise;
+
+        gatewayDetectPromise = (async () => {
+          const detectBtn = document.getElementById("detectNetBtn");
+          const badge = document.getElementById("scanRangePreview");
+          if (detectBtn) {
+            detectBtn.disabled = true;
+            detectBtn.textContent = "Detecting...";
+          }
+          if (badge) badge.textContent = "Detecting device gateway & subnet...";
+
+          let detectedGw = "";
+          let detectedMask = "";
+          let sourceLabel = "";
+
+          // 1. Real ESP32 /api/status (works on ESP32 IP, mDNS .local, and Live Server proxy)
+          if (!isOfflinePreview) {
+            try {
+              const res = await fetch("/api/status", { cache: "no-store" });
+              if (res.ok) {
+                const d = await res.json();
+                if (d.ip && isValidIpv4(d.ip)) liveNetInfo.ip = d.ip;
+                if (d.gateway && isValidIpv4(d.gateway)) {
+                  detectedGw = d.gateway;
+                  liveNetInfo.gateway = d.gateway;
+                } else if (d.ip && isValidIpv4(d.ip)) {
+                  detectedGw = d.ip.split(".").slice(0, 3).join(".") + ".1";
+                }
+                if (d.subnet && isValidSubnetMask(d.subnet)) {
+                  detectedMask = d.subnet;
+                  liveNetInfo.subnet = d.subnet;
+                }
+                if (detectedGw) sourceLabel = "ESP32 Gateway";
+              }
+            } catch (_) {}
+          }
+
+          // 2. Live Server opened on PC's LAN IP (useLocalIp: true) or ESP32 direct IP
+          if (
+            !detectedGw &&
+            isValidIpv4(location.hostname) &&
+            !location.hostname.startsWith("127.")
+          ) {
+            detectedGw =
+              location.hostname.split(".").slice(0, 3).join(".") + ".1";
+            detectedMask = inferDefaultMaskFromGateway(detectedGw);
+            liveNetInfo.ip = location.hostname;
+            liveNetInfo.gateway = detectedGw;
+            liveNetInfo.subnet = detectedMask;
+            sourceLabel = isOfflinePreview ? "Live Server IP" : "Hub IP";
+          }
+
+          // 3. VS Code Live Server on 127.0.0.1 -> Auto-discover real router gateway in parallel
+          if (!detectedGw) {
+            const candidateSet = new Set();
+
+            // Priority A: WebRTC local IP hint (if browser allows it)
+            const rtcIp = await tryGetLocalIpViaWebRtc(600);
+            if (rtcIp) {
+              candidateSet.add(rtcIp.split(".").slice(0, 3).join(".") + ".1");
+              liveNetInfo.ip = rtcIp;
+            }
+
+            // Priority B: Subnets already used by saved devices/shortcuts
+            (config.devices || []).forEach((d) => {
+              if (isValidIpv4(d.ip)) {
+                candidateSet.add(d.ip.split(".").slice(0, 3).join(".") + ".1");
+              }
+            });
+            (config.shortcuts || []).forEach((s) => {
+              if (isValidIpv4(s.host)) {
+                candidateSet.add(
+                  s.host.split(".").slice(0, 3).join(".") + ".1",
+                );
+              }
+            });
+
+            // Priority C: Configured network gateway + common home router gateways
+            const net = ensureNetObject();
+            if (isValidIpv4(net.gateway)) candidateSet.add(net.gateway.trim());
+            COMMON_GATEWAYS.forEach((gw) => candidateSet.add(gw));
+
+            const candidates = [...candidateSet];
+            const probeChecks = await Promise.all(
+              candidates.map(async (gw) => {
+                const r = await probeHttpEndpoint(gw, 80, 900, null, "/");
+                return r.open ? { gw, ms: r.ms } : null;
+              }),
+            );
+
+            const winner = probeChecks
+              .filter(Boolean)
+              .sort((a, b) => a.ms - b.ms)[0];
+
+            if (winner) {
+              detectedGw = winner.gw;
+              detectedMask = inferDefaultMaskFromGateway(detectedGw);
+              liveNetInfo.gateway = detectedGw;
+              liveNetInfo.subnet = detectedMask;
+              sourceLabel = "Auto-Detected Router";
+            } else if (rtcIp) {
+              detectedGw = rtcIp.split(".").slice(0, 3).join(".") + ".1";
+              detectedMask = inferDefaultMaskFromGateway(detectedGw);
+              liveNetInfo.gateway = detectedGw;
+              liveNetInfo.subnet = detectedMask;
+              sourceLabel = "Local Interface";
+            } else {
+              // Last fallback: saved device subnet or config.network.gateway
+              const firstSaved = (config.devices || []).find((d) =>
+                isValidIpv4(d.ip),
+              );
+              detectedGw = firstSaved
+                ? firstSaved.ip.split(".").slice(0, 3).join(".") + ".1"
+                : isValidIpv4(net.gateway)
+                  ? net.gateway.trim()
+                  : "192.168.1.1";
+              detectedMask = isValidSubnetMask(net.subnet)
+                ? net.subnet.trim()
+                : "255.255.255.0";
+              sourceLabel = "Fallback (Verify GW)";
+            }
+          }
+
+          if (!isValidSubnetMask(detectedMask)) {
+            detectedMask = inferDefaultMaskFromGateway(detectedGw);
+          }
+
+          liveNetInfo.source = sourceLabel;
+          const derived = deriveSubnetFromGateway(detectedGw, detectedMask);
+
+          if (derived) {
+            const gwInput = document.getElementById("scanGateway");
+            const maskInput = document.getElementById("scanSubnetMask");
+            const startInput = document.getElementById("scanIpStart");
+            const endInput = document.getElementById("scanIpEnd");
+
+            if (gwInput) gwInput.value = derived.gateway;
+            if (maskInput) maskInput.value = derived.subnetMask;
+            if (startInput) startInput.value = derived.startHost;
+            if (endInput) endInput.value = derived.endHost;
+            scannerUserEdited = false;
+          }
+
+          updateScanPreview();
+
+          if (detectBtn) {
+            detectBtn.disabled = false;
+            detectBtn.textContent = "Detect";
+          }
+          if (showFeedback && derived) {
+            showToast(
+              `Gateway ${derived.gateway} /${derived.cidr} (${sourceLabel})`,
+            );
+          }
+          return derived;
+        })().finally(() => {
+          gatewayDetectPromise = null;
+        });
+
+        return gatewayDetectPromise;
+      }
+
+      function onManualGatewayOrMaskEdit() {
+        scannerUserEdited = true;
+        const gw = document.getElementById("scanGateway")?.value?.trim();
+        const mask = document.getElementById("scanSubnetMask")?.value?.trim();
+        if (isValidIpv4(gw) && isValidSubnetMask(mask)) {
+          const derived = deriveSubnetFromGateway(gw, mask);
+          if (derived) {
+            document.getElementById("scanIpStart").value = derived.startHost;
+            document.getElementById("scanIpEnd").value = derived.endHost;
+          }
+        }
+        updateScanPreview();
       }
 
       function syncScannerWithGateway(forceReset = false) {
@@ -5230,80 +5688,67 @@
         if (!startEl) return;
 
         if (!scannerInitialized || forceReset) {
-          startEl.value = 1;
-          document.getElementById("scanIpEnd").value = 254;
           document.getElementById("scanPort").value = DEFAULT_SCAN_PORTS;
           document.getElementById("scanTld").value = ".local";
           const fm = document.getElementById("scanFilterMode");
           if (fm) fm.value = "iot";
+          const sm = document.getElementById("scanSpeedMode");
+          if (sm) sm.value = "smart";
           scannerInitialized = true;
+          scannerUserEdited = false;
+          autoDetectScannerNetwork(false);
+        } else if (
+          !scannerUserEdited &&
+          !isValidIpv4(document.getElementById("scanGateway")?.value)
+        ) {
+          autoDetectScannerNetwork(false);
+        } else {
+          updateScanPreview();
         }
-        updateScanPreview();
       }
 
       function resetScannerDefaults() {
+        scannerUserEdited = false;
         syncScannerWithGateway(true);
-        showToast("Scanner reset to default IoT multi-port profile");
+        showToast("Scanner reset & re-detecting gateway...");
       }
 
       function updateScanPreview() {
-        const prefix = getGatewayPrefix();
+        const gw = getActiveGatewayIp();
+        const mask = getActiveSubnetMask();
+        const derived = deriveSubnetFromGateway(gw, mask);
+        const prefix = derived ? derived.prefix : getGatewayPrefix();
+        const cidr = derived ? derived.cidr : 24;
         const start =
           Number(document.getElementById("scanIpStart")?.value) || 1;
         const end = Number(document.getElementById("scanIpEnd")?.value) || 254;
         const ports = parseScanPorts(
           document.getElementById("scanPort")?.value,
         );
-        const tld = normalizeTld(document.getElementById("scanTld")?.value);
-        const mode =
-          document.getElementById("scanFilterMode")?.value === "all"
-            ? "All"
-            : "IoT Only";
+        const modeTag = isOfflinePreview ? "Browser/Live" : "ESP32";
+        const srcTag = liveNetInfo.source ? ` • ${liveNetInfo.source}` : "";
 
         const badge = document.getElementById("scanRangePreview");
         if (badge) {
-          badge.textContent = `${prefix}.${start}–${end} | ${ports.length} Port(s) | ${mode} (${tld})`;
+          badge.textContent = `${prefix}.${start}–${end}/${cidr} | ${ports.length} Port(s) | ${modeTag}${srcTag}`;
         }
       }
 
+      // Wrapper used by "Ping Again" button
       async function measureIoTPing(
         host,
         port,
-        timeoutMs = 650,
+        timeoutMs = 1500,
         parentSignal = null,
       ) {
-        const info = PORT_SERVICE_MAP[port];
-        // Browsers cannot open raw TCP sockets (Modbus 502 / MQTT 1883,8883)
-        if (info && info.proto === "tcp") {
-          return { ok: false, ms: null, skippedBrowserTcp: true };
-        }
-        const scheme = port === 443 ? "https" : "http";
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-        const onAbort = () => ctrl.abort();
-        if (parentSignal) {
-          if (parentSignal.aborted) {
-            clearTimeout(timer);
-            return { ok: false, ms: null };
-          }
-          parentSignal.addEventListener("abort", onAbort, { once: true });
-        }
-
-        const start = performance.now();
-        try {
-          await fetch(`${scheme}://${host}:${port}/`, {
-            mode: "no-cors",
-            cache: "no-store",
-            signal: ctrl.signal,
-          });
-          const ms = Math.max(1, Math.round(performance.now() - start));
-          return { ok: true, ms };
-        } catch {
-          return { ok: false, ms: null };
-        } finally {
-          clearTimeout(timer);
-          if (parentSignal) parentSignal.removeEventListener("abort", onAbort);
-        }
+        const res = await probeHttpEndpoint(
+          host,
+          port,
+          timeoutMs,
+          parentSignal,
+          "/favicon.ico",
+        );
+        return { ok: res.open, ms: res.ms };
       }
 
       function isLikelyNonTarget(text) {
@@ -5314,8 +5759,8 @@
       async function identifyIoTDevice(ip, port, tld, parentSignal) {
         const lastOctet = ip.split(".")[3];
         const portMeta = PORT_SERVICE_MAP[port];
-        const scheme = port === 443 ? "https" : "http";
 
+        // 1. Instant match against saved devices/shortcuts
         const savedDev = config.devices.find((d) => d.ip === ip);
         if (savedDev) {
           return {
@@ -5337,31 +5782,19 @@
           };
         }
 
-        // Targeted IoT & Automation Fingerprints
+        // 2. Parallel lightweight JSON fingerprinting (max 500ms total)
         const probes = [];
-        if (port === 1880)
-          probes.push({ path: "/settings", type: "Node-RED", key: "version" });
-        else if (port === 3000)
-          probes.push({
-            path: "/api/health",
-            type: "Grafana",
-            key: "database",
-          });
-        else if (port === 8086)
-          probes.push({ path: "/health", type: "InfluxDB", key: "status" });
-        else if (port === 8123)
-          probes.push({
-            path: "/api/",
-            type: "Home Assistant",
-            key: "message",
-          });
-        else if (port === 6052)
-          probes.push({
-            path: "/devices",
-            type: "ESPHome Dashboard",
-            key: "configured",
-          });
-        else {
+        if (port === 1880) {
+          probes.push({ path: "/settings", type: "Node-RED" });
+        } else if (port === 3000) {
+          probes.push({ path: "/api/health", type: "Grafana" });
+        } else if (port === 8086) {
+          probes.push({ path: "/health", type: "InfluxDB" });
+        } else if (port === 8123) {
+          probes.push({ path: "/api/", type: "Home Assistant" });
+        } else if (port === 6052) {
+          probes.push({ path: "/devices", type: "ESPHome Dashboard" });
+        } else {
           probes.push(
             { path: "/api/status", type: "ESP32 IoT Hub/Node" },
             { path: "/api/switches", type: "ESP Smart Switch" },
@@ -5371,66 +5804,74 @@
           );
         }
 
-        for (const p of probes) {
-          if (parentSignal?.aborted) break;
-          const ctrl = new AbortController();
-          const t = setTimeout(() => ctrl.abort(), 380);
-          try {
-            const res = await fetch(`${scheme}://${ip}:${port}${p.path}`, {
-              cache: "no-store",
-              signal: ctrl.signal,
-            });
-            clearTimeout(t);
-            if (res.ok) {
+        const probeResults = await Promise.allSettled(
+          probes.map(async (p) => {
+            if (parentSignal?.aborted) throw new Error("aborted");
+            const ctrl = new AbortController();
+            const t = setTimeout(() => ctrl.abort(), 500);
+            try {
+              const res = await fetch(`http://${ip}:${port}${p.path}`, {
+                cache: "no-store",
+                signal: ctrl.signal,
+              });
+              if (!res.ok) throw new Error("http");
               const rawText = await res.text();
-              if (isLikelyNonTarget(rawText)) {
-                return {
-                  name: `non-target-${lastOctet}`,
-                  type: "Filtered Device",
-                  mdns: "",
-                  isVerifiedIoT: false,
-                  rejected: true,
-                };
-              }
-              let data = {};
-              try {
-                data = JSON.parse(rawText);
-              } catch (_) {}
-              const detectedName =
-                data.name ||
-                data.hostname ||
-                data.mdns ||
-                data.device ||
-                data.title ||
-                data.Status?.DeviceName ||
-                `${p.type.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${lastOctet}`;
-              return {
-                name: detectedName,
-                type: p.type,
-                mdns: formatDeviceMdns(data.mdns || detectedName, tld),
-                isVerifiedIoT: true,
-              };
+              return { p, rawText };
+            } finally {
+              clearTimeout(t);
             }
-          } catch {
-            clearTimeout(t);
+          }),
+        );
+
+        for (const r of probeResults) {
+          if (r.status !== "fulfilled") continue;
+          const { p, rawText } = r.value;
+          if (isLikelyNonTarget(rawText)) {
+            return {
+              name: `non-target-${lastOctet}`,
+              type: "Filtered Device",
+              mdns: "",
+              isVerifiedIoT: false,
+              rejected: true,
+            };
           }
+          let data = {};
+          try {
+            data = JSON.parse(rawText);
+          } catch (_) {}
+          const detectedName =
+            data.name ||
+            data.hostname ||
+            data.mdns ||
+            data.device ||
+            data.title ||
+            data.Status?.DeviceName ||
+            `${p.type.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${lastOctet}`;
+          return {
+            name: detectedName,
+            type: p.type,
+            mdns: formatDeviceMdns(data.mdns || detectedName, tld),
+            isVerifiedIoT: true,
+          };
         }
 
-        // Dedicated IoT service ports (1880, 3000, 8086, 6052, 8123, 502, 1883, 8883, 8266) count as IoT even without CORS JSON
         if (portMeta?.dedicatedIoT) {
+          const slug = portMeta.label
+            .replace(/[^a-zA-Z0-9]+/g, "-")
+            .toLowerCase();
           return {
-            name: `${portMeta.label.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase()}-${lastOctet}`,
+            name: `${slug}-${lastOctet}`,
             type: portMeta.label,
-            mdns: formatDeviceMdns(`${portMeta.label}-${lastOctet}`, tld),
+            mdns: formatDeviceMdns(`${slug}-${lastOctet}`, tld),
             isVerifiedIoT: true,
           };
         }
 
         return {
-          name: `host-${lastOctet}`,
-          type: portMeta?.label || `Port ${port} Host`,
-          mdns: `host-${lastOctet}${tld}`,
-          isVerifiedIoT: false,
+          name: `device-${lastOctet}`,
+          type: portMeta ? `${portMeta.label}` : `HTTP :${port}`,
+          mdns: `device-${lastOctet}${tld}`,
+          isVerifiedIoT: true,
         };
       }
 
@@ -5450,20 +5891,38 @@
           return showToast("Scan stopped");
         }
 
+        if (location.protocol === "https:") {
+          showToast("Open Hub over HTTP (not HTTPS) for LAN scanning");
+        }
+
+        // Wait for any in-progress gateway auto-detection first
+        if (gatewayDetectPromise) {
+          await gatewayDetectPromise;
+        } else if (
+          !isValidIpv4(document.getElementById("scanGateway")?.value)
+        ) {
+          await autoDetectScannerNetwork(false);
+        }
+
         const gatewayIp = getActiveGatewayIp();
-        const prefix = getGatewayPrefix();
+        const subnetMask = getActiveSubnetMask();
+        const derived = deriveSubnetFromGateway(gatewayIp, subnetMask);
+        const prefix = derived ? derived.prefix : getGatewayPrefix();
+
         let startIp = Math.max(
           1,
           Math.min(
             254,
-            Number(document.getElementById("scanIpStart").value) || 1,
+            Number(document.getElementById("scanIpStart").value) ||
+              (derived ? derived.startHost : 1),
           ),
         );
         let endIp = Math.max(
           1,
           Math.min(
             254,
-            Number(document.getElementById("scanIpEnd").value) || 254,
+            Number(document.getElementById("scanIpEnd").value) ||
+              (derived ? derived.endHost : 254),
           ),
         );
         if (startIp > endIp) [startIp, endIp] = [endIp, startIp];
@@ -5471,6 +5930,8 @@
         const ports = parseScanPorts(document.getElementById("scanPort").value);
         const iotOnly =
           document.getElementById("scanFilterMode")?.value !== "all";
+        const isDeepMode =
+          document.getElementById("scanSpeedMode")?.value === "deep";
         const tld = normalizeTld(document.getElementById("scanTld").value);
         document.getElementById("scanTld").value = tld;
 
@@ -5479,38 +5940,138 @@
         isScanningLan = true;
         scanAbortCtrl = new AbortController();
         lastScannedList = [];
+        const seenMap = new Map();
+        const pendingFingerprints = [];
+
+        const upsertDiscovered = (entry) => {
+          const key = `${entry.ip}:${entry.port}`;
+          const existing = seenMap.get(key);
+          if (existing) {
+            Object.assign(existing, entry);
+          } else {
+            seenMap.set(key, entry);
+            lastScannedList.push(entry);
+          }
+          lastScannedList.sort(
+            (a, b) =>
+              Number(a.ip.split(".")[3]) - Number(b.ip.split(".")[3]) ||
+              a.port - b.port,
+          );
+          renderScannedDevices();
+        };
+
+        const removeDiscovered = (ip, port) => {
+          const key = `${ip}:${port}`;
+          if (!seenMap.has(key)) return;
+          seenMap.delete(key);
+          lastScannedList = lastScannedList.filter(
+            (x) => !(x.ip === ip && x.port === port),
+          );
+          renderScannedDevices();
+        };
+
+        // Immediately show found host, then enrich name/type asynchronously without stalling scan workers
+        const recordLiveHit = (ip, port, pingMs) => {
+          const octet = ip.split(".")[3];
+          const portMeta = PORT_SERVICE_MAP[port];
+          const savedDev = config.devices.find((d) => d.ip === ip);
+          const savedSc = (config.shortcuts || []).find((s) => s.host === ip);
+          const initName = savedDev?.name || savedSc?.name || `device-${octet}`;
+          const initType =
+            savedDev?.note ||
+            (savedSc
+              ? "Smart Switch Node"
+              : portMeta?.label || `HTTP :${port}`);
+
+          upsertDiscovered({
+            name: initName,
+            type: initType,
+            ip,
+            mdns: formatDeviceMdns(savedDev?.mdns || initName, tld),
+            port,
+            pingMs,
+            online: true,
+          });
+
+          const fpJob = identifyIoTDevice(ip, port, tld, scanAbortCtrl.signal)
+            .then((info) => {
+              if (scanAbortCtrl.signal.aborted) return;
+              if (info.rejected && iotOnly) {
+                removeDiscovered(ip, port);
+                return;
+              }
+              upsertDiscovered({
+                name: info.name,
+                type: info.type,
+                ip,
+                mdns: info.mdns,
+                port,
+                pingMs,
+                online: true,
+              });
+            })
+            .catch(() => {});
+
+          pendingFingerprints.push(fpJob);
+        };
+
         document.getElementById("scanCountLabel").textContent = "0";
         btn.textContent = "Stop";
         progWrap.style.display = "block";
         fill.style.width = "2%";
         pctTxt.textContent = "0%";
-        statusTxt.textContent = `Scanning ${prefix}.${startIp}–${endIp} across ${ports.length} port(s)...`;
-        out.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">Scanning ${prefix}.${startIp}–${endIp} on ports: <code>${ports.join(", ")}</code>...</div>`;
+        statusTxt.textContent = `Scanning ${prefix}.${startIp}–${endIp} (GW: ${gatewayIp}, Mask: ${subnetMask})...`;
+        out.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">Scanning <strong>${prefix}.${startIp}–${endIp}</strong> (${subnetMask})...</div>`;
 
         try {
-          let usedBackendScan = false;
+          let backendHandled = false;
 
-          // 1. Prefer ESP32 native backend scan (supports raw TCP 502/1883/8883 + mDNS + MAC/Banner filtering)
+          // 1. Native ESP32 backend scan (25s timeout so ESP32 finishes mDNS + TCP 502/1883/8883)
           if (!isOfflinePreview) {
+            statusTxt.textContent = `Running ESP32 native scan on ${prefix}.${startIp}–${endIp}...`;
+            const backendCtrl = new AbortController();
+            const backendTimer = setTimeout(() => backendCtrl.abort(), 25000);
+            const onOuterAbort = () => backendCtrl.abort();
+            scanAbortCtrl.signal.addEventListener("abort", onOuterAbort, {
+              once: true,
+            });
+
             try {
-              const query = `?subnet=${encodeURIComponent(prefix)}&start=${startIp}&end=${endIp}&ports=${encodeURIComponent(ports.join(","))}&iotOnly=${iotOnly ? 1 : 0}&tld=${encodeURIComponent(tld)}`;
+              const query =
+                `?gateway=${encodeURIComponent(gatewayIp)}` +
+                `&subnet=${encodeURIComponent(prefix)}` +
+                `&mask=${encodeURIComponent(subnetMask)}` +
+                `&start=${startIp}&end=${endIp}` +
+                `&ports=${encodeURIComponent(ports.join(","))}` +
+                `&iotOnly=${iotOnly ? 1 : 0}` +
+                `&tld=${encodeURIComponent(tld)}`;
+
               const res = await fetch(`/api/scan${query}`, {
                 cache: "no-store",
-                signal: scanAbortCtrl.signal,
+                signal: backendCtrl.signal,
               });
-              if (res.ok) {
+              const ctype = (
+                res.headers.get("content-type") || ""
+              ).toLowerCase();
+              if (res.ok && ctype.includes("application/json")) {
                 const rawList = await res.json();
-                if (Array.isArray(rawList)) {
-                  usedBackendScan = true;
-                  rawList.forEach((item) => {
-                    if (!item.ip || item.ip === gatewayIp) return;
+                const items = Array.isArray(rawList)
+                  ? rawList
+                  : Array.isArray(rawList?.devices)
+                    ? rawList.devices
+                    : null;
+                if (items && items.length > 0) {
+                  backendHandled = true;
+                  items.forEach((item) => {
+                    if (!item.ip || (iotOnly && item.ip === gatewayIp)) return;
                     if (
                       iotOnly &&
                       isLikelyNonTarget(`${item.name} ${item.type}`)
-                    )
+                    ) {
                       return;
+                    }
                     const p = Number(item.port) || 80;
-                    lastScannedList.push({
+                    upsertDiscovered({
                       name: item.name || `iot-${item.ip.split(".")[3]}`,
                       type:
                         item.type ||
@@ -5523,103 +6084,186 @@
                       online: true,
                     });
                   });
-                  lastScannedList.sort(
-                    (a, b) =>
-                      Number(a.ip.split(".")[3]) - Number(b.ip.split(".")[3]) ||
-                      a.port - b.port,
-                  );
                 }
               }
             } catch (e) {
-              if (e.name === "AbortError") throw e;
+              if (scanAbortCtrl.signal.aborted) throw e;
+            } finally {
+              clearTimeout(backendTimer);
+              scanAbortCtrl.signal.removeEventListener("abort", onOuterAbort);
             }
           }
 
-          // 2. Browser Worker-Pool Multi-Port Fallback (HTTP/Web IoT ports)
-          if (!usedBackendScan) {
-            const webPorts = ports.filter(
-              (p) => PORT_SERVICE_MAP[p]?.proto !== "tcp",
-            );
-            const tcpOnlyPorts = ports.filter(
-              (p) => PORT_SERVICE_MAP[p]?.proto === "tcp",
-            );
-            if (tcpOnlyPorts.length) {
+          // 2. Windows / VS Code Live Server / Browser Fallback Engine
+          if (!backendHandled && !scanAbortCtrl.signal.aborted) {
+            const webPorts = ports.filter((p) => {
+              const proto = PORT_SERVICE_MAP[p]?.proto;
+              return proto !== "tcp" && proto !== "https";
+            });
+            const skippedPorts = ports.filter((p) => !webPorts.includes(p));
+            if (skippedPorts.length) {
               showToast(
-                `Note: Raw TCP ports (${tcpOnlyPorts.join(",")}) need ESP32 /api/scan backend`,
+                `Browser scan: HTTP ports only (TCP/HTTPS ${skippedPorts.join(",")} need ESP32 /api/scan)`,
               );
             }
 
-            const tasks = [];
-            for (let i = startIp; i <= endIp; i++) {
-              const ip = `${prefix}.${i}`;
-              if (ip === gatewayIp || ip === location.hostname) continue;
-              for (const port of webPorts) {
-                tasks.push({ ip, port });
+            if (!webPorts.length) {
+              statusTxt.textContent =
+                "No browser-scannable HTTP ports selected.";
+            } else {
+              // Build IP list, prioritizing saved devices on this subnet first for instant hits
+              const savedOnSubnet = new Set();
+              (config.devices || []).forEach((d) => {
+                if (isValidIpv4(d.ip) && d.ip.startsWith(`${prefix}.`)) {
+                  savedOnSubnet.add(d.ip);
+                }
+              });
+              (config.shortcuts || []).forEach((s) => {
+                if (isValidIpv4(s.host) && s.host.startsWith(`${prefix}.`)) {
+                  savedOnSubnet.add(s.host);
+                }
+              });
+
+              const prioritized = [];
+              const remaining = [];
+              for (let i = startIp; i <= endIp; i++) {
+                const ip = `${prefix}.${i}`;
+                if (iotOnly && ip === gatewayIp) continue;
+                if (savedOnSubnet.has(ip)) prioritized.push(ip);
+                else remaining.push(ip);
               }
-            }
+              const targetIps = [...prioritized, ...remaining];
 
-            const total = Math.max(1, tasks.length);
-            let completed = 0;
-            let cursor = 0;
-            const CONCURRENCY = 16;
+              // Windows/Chrome socket-safe wave runner (prevents SYN_SENT pool starvation)
+              const CONCURRENCY = 12;
+              const TIMEOUT_MS = 850;
+              const WAVE_PAUSE_MS = 25;
 
-            async function worker() {
-              while (cursor < tasks.length && !scanAbortCtrl.signal.aborted) {
-                const task = tasks[cursor++];
-                const probe = await measureIoTPing(
-                  task.ip,
-                  task.port,
-                  550,
-                  scanAbortCtrl.signal,
-                );
-                completed++;
-
-                if (probe.ok && !scanAbortCtrl.signal.aborted) {
-                  const info = await identifyIoTDevice(
-                    task.ip,
-                    task.port,
-                    tld,
-                    scanAbortCtrl.signal,
+              const runWavePool = async (items, fn, onProgress) => {
+                let done = 0;
+                const total = Math.max(1, items.length);
+                for (let idx = 0; idx < items.length; idx += CONCURRENCY) {
+                  if (scanAbortCtrl.signal.aborted) break;
+                  const batch = items.slice(idx, idx + CONCURRENCY);
+                  await Promise.all(
+                    batch.map(async (item) => {
+                      if (scanAbortCtrl.signal.aborted) return;
+                      await fn(item);
+                      done++;
+                    }),
                   );
-                  if (!info.rejected && (!iotOnly || info.isVerifiedIoT)) {
-                    lastScannedList.push({
-                      name: info.name,
-                      type: info.type,
-                      ip: task.ip,
-                      mdns: info.mdns,
-                      port: task.port,
-                      pingMs: probe.ms,
-                      online: true,
-                    });
-                    lastScannedList.sort(
-                      (a, b) =>
-                        Number(a.ip.split(".")[3]) -
-                          Number(b.ip.split(".")[3]) || a.port - b.port,
-                    );
-                    renderScannedDevices();
+                  onProgress(done, total);
+                  if (idx + CONCURRENCY < items.length) {
+                    await sleepMs(WAVE_PAUSE_MS);
                   }
                 }
+              };
 
-                if (completed % 12 === 0 || completed === total) {
-                  const pct = Math.min(
-                    100,
-                    Math.round((completed / total) * 100),
+              if (!isDeepMode && webPorts.length > 1) {
+                // PHASE 1: Primary HTTP port across entire range (~15-18s for 254 IPs on Windows)
+                const primaryPort = webPorts.includes(80) ? 80 : webPorts[0];
+                const extraPorts = webPorts.filter((p) => p !== primaryPort);
+                const liveHosts = new Set(prioritized);
+
+                statusTxt.textContent = `Phase 1/2: Sweeping ${prefix}.${startIp}–${endIp}:${primaryPort}...`;
+
+                await runWavePool(
+                  targetIps,
+                  async (ip) => {
+                    const res = await probeHttpEndpoint(
+                      ip,
+                      primaryPort,
+                      TIMEOUT_MS,
+                      scanAbortCtrl.signal,
+                      "/favicon.ico",
+                    );
+                    if (res.alive) liveHosts.add(ip);
+                    if (res.open && !scanAbortCtrl.signal.aborted) {
+                      recordLiveHit(ip, primaryPort, res.ms);
+                    }
+                  },
+                  (done, total) => {
+                    const pct = Math.min(82, Math.round((done / total) * 82));
+                    fill.style.width = `${pct}%`;
+                    pctTxt.textContent = `${pct}%`;
+                    statusTxt.textContent = `Phase 1/2: ${done}/${total} IPs on :${primaryPort} — ${lastScannedList.length} found`;
+                  },
+                );
+
+                // PHASE 2: Probe extra ports only on responsive/saved hosts
+                if (liveHosts.size > 0 && !scanAbortCtrl.signal.aborted) {
+                  const p2Tasks = [];
+                  for (const ip of liveHosts) {
+                    for (const port of extraPorts) {
+                      p2Tasks.push({ ip, port });
+                    }
+                  }
+                  statusTxt.textContent = `Phase 2/2: Checking ${extraPorts.length} extra port(s) on ${liveHosts.size} host(s)...`;
+
+                  await runWavePool(
+                    p2Tasks,
+                    async ({ ip, port }) => {
+                      const res = await probeHttpEndpoint(
+                        ip,
+                        port,
+                        700,
+                        scanAbortCtrl.signal,
+                        "/favicon.ico",
+                      );
+                      if (res.open && !scanAbortCtrl.signal.aborted) {
+                        recordLiveHit(ip, port, res.ms);
+                      }
+                    },
+                    (done, total) => {
+                      const pct = 82 + Math.round((done / total) * 18);
+                      fill.style.width = `${Math.min(100, pct)}%`;
+                      pctTxt.textContent = `${Math.min(100, pct)}%`;
+                      statusTxt.textContent = `Phase 2/2: ${done}/${total} extra endpoints — ${lastScannedList.length} found`;
+                    },
                   );
-                  fill.style.width = `${pct}%`;
-                  pctTxt.textContent = `${pct}%`;
-                  statusTxt.textContent = `Probed ${completed}/${total} endpoints — Found ${lastScannedList.length} target(s)...`;
                 }
+              } else {
+                // Single-port or Deep Multi-Port Scan
+                const tasks = [];
+                for (const ip of targetIps) {
+                  for (const port of webPorts) tasks.push({ ip, port });
+                }
+
+                await runWavePool(
+                  tasks,
+                  async ({ ip, port }) => {
+                    const res = await probeHttpEndpoint(
+                      ip,
+                      port,
+                      TIMEOUT_MS,
+                      scanAbortCtrl.signal,
+                      "/favicon.ico",
+                    );
+                    if (res.open && !scanAbortCtrl.signal.aborted) {
+                      recordLiveHit(ip, port, res.ms);
+                    }
+                  },
+                  (done, total) => {
+                    const pct = Math.min(100, Math.round((done / total) * 100));
+                    fill.style.width = `${pct}%`;
+                    pctTxt.textContent = `${pct}%`;
+                    statusTxt.textContent = `Probed ${done}/${total} endpoints — ${lastScannedList.length} found`;
+                  },
+                );
               }
             }
+          }
 
-            await Promise.all(
-              Array.from({ length: CONCURRENCY }, () => worker()),
-            );
+          if (pendingFingerprints.length) {
+            await Promise.race([
+              Promise.allSettled(pendingFingerprints),
+              sleepMs(1200),
+            ]);
           }
 
           fill.style.width = "100%";
           pctTxt.textContent = "100%";
-          statusTxt.textContent = `Scan complete — ${lastScannedList.length} target service(s) found.`;
+          statusTxt.textContent = `Scan complete — ${lastScannedList.length} service(s) found on ${prefix}.x (${subnetMask})`;
           renderScannedDevices();
         } catch (err) {
           if (err.name !== "AbortError") showToast("Scan interrupted");
@@ -5638,7 +6282,7 @@
         if (countEl) countEl.textContent = lastScannedList.length;
 
         if (!lastScannedList.length) {
-          out.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">No matching IoT/automation devices found on <strong>${getGatewayPrefix()}.x</strong>.<br/>Tip: Switch filter to <strong>All Responding Network Hosts</strong> if your device blocks CORS headers, or ensure ESP32 <code>/api/scan</code> is active for Modbus/MQTT ports.</div>`;
+          out.innerHTML = `<div class="card-box" style="text-align:center;color:var(--text-muted)">No HTTP/IoT devices found on <strong>${escapeHtml(getGatewayPrefix())}.x</strong> (GW: ${escapeHtml(getActiveGatewayIp())}, Mask: ${escapeHtml(getActiveSubnetMask())}).<br/>Verify the <strong>Device Gateway IP</strong> matches your router (run <code>ipconfig</code>) and keep this page on <code>http://</code>.</div>`;
           return;
         }
 
