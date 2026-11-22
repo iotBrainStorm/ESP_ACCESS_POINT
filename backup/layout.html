@@ -884,6 +884,41 @@
         max-width: 100%;
       }
 
+      /* 2b. IP / DNS Switcher Child */
+      .pv-addr-wrap {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      .pv-addr-wrap .seg-btn {
+        padding: 4px 9px;
+        font-size: 0.7rem;
+      }
+      .pv-addr-wrap[data-style="ghost"] .seg-toggle {
+        background: transparent;
+        border-color: transparent;
+      }
+      .pv-addr-wrap[data-style="tinted"] .seg-toggle {
+        background: var(--accent-soft);
+        border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+      }
+      .pv-addr-wrap[data-shape="pill"] .seg-toggle,
+      .pv-addr-wrap[data-shape="pill"] .seg-btn {
+        border-radius: 999px;
+      }
+      .pv-addr-wrap[data-shape="square"] .seg-toggle,
+      .pv-addr-wrap[data-shape="square"] .seg-btn {
+        border-radius: 4px;
+      }
+      .pv-addr-wrap[data-size="sm"] .seg-btn {
+        padding: 2px 6px;
+        font-size: 0.64rem;
+      }
+      .pv-addr-wrap[data-size="lg"] .seg-btn {
+        padding: 7px 12px;
+        font-size: 0.78rem;
+      }
+
       /* 3. Header Actions Child */
       .pv-actions {
         display: flex;
@@ -2060,6 +2095,96 @@
               </div>
             </div>
 
+            <!-- Child 2b: IP / DNS Switcher Options -->
+            <div class="ctrl-card">
+              <div class="ctrl-card-title">Header IP / DNS Switcher</div>
+              <div class="toggle-row" style="margin-bottom: 8px">
+                <span>Show IP / DNS Switcher</span>
+                <input
+                  type="checkbox"
+                  class="switch"
+                  id="hdrAddr"
+                  onchange="setHeader('showAddrToggle', this.checked)"
+                />
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Row Assignment</label>
+                  <select
+                    id="hdrSwitcherNewRow"
+                    class="select"
+                    onchange="setHeader('switcherNewRow', this.value === '1')"
+                  >
+                    <option value="0">Same Row</option>
+                    <option value="1">New Row</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Row Alignment</label>
+                  <select
+                    id="hdrSwitcherAlign"
+                    class="select"
+                    onchange="setHeader('switcherAlign', this.value)"
+                  >
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Switcher Size</label>
+                  <select
+                    id="hdrSwitcherSize"
+                    class="select"
+                    onchange="setHeader('switcherSize', this.value)"
+                  >
+                    <option value="sm">Compact</option>
+                    <option value="md">Medium (Default)</option>
+                    <option value="lg">Large</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Switcher Shape</label>
+                  <select
+                    id="hdrSwitcherShape"
+                    class="select"
+                    onchange="setHeader('switcherShape', this.value)"
+                  >
+                    <option value="rounded">Rounded (Default)</option>
+                    <option value="pill">Full Pill</option>
+                    <option value="square">Sharp Square</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Switcher Surface</label>
+                  <select
+                    id="hdrSwitcherStyle"
+                    class="select"
+                    onchange="setHeader('switcherStyle', this.value)"
+                  >
+                    <option value="default">Default Card</option>
+                    <option value="ghost">Minimal Ghost</option>
+                    <option value="tinted">Soft Accent Tint</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Label Format</label>
+                  <select
+                    id="hdrSwitcherLabelMode"
+                    class="select"
+                    onchange="setHeader('switcherLabelMode', this.value)"
+                  >
+                    <option value="short">Short (IP / DNS)</option>
+                    <option value="full">Full (IPv4 / mDNS)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <!-- Child 3: Actions Section (pv-actions) & Footer Options -->
             <div class="ctrl-card">
               <div class="ctrl-card-title">Header Actions &amp; Footer</div>
@@ -2159,15 +2284,6 @@
                   class="switch"
                   id="hdrMap"
                   onchange="setHeader('showMapBtn', this.checked)"
-                />
-              </div>
-              <div class="toggle-row">
-                <span>Show IP / DNS Switcher</span>
-                <input
-                  type="checkbox"
-                  class="switch"
-                  id="hdrAddr"
-                  onchange="setHeader('showAddrToggle', this.checked)"
                 />
               </div>
               <div class="toggle-row">
@@ -2899,7 +3015,7 @@
             rowGap: "normal",
             divider: "border",
             sticky: true,
-            order: ["brand", "search", "actions"],
+            order: ["brand", "search", "switcher", "actions"],
             brandNewRow: false,
             brandAlign: "left",
             brandSize: "md",
@@ -2925,6 +3041,12 @@
             mapBtnStyle: "soft",
             showMapBtn: true,
             showAddrToggle: true,
+            switcherNewRow: false,
+            switcherAlign: "right",
+            switcherSize: "md",
+            switcherShape: "rounded",
+            switcherStyle: "default",
+            switcherLabelMode: "short",
             showRefreshBtn: true,
             showFooter: true,
           },
@@ -2985,12 +3107,21 @@
             ? raw.sectionOrder
             : def.sectionOrder;
         const hdrRaw = raw.header || {};
-        const hdrOrder =
-          Array.isArray(hdrRaw.order) &&
-          hdrRaw.order.length === 3 &&
-          ["brand", "search", "actions"].every((k) => hdrRaw.order.includes(k))
-            ? hdrRaw.order
-            : def.header.order;
+        const allHdrKeys = ["brand", "search", "switcher", "actions"];
+        let hdrOrder = Array.isArray(hdrRaw.order)
+          ? hdrRaw.order.filter((k) => allHdrKeys.includes(k))
+          : [];
+        allHdrKeys.forEach((k) => {
+          if (!hdrOrder.includes(k)) {
+            if (k === "switcher") {
+              const i = hdrOrder.indexOf("actions");
+              if (i !== -1) hdrOrder.splice(i, 0, "switcher");
+              else hdrOrder.push("switcher");
+            } else {
+              hdrOrder.push(k);
+            }
+          }
+        });
         return {
           ...def,
           ...raw,
@@ -3267,6 +3398,24 @@
 
         applyGlobalThemeAndAccent();
 
+        if (!isOfflinePreview) {
+          try {
+            const stRes = await fetch("/api/status", { cache: "no-store" });
+            if (stRes.ok) {
+              const stData = await stRes.json();
+              const lockRaw = JSON.parse(
+                localStorage.getItem(LOCKOUT_STORAGE_KEY) || "{}",
+              );
+              if (
+                stData.bootId &&
+                lockRaw.bootSession !== String(stData.bootId)
+              ) {
+                localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+                sessionStorage.setItem("esp_boot_id", String(stData.bootId));
+              }
+            }
+          } catch (_) {}
+        }
         const loggedIn = await enforceLayoutAuth();
         if (!loggedIn) {
           window.location.href = "config.html";
@@ -3428,6 +3577,7 @@
         const labels = {
           brand: "Brand & Status",
           search: "Search Bar",
+          switcher: "IP / DNS Switcher",
           actions: "Header Actions",
         };
         el.innerHTML = ui.header.order
@@ -3591,6 +3741,15 @@
         document.getElementById("hdrMapStyle").value = h.mapBtnStyle;
         document.getElementById("hdrMap").checked = h.showMapBtn;
         document.getElementById("hdrAddr").checked = h.showAddrToggle;
+        document.getElementById("hdrSwitcherNewRow").value = h.switcherNewRow
+          ? "1"
+          : "0";
+        document.getElementById("hdrSwitcherAlign").value = h.switcherAlign;
+        document.getElementById("hdrSwitcherSize").value = h.switcherSize;
+        document.getElementById("hdrSwitcherShape").value = h.switcherShape;
+        document.getElementById("hdrSwitcherStyle").value = h.switcherStyle;
+        document.getElementById("hdrSwitcherLabelMode").value =
+          h.switcherLabelMode;
         document.getElementById("hdrRefresh").checked = h.showRefreshBtn;
         document.getElementById("hdrFooter").checked = h.showFooter;
 
@@ -3760,6 +3919,7 @@
       function resetLayoutDefaults() {
         if (!confirm("Reset Home UI Layout back to default settings?")) return;
         ui = getDefaultLayoutConfig();
+        config.settings.showIpOnCard = ui.group.showAddr;
         config.settings.accentColor = "";
         applyGlobalThemeAndAccent();
         syncControlsFromState();
@@ -3928,11 +4088,25 @@
                  data-gap="${h.actionGap}"
                  data-map-style="${h.mapBtnStyle}">
               ${h.showMapBtn ? `<div class="pv-map-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg><span class="pv-map-lbl">Map View</span><span class="pv-map-count-pill">2</span></div>` : ""}
-              ${h.showAddrToggle ? `<div class="seg-toggle"><span class="seg-btn active">IP</span><span class="seg-btn">DNS</span></div>` : ""}
               ${h.showRefreshBtn ? `<div class="pv-ico-btn">↻</div>` : ""}
               <div class="pv-ico-btn">⚙</div>
             </div>
           `,
+          switcher: h.showAddrToggle
+            ? `
+            <div class="pv-addr-wrap"
+                 data-new-row="${h.switcherNewRow}"
+                 data-align="${h.switcherAlign}"
+                 data-size="${h.switcherSize}"
+                 data-shape="${h.switcherShape}"
+                 data-style="${h.switcherStyle}">
+              <div class="seg-toggle">
+                <span class="seg-btn active">${h.switcherLabelMode === "full" ? "IPv4" : "IP"}</span>
+                <span class="seg-btn">${h.switcherLabelMode === "full" ? "mDNS" : "DNS"}</span>
+              </div>
+            </div>
+          `
+            : "",
         };
 
         const headerHtml = `

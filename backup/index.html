@@ -528,6 +528,37 @@
         display: none;
       }
 
+      /* 2b. IP / DNS Switcher (Independent Topbar Element) */
+      .addr-switch-wrap {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      .addr-switch-wrap[data-style="ghost"] .seg-toggle {
+        background: transparent;
+        border-color: transparent;
+      }
+      .addr-switch-wrap[data-style="tinted"] .seg-toggle {
+        background: var(--accent-soft);
+        border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+      }
+      .addr-switch-wrap[data-shape="pill"] .seg-toggle,
+      .addr-switch-wrap[data-shape="pill"] .seg-btn {
+        border-radius: 999px;
+      }
+      .addr-switch-wrap[data-shape="square"] .seg-toggle,
+      .addr-switch-wrap[data-shape="square"] .seg-btn {
+        border-radius: 4px;
+      }
+      .addr-switch-wrap[data-size="sm"] .seg-btn {
+        padding: 3px 7px;
+        font-size: 0.7rem;
+      }
+      .addr-switch-wrap[data-size="lg"] .seg-btn {
+        padding: 7px 13px;
+        font-size: 0.82rem;
+      }
+
       /* 3. Header Actions */
       .header-actions {
         display: flex;
@@ -2085,6 +2116,28 @@
           </div>
         </div>
 
+        <div class="addr-switch-wrap" id="addrSwitchWrap">
+          <div
+            class="seg-toggle"
+            title="Switch primary address mode (IP vs mDNS)"
+          >
+            <button
+              class="seg-btn active"
+              id="modeIpBtn"
+              onclick="setAddressMode(false)"
+            >
+              IP
+            </button>
+            <button
+              class="seg-btn"
+              id="modeMdnsBtn"
+              onclick="setAddressMode(true)"
+            >
+              DNS
+            </button>
+          </div>
+        </div>
+
         <div class="header-actions">
           <button
             type="button"
@@ -2114,25 +2167,6 @@
               style="display: none"
             ></span>
           </button>
-          <div
-            class="seg-toggle"
-            title="Switch primary address mode (IP vs mDNS)"
-          >
-            <button
-              class="seg-btn active"
-              id="modeIpBtn"
-              onclick="setAddressMode(false)"
-            >
-              IP
-            </button>
-            <button
-              class="seg-btn"
-              id="modeMdnsBtn"
-              onclick="setAddressMode(true)"
-            >
-              DNS
-            </button>
-          </div>
 
           <button
             class="icon-btn"
@@ -2729,14 +2763,22 @@
           maxWidth: raw.maxWidth !== undefined ? Number(raw.maxWidth) : 1280,
           header: (() => {
             const rawHdr = raw.header || {};
-            const validOrder =
-              Array.isArray(rawHdr.order) &&
-              rawHdr.order.length === 3 &&
-              ["brand", "search", "actions"].every((k) =>
-                rawHdr.order.includes(k),
-              )
-                ? rawHdr.order
-                : ["brand", "search", "actions"];
+            const allKeys = ["brand", "search", "switcher", "actions"];
+            let validOrder = Array.isArray(rawHdr.order)
+              ? rawHdr.order.filter((k) => allKeys.includes(k))
+              : [];
+            // Backwards-compatible upgrade for older 3-item configs
+            allKeys.forEach((k) => {
+              if (!validOrder.includes(k)) {
+                if (k === "switcher") {
+                  const actIdx = validOrder.indexOf("actions");
+                  if (actIdx !== -1) validOrder.splice(actIdx, 0, "switcher");
+                  else validOrder.push("switcher");
+                } else {
+                  validOrder.push(k);
+                }
+              }
+            });
             return {
               style: "glass",
               padding: "md",
@@ -2759,6 +2801,13 @@
               searchSize: "md",
               searchStyle: "rounded",
               searchWidth: "md",
+              showAddrToggle: true,
+              switcherNewRow: false,
+              switcherAlign: "right",
+              switcherSize: "md",
+              switcherShape: "rounded",
+              switcherStyle: "default",
+              switcherLabelMode: "short", // "short" (IP/DNS) | "full" (IPv4/mDNS)
               actionsNewRow: false,
               actionsAlign: "right",
               actionSize: "md",
@@ -2767,7 +2816,6 @@
               actionGap: "normal",
               mapBtnStyle: "soft",
               showMapBtn: true,
-              showAddrToggle: true,
               showRefreshBtn: true,
               showFooter: true,
               ...rawHdr,
@@ -3208,6 +3256,13 @@
           clearLockoutData();
           refreshAuthModalLiveStatus();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+          if (!isOfflinePreview) {
+            await fetch("/api/config", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(config),
+            }).catch(() => {});
+          }
           box.style.display = "none";
           showToast("Users reset! Default is now esp / 456456");
         } else {
@@ -3344,10 +3399,14 @@
 
       function applySettingsUI() {
         const s = config.settings;
+        const ui = getUiLayout();
 
         // Resolve default view mode before toggling toolbar buttons
-        if (!localStorage.getItem("hub_view_mode") && s.defaultViewMode) {
-          viewMode = s.defaultViewMode;
+        if (!localStorage.getItem("hub_view_mode")) {
+          viewMode =
+            ui.group.layout === "compact"
+              ? "list"
+              : s.defaultViewMode || "grid";
         }
 
         document.documentElement.setAttribute("data-theme", s.theme || "dark");
@@ -3368,7 +3427,6 @@
         document
           .getElementById("listViewBtn")
           .classList.toggle("active", viewMode === "list");
-        const ui = getUiLayout();
 
         // Accent color & global radius/width/surface
         const acc = s.accentColor || "";
@@ -3398,6 +3456,7 @@
         const topbarInner = document.querySelector(".topbar-inner");
         const brandEl = document.querySelector(".brand");
         const searchWrap = document.getElementById("searchWrap");
+        const switcherWrap = document.getElementById("addrSwitchWrap");
         const actionsEl = document.querySelector(".header-actions");
 
         topbarEl.dataset.style = hdr.style;
@@ -3410,6 +3469,7 @@
         const childMap = {
           brand: brandEl,
           search: searchWrap,
+          switcher: switcherWrap,
           actions: actionsEl,
         };
         hdr.order.forEach((key) => {
@@ -3444,6 +3504,18 @@
         searchWrap.dataset.width = hdr.searchWidth;
         if (hdr.searchStyle !== "icon") searchWrap.classList.remove("expanded");
 
+        // Child 2b: IP / DNS Switcher
+        switcherWrap.style.display = hdr.showAddrToggle ? "" : "none";
+        switcherWrap.dataset.newRow = String(hdr.switcherNewRow);
+        switcherWrap.dataset.align = hdr.switcherAlign;
+        switcherWrap.dataset.size = hdr.switcherSize;
+        switcherWrap.dataset.shape = hdr.switcherShape;
+        switcherWrap.dataset.style = hdr.switcherStyle;
+        document.getElementById("modeIpBtn").textContent =
+          hdr.switcherLabelMode === "full" ? "IPv4" : "IP";
+        document.getElementById("modeMdnsBtn").textContent =
+          hdr.switcherLabelMode === "full" ? "mDNS" : "DNS";
+
         // Child 3: Header Actions & Footer
         actionsEl.dataset.newRow = String(hdr.actionsNewRow);
         actionsEl.dataset.align = hdr.actionsAlign;
@@ -3455,8 +3527,6 @@
         document.getElementById("mapViewBtn").style.display = hdr.showMapBtn
           ? ""
           : "none";
-        document.getElementById("modeIpBtn").parentElement.style.display =
-          hdr.showAddrToggle ? "" : "none";
         document.getElementById("refreshBtn").style.display = hdr.showRefreshBtn
           ? ""
           : "none";
@@ -3475,12 +3545,32 @@
         ui.sectionOrder.forEach((key, idx) => {
           if (orderMap[key]) orderMap[key].style.order = idx;
         });
+      }
 
-        // Dynamic shortcut sync interval
+      let isTelemetryInFlight = false;
+      let isShortcutsInFlight = false;
+      let isAuthenticated = false;
+
+      function startHomeBackgroundTimers() {
         clearInterval(shortcutSyncTimer);
-        const syncInterval = Math.max(1000, Number(s.shortcutSyncMs) || 2500);
-        shortcutSyncTimer = setInterval(() => {
-          if (config?.shortcuts?.length) syncAllShortcuts(true);
+        const syncInterval = Math.max(
+          1500,
+          Number(config?.settings?.shortcutSyncMs) || 2500,
+        );
+        shortcutSyncTimer = setInterval(async () => {
+          if (
+            !isAuthenticated ||
+            document.hidden ||
+            isShortcutsInFlight ||
+            !config?.shortcuts?.length
+          )
+            return;
+          isShortcutsInFlight = true;
+          try {
+            await syncAllShortcuts(true);
+          } finally {
+            isShortcutsInFlight = false;
+          }
         }, syncInterval);
       }
 
@@ -3567,7 +3657,10 @@
             body: bodyStr,
             cache: "no-store",
           });
-          const data = await res.json();
+          const data = await res.json().catch(() => ({
+            ok: false,
+            error: `Invalid response (HTTP ${res.status})`,
+          }));
 
           if (!res.ok || data.ok === false) {
             throw new Error(data.error || `HTTP ${res.status}`);
@@ -3717,6 +3810,7 @@
         );
 
         let stateChanged = false;
+        let configDataChanged = false;
 
         try {
           const res = await fetch(`http://${cleanH}${portPart}/api/switches`, {
@@ -3731,6 +3825,7 @@
             if (Array.isArray(data.states) && data.states[idx] !== undefined) {
               const liveState = !!data.states[idx];
               if (s.state !== liveState) {
+                configDataChanged = true;
                 s.state = liveState;
                 stateChanged = true;
               }
@@ -3749,7 +3844,7 @@
           });
         } finally {
           clearTimeout(timeout);
-          if (stateChanged) {
+          if (configDataChanged) {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
           }
           updateStatusIndicators();
@@ -3776,10 +3871,18 @@
       async function pingAllDevices() {
         const btn = document.getElementById("refreshBtn");
         btn.classList.add("spinning");
-        await Promise.all([
-          ...config.devices.map((d) => pingSingleDevice(d)),
-          syncAllShortcuts(false),
-        ]);
+        const queue = [...config.devices];
+        const CONCURRENCY = 6;
+        const workers = Array.from(
+          { length: Math.min(CONCURRENCY, queue.length) },
+          async () => {
+            while (queue.length) {
+              const dev = queue.shift();
+              if (dev) await pingSingleDevice(dev);
+            }
+          },
+        );
+        await Promise.all([...workers, syncAllShortcuts(false)]);
         btn.classList.remove("spinning");
       }
 
@@ -4376,7 +4479,7 @@
         let html = "";
         const uiGrp = getUiLayout().group;
         const uiSc = getUiLayout().shortcut;
-        const isList = viewMode === "list" || uiGrp.layout === "compact";
+        const isList = viewMode === "list";
         const gridClass = `device-grid ${isList ? "list-view" : ""}`;
         const devGridAttrs = `data-cols="1" data-layout="${uiGrp.layout}" data-size="${uiGrp.size}" data-accent-pos="${uiGrp.accentPos}" style="${gridColVars(uiGrp.colsDesktop, uiGrp.colsMobile, 265)}"`;
 
@@ -4499,6 +4602,8 @@
           return;
         }
         document.body.classList.add("auth-ready");
+        isAuthenticated = true;
+        startHomeBackgroundTimers();
         renderAll();
         loadSavedBuildings();
         if (config.settings.autoPing) pingAllDevices();
@@ -4560,11 +4665,53 @@
         }
       });
 
-      setInterval(updateHomeClock, 1000);
+      const clockTimer = setInterval(() => {
+        if (!document.hidden) updateHomeClock();
+      }, 1000);
 
-      setInterval(() => {
-        if (!isOfflinePreview) loadTelemetry();
+      const telemetryTimer = setInterval(async () => {
+        if (
+          !isAuthenticated ||
+          isOfflinePreview ||
+          document.hidden ||
+          isTelemetryInFlight
+        )
+          return;
+        isTelemetryInFlight = true;
+        try {
+          await loadTelemetry();
+        } finally {
+          isTelemetryInFlight = false;
+        }
       }, 15000);
+
+      // Instant refresh when user returns to tab or saves in config.html / layout.html
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && isAuthenticated) {
+          updateHomeClock();
+          if (!isOfflinePreview) loadTelemetry();
+          if (config?.shortcuts?.length) syncAllShortcuts(true);
+        }
+      });
+
+      window.addEventListener("storage", (e) => {
+        if (e.key === STORAGE_KEY && e.newValue && isAuthenticated) {
+          try {
+            config = sanitizeConfig(JSON.parse(e.newValue));
+            applySettingsUI();
+            startHomeBackgroundTimers();
+            renderAll();
+          } catch (_) {}
+        }
+      });
+
+      window.addEventListener("pagehide", () => {
+        clearInterval(shortcutSyncTimer);
+        clearInterval(clockTimer);
+        clearInterval(telemetryTimer);
+        clearInterval(authStatusTimer);
+        clearInterval(forgetBootTimer);
+      });
 
       loadConfig();
     </script>
