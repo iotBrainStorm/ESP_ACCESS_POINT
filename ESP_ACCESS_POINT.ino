@@ -106,6 +106,7 @@ unsigned long portalStartAt = 0;
 
 bool restartPending = false;
 unsigned long restartAt = 0;
+bool factoryWifiWipePending = false;
 
 unsigned long lastWifiRetryMs = 0;
 unsigned long lastNtpSyncAttemptMs = 0;
@@ -1316,31 +1317,90 @@ void setupWebServer() {
     restartAt = millis() + 600;
   });
 
-  // --- POST /api/reset (Factory Reset: clears config, designs, network/time defaults) ---
+  // --- POST /api/reset?mode=data|settings|factory ---
   server.on("/api/reset", ASYNC_POST, [](AsyncWebServerRequest *req) {
-    if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-      if (SPIFFS.exists(CONFIG_PATH)) SPIFFS.remove(CONFIG_PATH);
-      if (SPIFFS.exists(CONFIG_TMP_PATH)) SPIFFS.remove(CONFIG_TMP_PATH);
-      if (SPIFFS.exists(DESIGN_PATH)) SPIFFS.remove(DESIGN_PATH);
-      if (SPIFFS.exists(DESIGN_TMP_PATH)) SPIFFS.remove(DESIGN_TMP_PATH);
-      xSemaphoreGive(fsMutex);
+    String mode = req->hasParam("mode") ? req->getParam("mode")->value() : "factory";
+    mode.trim();
+    mode.toLowerCase();
+
+    if (mode == "data") {
+      // 1. RESET DATA: Erase 2D designs in SPIFFS
+      //    (devices, shortcuts, groups, favorites are saved via /api/config)
+      if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+        if (SPIFFS.exists(DESIGN_PATH)) SPIFFS.remove(DESIGN_PATH);
+        if (SPIFFS.exists(DESIGN_TMP_PATH)) SPIFFS.remove(DESIGN_TMP_PATH);
+        xSemaphoreGive(fsMutex);
+      }
+      notifyStorage();
+      Serial.println("[RESET] Data reset complete (/design.json removed)");
+      req->send(200, "application/json", "{\"ok\":true,\"mode\":\"data\"}");
+      return;
     }
 
-    Preferences p;
-    p.begin("hubnet", false);
-    p.clear();
-    p.end();
+    if (mode == "settings") {
+      // 2. RESET SETTINGS: Clear Network (hubnet) & Time (hubtime) NVS, keep WiFi & Designs
+      bool wasStatic = !netCfg.dhcp;
 
-    p.begin("hubtime", false);
-    p.clear();
-    p.end();
+      Preferences p;
+      p.begin("hubnet", false);
+      p.clear();
+      p.end();
 
-    loadNetworkAndTimeFromNvs();
-    pendingMdnsRefresh = true;
-    pendingNtpResync = true;
-    notifyStorage();
+      p.begin("hubtime", false);
+      p.clear();
+      p.end();
 
-    req->send(200, "application/json", "{\"ok\":true}");
+      timeSynced = false;
+      loadNetworkAndTimeFromNvs();
+      pendingMdnsRefresh = true;
+      pendingNtpResync = true;
+      if (wasStatic) {
+        pendingIpReapply = true;
+        ipReapplyAt = millis() + 1500;  // Wait so /api/config POST finishes first
+      }
+
+      notifyStorage();
+      Serial.println("[RESET] Settings reset complete (hubnet & hubtime NVS cleared)");
+      req->send(200, "application/json", "{\"ok\":true,\"mode\":\"settings\"}");
+      return;
+    }
+
+    if (mode == "factory") {
+      // 3. FACTORY RESET: Erase SPIFFS files + hubnet + hubtime + WiFi (wfcfg) + Reboot
+      if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+        if (SPIFFS.exists(CONFIG_PATH)) SPIFFS.remove(CONFIG_PATH);
+        if (SPIFFS.exists(CONFIG_TMP_PATH)) SPIFFS.remove(CONFIG_TMP_PATH);
+        if (SPIFFS.exists(DESIGN_PATH)) SPIFFS.remove(DESIGN_PATH);
+        if (SPIFFS.exists(DESIGN_TMP_PATH)) SPIFFS.remove(DESIGN_TMP_PATH);
+        xSemaphoreGive(fsMutex);
+      }
+
+      Preferences p;
+      p.begin("hubnet", false);
+      p.clear();
+      p.end();
+
+      p.begin("hubtime", false);
+      p.clear();
+      p.end();
+
+      clearSavedWifiCredentials();  // Erases NVS "wfcfg" (SSID & Password)
+
+      timeSynced = false;
+      loadNetworkAndTimeFromNvs();
+      notifyStorage();
+      Serial.println("[RESET] Factory reset complete - wiping WiFi & rebooting...");
+
+      // Send HTTP 200 BEFORE dropping WiFi so the browser receives confirmation
+      req->send(200, "application/json", "{\"ok\":true,\"mode\":\"factory\",\"rebooting\":true}");
+
+      factoryWifiWipePending = true;
+      restartPending = true;
+      restartAt = millis() + 800;
+      return;
+    }
+
+    req->send(400, "application/json", "{\"ok\":false,\"error\":\"Invalid reset mode\"}");
   });
 
   // --- Fallback & CORS Preflight ---
@@ -1539,6 +1599,11 @@ void loop() {
     restartPending = false;
     if (webServerRunning) server.end();
     if (mdnsRunning) MDNS.end();
+    if (factoryWifiWipePending) {
+      factoryWifiWipePending = false;
+      WiFi.disconnect(true, true);  // Also erases ESP-IDF SDK WiFi flash credentials
+      delay(150);
+    }
     delay(50);
     ESP.restart();
   }

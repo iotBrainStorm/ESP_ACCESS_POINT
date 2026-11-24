@@ -2271,11 +2271,42 @@
             style="
               font-size: 0.8rem;
               color: var(--text-muted);
-              margin-bottom: 12px;
+              margin-bottom: 10px;
             "
           >
             All reset actions require Administrator verification.
           </p>
+          <div
+            style="
+              font-size: 0.76rem;
+              color: var(--text-muted);
+              background: var(--bg);
+              border: 1px solid var(--border);
+              border-radius: 10px;
+              padding: 10px 12px;
+              margin-bottom: 12px;
+              line-height: 1.6;
+            "
+          >
+            <div>
+              <strong style="color: var(--text)">Reset Data:</strong> Erases
+              Devices, Shortcut Buttons, Groups, Favorites &amp; 2D Building
+              Designs. Keeps WiFi, Network, Admin &amp; Preferences.
+            </div>
+            <div>
+              <strong style="color: var(--text)">Reset Settings:</strong> Erases
+              UI Preferences, Layout Studio, Network NVS (IP/DHCP, AP, mDNS),
+              Time/NTP NVS, Users (reverts to <code>esp / 456456</code>) &amp;
+              Verification rules. Keeps WiFi, Devices, Shortcuts, Groups,
+              Favorites &amp; Designs.
+            </div>
+            <div>
+              <strong style="color: var(--err)">Factory Reset:</strong> Erases
+              everything above
+              <strong>plus saved WiFi credentials</strong>
+              and reboots ESP32 into AP Setup Portal (<code>HOME ACCESS</code>).
+            </div>
+          </div>
           <div style="display: flex; gap: 10px; flex-wrap: wrap">
             <button class="btn" onclick="rebootHub()">Restart Hub</button>
             <button class="btn btn-danger" onclick="resetDataOnly()">
@@ -7139,16 +7170,24 @@
         setTimeout(() => (location.href = "index.html"), 4000);
       }
 
-      // 1. Reset Data Only (Clears Devices, Shortcuts, Groups & Favorites; keeps Settings/Network/Admin)
+      // 1. Reset Data Only (Erases Devices, Shortcuts, Groups, Favorites & 2D Designs)
       async function resetDataOnly() {
         const verified = await promptVerification(
           "admin",
-          "Admin Auth: Reset All Device & Group Data",
+          "Admin Auth: Reset All Data",
         );
         if (!verified) return;
         if (
           !confirm(
-            "Reset Data?\n\nThis will remove all saved Devices, Shortcut Buttons, Groups, and Favorites, while keeping your Network, Admin, and UI Settings intact.",
+            "Reset Data?\n\n" +
+              "WILL BE ERASED:\n" +
+              "• All saved Devices\n" +
+              "• All Shortcut Buttons\n" +
+              "• All Groups (reverts to General)\n" +
+              "• All Favorites\n" +
+              "• All 2D Home Designs (/design.json)\n\n" +
+              "WILL BE KEPT:\n" +
+              "• WiFi, Network, Time, Admin Users & UI Preferences",
           )
         )
           return;
@@ -7157,9 +7196,16 @@
         config.shortcuts = [];
         config.groups = [{ id: "g1", name: "General", color: "#38bdf8" }];
         config.favorites = [];
+        pendingImportedDesigns = null;
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        localStorage.removeItem(DESIGN_STORAGE_KEY);
+        localStorage.removeItem("hub_collapsed_groups");
+
         if (!isOfflinePreview) {
+          await fetch("/api/reset?mode=data", { method: "POST" }).catch(
+            () => {},
+          );
           await fetch("/api/config", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -7167,20 +7213,28 @@
           }).catch(() => {});
         }
         isDirty = false;
+        pendingReorderAuth.clear();
         renderAll();
-        showToast("All device, shortcut, group & favorite data reset!");
+        showToast("Data & 2D designs erased! Settings & WiFi kept.");
       }
 
-      // 2. Reset Settings Only (Resets Preferences, Network & Admin; keeps Devices/Shortcuts/Groups/Favorites)
+      // 2. Reset Settings Only (Erases Preferences, Layout, Network NVS, Time NVS & Admin)
       async function resetSettingsOnly() {
         const verified = await promptVerification(
           "admin",
-          "Admin Auth: Reset All Hub Settings",
+          "Admin Auth: Reset Hub Settings",
         );
         if (!verified) return;
         if (
           !confirm(
-            "Reset Settings?\n\nThis will reset Preferences, Network configuration, and Administrator settings to defaults, while keeping your saved Devices, Shortcuts, Groups, and Favorites.",
+            "Reset Settings?\n\n" +
+              "WILL BE ERASED:\n" +
+              "• Dashboard Preferences & Layout Studio\n" +
+              "• Network NVS (reverts to DHCP, AP 'HOME ACCESS', homeaccess.local)\n" +
+              "• Time & NTP NVS (pool.ntp.org, UTC+5.5, Last Sync)\n" +
+              "• Users & Login Policies (reverts to esp / 456456)\n\n" +
+              "WILL BE KEPT:\n" +
+              "• Saved WiFi SSID/Password, Devices, Shortcuts, Groups, Favorites & 2D Designs",
           )
         )
           return;
@@ -7191,8 +7245,14 @@
         config.admin = defaults.admin;
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        localStorage.removeItem("hub_view_mode");
         clearLockoutData();
+        sessionStorage.clear();
+
         if (!isOfflinePreview) {
+          await fetch("/api/reset?mode=settings", { method: "POST" }).catch(
+            () => {},
+          );
           await fetch("/api/config", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -7200,34 +7260,48 @@
           }).catch(() => {});
         }
         isDirty = false;
+        pendingReorderAuth.clear();
         applyTheme();
         renderAll();
-        showToast("Hub settings reset to default (Devices kept)!");
+        showToast("Settings reset! Default login is now esp / 456456");
       }
 
-      // 3. Factory Reset (Erases Everything)
+      // 3. Factory Reset (Erases SPIFFS, Network/Time NVS, WiFi Credentials & Reboots)
       async function factoryReset() {
         const verified = await promptVerification(
           "admin",
-          "Admin Auth: Factory Reset NVS",
+          "Admin Auth: Full Factory Reset",
         );
         if (!verified) return;
         if (
           !confirm(
-            "Factory Reset?\n\nErase ALL saved devices, shortcuts, groups, favorites, and settings back to factory defaults?",
+            "Factory Reset?\n\n" +
+              "WILL BE ERASED PERMANENTLY:\n" +
+              "• /config.json (Devices, Shortcuts, Groups, Favorites, Settings, Admin)\n" +
+              "• /design.json (All 2D Home Designs)\n" +
+              "• NVS hubnet & hubtime (Static IP, AP, mDNS, NTP, Timezone)\n" +
+              "• NVS wfcfg (Saved WiFi SSID & Password)\n\n" +
+              "The ESP32 will reboot into AP Setup Portal (HOME ACCESS).",
           )
         )
           return;
 
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(DESIGN_STORAGE_KEY);
+        localStorage.removeItem("hub_view_mode");
+        localStorage.removeItem("hub_collapsed_groups");
         clearLockoutData();
         sessionStorage.clear();
         isDirty = false;
-        if (!isOfflinePreview)
-          await fetch("/api/reset", { method: "POST" }).catch(() => {});
-        showToast("Factory reset complete");
-        setTimeout(() => location.reload(), 800);
+        pendingReorderAuth.clear();
+
+        if (!isOfflinePreview) {
+          await fetch("/api/reset?mode=factory", { method: "POST" }).catch(
+            () => {},
+          );
+        }
+        showToast("Factory reset complete! ESP32 rebooting into AP mode...");
+        setTimeout(() => location.reload(), 2000);
       }
 
       /* ============================================================================

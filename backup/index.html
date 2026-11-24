@@ -2453,6 +2453,7 @@
       let deviceLatency = {};
       let shortcutStatus = {};
       let shortcutBusy = {};
+      let shortcutErrorReason = {};
 
       let authResolveCallback = null;
       let requiredAuthRole = "all"; // "admin" | "user" | "all"
@@ -3671,6 +3672,7 @@
           matchingShortcuts.forEach((item) => {
             item.state = newState;
             shortcutStatus[item.id] = "online";
+            delete shortcutErrorReason[item.id];
           });
 
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
@@ -3681,6 +3683,8 @@
           showToast(err.message || `Failed to toggle ${sc.name}`);
           matchingShortcuts.forEach((item) => {
             shortcutStatus[item.id] = "offline";
+            shortcutErrorReason[item.id] =
+              err.message || "Auth / Network error";
           });
         } finally {
           matchingShortcuts.forEach((item) => (shortcutBusy[item.id] = false));
@@ -3779,21 +3783,22 @@
         }
       }
 
-      async function syncShortcutsForHost(hostKey, silent = false) {
-        const group = (config.shortcuts || []).filter((s) => {
-          const h = cleanHostInput(s.host).toLowerCase();
-          const p = Number(s.port) || 80;
-          return `${h}:${p}` === hostKey;
-        });
+      async function syncShortcutGroup(group, silent = false) {
         if (!group.length) return;
 
         const first = group[0];
         const cleanH = cleanHostInput(first.host);
         const portPart =
           first.port && Number(first.port) !== 80 ? `:${first.port}` : "";
+        const rawKey = revealApiKey(first.apiKey);
 
-        if (!cleanH) {
-          group.forEach((s) => (shortcutStatus[s.id] = "offline"));
+        if (!cleanH || !rawKey) {
+          group.forEach((s) => {
+            shortcutStatus[s.id] = "offline";
+            shortcutErrorReason[s.id] = !cleanH
+              ? "Invalid host"
+              : "Missing API key";
+          });
           updateStatusIndicators();
           return;
         }
@@ -3809,38 +3814,76 @@
           config.settings.pingTimeoutMs || 1800,
         );
 
-        let stateChanged = false;
         let configDataChanged = false;
+        const baseUrl = `http://${cleanH}${portPart}`;
 
         try {
-          const res = await fetch(`http://${cleanH}${portPart}/api/switches`, {
+          // Step 1: Validate API key via non-toggling state=status check
+          const authRes = await fetch(`${baseUrl}/api/switch/toggle`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: `index=${encodeURIComponent(first.index ?? 0)}&state=status&key=${encodeURIComponent(rawKey)}`,
             cache: "no-store",
             signal: controller.signal,
           });
-          if (!res.ok) throw new Error("HTTP " + res.status);
-          const data = await res.json();
+          const authData = await authRes.json().catch(() => ({
+            ok: false,
+            error: `HTTP ${authRes.status}`,
+          }));
 
-          group.forEach((s) => {
-            const idx = Number(s.index) || 0;
-            if (Array.isArray(data.states) && data.states[idx] !== undefined) {
-              const liveState = !!data.states[idx];
-              if (s.state !== liveState) {
+          if (!authRes.ok || authData.ok === false) {
+            throw new Error(authData.error || "Invalid API Key");
+          }
+
+          // Step 2: Single shortcut? We already have its live state!
+          if (group.length === 1) {
+            if (authData.state !== undefined) {
+              const liveState = !!authData.state;
+              if (first.state !== liveState) {
+                first.state = liveState;
                 configDataChanged = true;
-                s.state = liveState;
-                stateChanged = true;
               }
             }
-            if (shortcutStatus[s.id] !== "online") {
-              shortcutStatus[s.id] = "online";
-              stateChanged = true;
-            }
-          });
+            shortcutStatus[first.id] = "online";
+            delete shortcutErrorReason[first.id];
+          } else {
+            // Multiple shortcuts sharing this verified host + key -> fetch all states once
+            const res = await fetch(`${baseUrl}/api/switches`, {
+              cache: "no-store",
+              signal: controller.signal,
+            });
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const data = await res.json();
+
+            group.forEach((s) => {
+              const idx = Number(s.index) || 0;
+              if (
+                Array.isArray(data.states) &&
+                data.states[idx] !== undefined
+              ) {
+                const liveState = !!data.states[idx];
+                if (s.state !== liveState) {
+                  s.state = liveState;
+                  configDataChanged = true;
+                }
+                shortcutStatus[s.id] = "online";
+                delete shortcutErrorReason[s.id];
+              } else {
+                shortcutStatus[s.id] = "offline";
+                shortcutErrorReason[s.id] = `Invalid index ${idx}`;
+              }
+            });
+          }
         } catch (err) {
+          const reason =
+            err.name === "AbortError"
+              ? "Timeout / Unreachable"
+              : err.message || "Auth failed";
           group.forEach((s) => {
-            if (shortcutStatus[s.id] !== "offline") {
-              shortcutStatus[s.id] = "offline";
-              stateChanged = true;
-            }
+            shortcutStatus[s.id] = "offline";
+            shortcutErrorReason[s.id] = reason;
           });
         } finally {
           clearTimeout(timeout);
@@ -3852,19 +3895,19 @@
       }
 
       async function syncAllShortcuts(silent = false) {
-        const uniqueHosts = [
-          ...new Set(
-            (config.shortcuts || [])
-              .map((s) => {
-                const h = cleanHostInput(s.host).toLowerCase();
-                const p = Number(s.port) || 80;
-                return h ? `${h}:${p}` : null;
-              })
-              .filter(Boolean),
-          ),
-        ];
+        const groupsMap = new Map();
+        (config.shortcuts || []).forEach((s) => {
+          const h = cleanHostInput(s.host).toLowerCase();
+          const p = Number(s.port) || 80;
+          const k = revealApiKey(s.apiKey);
+          const groupKey = `${h}:${p}|${k}`;
+          if (!groupsMap.has(groupKey)) groupsMap.set(groupKey, []);
+          groupsMap.get(groupKey).push(s);
+        });
         await Promise.all(
-          uniqueHosts.map((hostKey) => syncShortcutsForHost(hostKey, silent)),
+          Array.from(groupsMap.values()).map((grp) =>
+            syncShortcutGroup(grp, silent),
+          ),
         );
       }
 
@@ -3935,7 +3978,9 @@
             .querySelectorAll(`[data-sc-status-id="${sc.id}"]`)
             .forEach((dot) => {
               dot.className = `dot ${st}`;
-              dot.title = `Status: ${st}`;
+              dot.title = shortcutErrorReason[sc.id]
+                ? `Status: ${st} (${shortcutErrorReason[sc.id]})`
+                : `Status: ${st}`;
             });
           document
             .querySelectorAll(`[data-sc-card-id="${sc.id}"]`)
@@ -4701,6 +4746,7 @@
             applySettingsUI();
             startHomeBackgroundTimers();
             renderAll();
+            if (config?.shortcuts?.length) syncAllShortcuts(true);
           } catch (_) {}
         }
       });
