@@ -1,15 +1,19 @@
+#include "esp_heap_caps.h"
+#include "esp_partition.h"
 #include "esp_sntp.h"
 #include "esp_timer.h"
 #include "time.h"
 #include <Arduino.h>
-#include <Ticker.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
+#include <Wire.h>
 #include <new>
 
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
+#include <FFat.h>
+#include <FS.h>
 #include <Preferences.h>
 #include <SPIFFS.h>
 #include <math.h>
@@ -20,21 +24,58 @@ static constexpr WebRequestMethod ASYNC_POST = AsyncWebRequestMethod::HTTP_POST;
 static constexpr WebRequestMethod ASYNC_OPTIONS = AsyncWebRequestMethod::HTTP_OPTIONS;
 
 // ============================================================================
-// 1. HARDWARE PINS & SYSTEM LIMITS
+// 1. BOARD AUTO-DETECTION, HARDWARE PINS & SYSTEM LIMITS
 // ============================================================================
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+#define HUB_BOARD_NAME "ESP32-S3"
+#define HAS_BUILTIN_RGB_LED 1
+// Standard ESP32-S3 N16R8 DevKitC-1 uses GPIO 48 for onboard WS2812B RGB LED.
+// (Change to 38 only if your board silkscreen/revision specifies GPIO 38.)
+#define S3_RGB_LED_PIN 48
+
+// Safe GPIOs on ESP32-S3 N16R8:
+// - Avoids OPI PSRAM pins (35, 36, 37) and Flash pins (26-32)
+// - Avoids Native USB pins (19, 20)
+// - Avoids Default I2C pins (SDA=8, SCL=9) reserved for future 128x64 display
 #define LED_PIN 16
-#define BUILTIN_LED_PIN 2
 #define BUZZER_PIN 17
 #define BOOT_BUTTON 0
+
+static constexpr size_t MAX_CONFIG_BYTES = 131072;    // 128 KB on S3
+static constexpr size_t MAX_DESIGN_BYTES = 524288;    // 512 KB on S3
+static constexpr size_t MAX_SMALL_JSON_BYTES = 4096;  // 4 KB
+static constexpr uint8_t FS_MAX_OPEN_FILES = 16;
+static constexpr int MAX_MDNS_SCAN_RESULTS = 64;
+#else
+#define HUB_BOARD_NAME "ESP32-Dev"
+#define HAS_BUILTIN_RGB_LED 0
+#define BUILTIN_LED_PIN 2
+
+// Safe GPIOs on Classic ESP32 Dev Module:
+// - Avoids Default I2C pins (SDA=21, SCL=22) reserved for future 128x64 display
+#define LED_PIN 16
+#define BUZZER_PIN 17
+#define BOOT_BUTTON 0
+
+static constexpr size_t MAX_CONFIG_BYTES = 20480;     // 20 KB (16 KB UI + margin)
+static constexpr size_t MAX_DESIGN_BYTES = 69632;     // 68 KB (64 KB UI + margin)
+static constexpr size_t MAX_SMALL_JSON_BYTES = 1024;  // 1 KB
+static constexpr uint8_t FS_MAX_OPEN_FILES = 10;
+static constexpr int MAX_MDNS_SCAN_RESULTS = 24;
+#endif
+
+// Default board I2C bus reserved for future 128x64 I2C OLED/LCD display:
+// - Classic ESP32 Dev Module: SDA = 21, SCL = 22
+// - ESP32-S3 N16R8 Module:    SDA = 8,  SCL = 9
+static constexpr uint8_t I2C_SDA_PIN = SDA;
+static constexpr uint8_t I2C_SCL_PIN = SCL;
+static constexpr uint32_t I2C_CLOCK_HZ = 400000UL;
 
 static const char *CONFIG_PATH = "/config.json";
 static const char *CONFIG_TMP_PATH = "/config.tmp";
 static const char *DESIGN_PATH = "/design.json";
 static const char *DESIGN_TMP_PATH = "/design.tmp";
 
-static const size_t MAX_CONFIG_BYTES = 20480;     // 16 KB UI limit + safety margin
-static const size_t MAX_DESIGN_BYTES = 69632;     // 64 KB UI limit + safety margin
-static const size_t MAX_SMALL_JSON_BYTES = 1024;  // For /api/time/sync & /api/wifi/portal
 static const uint32_t MIN_FREE_HEAP_FOR_FILES = 12000;
 static const uint32_t MIN_FREE_HEAP_FOR_UPLOAD = 16000;
 static const uint32_t CRITICAL_LOW_HEAP_BYTES = 8000;
@@ -49,20 +90,325 @@ static const unsigned long BOOT_HOLD_VALID_MS = 15000UL;
 static const unsigned long FORGET_HOLD_CONFIRM_MS = 350UL;  // Stable press during 5s window
 
 // ============================================================================
-// 2. GLOBAL OBJECTS & THREAD SAFETY
+// 2. PSRAM ALLOCATOR (ARDUINOJSON v7) & PSRAM STATIC ASSET CACHE
+// ============================================================================
+bool hasPsram = false;
+
+struct PsramAllocator : ArduinoJson::Allocator {
+  void *allocate(size_t size) override {
+    if (hasPsram) {
+      void *ptr = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+      if (ptr) return ptr;
+    }
+    return malloc(size);
+  }
+  void deallocate(void *pointer) override {
+    free(pointer);
+  }
+  void *reallocate(void *ptr, size_t new_size) override {
+    if (hasPsram) {
+      void *newPtr = heap_caps_realloc(ptr, new_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+      if (newPtr) return newPtr;
+    }
+    return realloc(ptr, new_size);
+  }
+};
+static PsramAllocator psramAllocator;
+
+// Static web file cache in 8 MB OPI PSRAM (eliminates repeated flash reads on S3)
+static constexpr size_t MAX_PSRAM_CACHE_ENTRIES = 12;
+static constexpr size_t MAX_PSRAM_CACHE_FILE_BYTES = 524288;  // 512 KB per asset
+
+struct PsramCacheEntry {
+  char path[40] = "";
+  uint8_t *data = nullptr;
+  size_t len = 0;
+  bool isGzip = false;
+  bool valid = false;
+};
+static PsramCacheEntry psramCache[MAX_PSRAM_CACHE_ENTRIES];
+static size_t psramCacheTotalBytes = 0;
+
+// Must be called ONLY while holding fsMutex
+void clearPsramCacheLocked() {
+  for (size_t i = 0; i < MAX_PSRAM_CACHE_ENTRIES; i++) {
+    if (psramCache[i].data) {
+      free(psramCache[i].data);
+      psramCache[i].data = nullptr;
+    }
+    psramCache[i].path[0] = '\0';
+    psramCache[i].len = 0;
+    psramCache[i].isGzip = false;
+    psramCache[i].valid = false;
+  }
+  psramCacheTotalBytes = 0;
+}
+
+// ============================================================================
+// 3. UNIFIED FILESYSTEM ABSTRACTION (SPIFFS / 16MB FFat AUTO-DETECT)
+// ============================================================================
+fs::FS *hubFS = nullptr;
+bool fsIsFFat = false;
+const char *fsTypeName = "NONE";
+
+uint64_t fsUsedBytes() {
+  if (!hubFS) return 0;
+  return fsIsFFat ? (uint64_t)FFat.usedBytes() : (uint64_t)SPIFFS.usedBytes();
+}
+
+uint64_t fsTotalBytes() {
+  if (!hubFS) return 0;
+  return fsIsFFat ? (uint64_t)FFat.totalBytes() : (uint64_t)SPIFFS.totalBytes();
+}
+
+bool initStorage() {
+  const esp_partition_t *spiffsPart = esp_partition_find_first(
+    ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, nullptr);
+  const esp_partition_t *fatPart = esp_partition_find_first(
+    ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, nullptr);
+
+  // Prefer FATFS when a large FAT partition is selected (e.g., 16M Flash 9.9MB/12.5MB FATFS),
+  // otherwise mount SPIFFS automatically.
+  if (fatPart && !spiffsPart) {
+    Serial.println("[FS] Detected FAT partition - mounting FFat (first-time format may take ~15s)...");
+    if (FFat.begin(true, "/ffat", FS_MAX_OPEN_FILES)) {
+      hubFS = &FFat;
+      fsIsFFat = true;
+      fsTypeName = "FFat";
+      return true;
+    }
+    Serial.println("[ERROR] FFat mount failed!");
+    return false;
+  }
+
+  if (spiffsPart) {
+    if (SPIFFS.begin(true, "/spiffs", FS_MAX_OPEN_FILES)) {
+      hubFS = &SPIFFS;
+      fsIsFFat = false;
+      fsTypeName = "SPIFFS";
+      return true;
+    }
+    Serial.println("[ERROR] SPIFFS mount failed!");
+  }
+
+  // Fallback if both or custom partition labels exist
+  if (fatPart && FFat.begin(true, "/ffat", FS_MAX_OPEN_FILES)) {
+    hubFS = &FFat;
+    fsIsFFat = true;
+    fsTypeName = "FFat";
+    return true;
+  }
+
+  return false;
+}
+
+// ============================================================================
+// 4. BUILT-IN /upload FILE MANAGER UI (SERVED FROM FLASH WITH ZERO HEAP)
+// ============================================================================
+static const char UPLOAD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smart Hub Flash Uploader</title>
+<style>
+  :root{--bg:#0d1117;--card:#161b22;--bd:#30363d;--tx:#e6edf3;--mut:#8b949e;--acc:#2f81f7;--ok:#3fb950;--err:#f85149}
+  *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  body{margin:0;background:var(--bg);color:var(--tx);padding:20px}
+  .wrap{max-width:720px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:18px;margin-bottom:16px}
+  h1{margin:0 0 6px;font-size:20px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .sub{color:var(--mut);font-size:13px;margin:0 0 14px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}
+  .stat{background:#0d1117;border:1px solid var(--bd);border-radius:8px;padding:10px}
+  .stat b{display:block;font-size:15px;margin-top:2px}
+  .stat span{font-size:11px;color:var(--mut);text-transform:uppercase}
+  .bar{height:8px;background:#21262d;border-radius:99px;overflow:hidden}
+  .bar>div{height:100%;background:var(--acc);width:0%;transition:width .2s}
+  .drop{border:2px dashed var(--bd);border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;transition:.15s}
+  .drop.over{border-color:var(--acc);background:rgba(47,129,247,.08)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  button,a.btn{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+  button.sec,a.sec{background:#21262d;border:1px solid var(--bd);color:var(--tx)}
+  button.del{background:transparent;border:1px solid rgba(248,81,73,.4);color:var(--err);padding:4px 9px;font-size:12px}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  #log{margin-top:12px;font-family:ui-monospace,Consolas,monospace;font-size:12px;background:#0d1117;border:1px solid var(--bd);border-radius:8px;padding:10px;max-height:160px;overflow:auto;white-space:pre-wrap;display:none}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--bd)}
+  th{color:var(--mut);font-weight:600;font-size:12px}
+  td.sz{font-family:ui-monospace,Consolas,monospace;color:var(--mut);white-space:nowrap}
+  td.act{text-align:right;white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>
+      <span>Flash Storage Uploader</span>
+      <span style="display:flex;gap:8px">
+        <a class="btn sec" href="/">Open Hub</a>
+        <button class="sec" onclick="rebootHub()">Reboot</button>
+      </span>
+    </h1>
+    <p class="sub">Drop all <b>.gz</b> / web files from your <code>data/</code> folder here to upload directly into flash.</p>
+    <div class="stats">
+      <div class="stat"><span>Board / FS</span><b id="stBoard">-</b></div>
+      <div class="stat"><span>Storage Used</span><b id="stUsed">-</b></div>
+      <div class="stat"><span>Storage Free</span><b id="stFree">-</b></div>
+      <div class="stat"><span>PSRAM</span><b id="stPsram">-</b></div>
+    </div>
+    <div class="bar"><div id="stBar"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="drop" id="dropZone" onclick="fileInput.click()">
+      <div style="font-size:15px;font-weight:600">Click to select files or drag &amp; drop here</div>
+      <div style="font-size:12px;color:var(--mut);margin-top:4px">Supports multiple files (index.html.gz, config.html.gz, layout.html.gz, design.html.gz, *.svg.gz)</div>
+      <input id="fileInput" type="file" multiple style="display:none">
+    </div>
+    <div class="row">
+      <button id="upBtn" onclick="uploadQueued()" disabled>Upload Selected (0)</button>
+      <button class="sec" onclick="loadList()">Refresh List</button>
+      <span id="upStatus" style="font-size:13px;color:var(--mut)"></span>
+    </div>
+    <div class="bar" style="margin-top:10px"><div id="upBar"></div></div>
+    <div id="log"></div>
+  </div>
+
+  <div class="card">
+    <h1 style="font-size:16px;margin-bottom:10px"><span>Files in Flash (<span id="fCount">0</span>)</span></h1>
+    <table>
+      <thead><tr><th>Path</th><th>Size</th><th style="text-align:right">Action</th></tr></thead>
+      <tbody id="fBody"><tr><td colspan="3" style="color:var(--mut)">Loading...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+<script>
+let queued = [];
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const upBtn = document.getElementById('upBtn');
+const upStatus = document.getElementById('upStatus');
+const upBar = document.getElementById('upBar');
+const logEl = document.getElementById('log');
+
+function fmtBytes(b){
+  if(b >= 1048576) return (b/1048576).toFixed(2)+' MB';
+  if(b >= 1024) return (b/1024).toFixed(1)+' KB';
+  return b+' B';
+}
+function addLog(msg){
+  logEl.style.display='block';
+  logEl.textContent += msg + '\n';
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setQueue(fileList){
+  queued = Array.from(fileList || []);
+  upBtn.textContent = 'Upload Selected (' + queued.length + ')';
+  upBtn.disabled = queued.length === 0;
+  upStatus.textContent = queued.length ? queued.map(f=>f.name).join(', ') : '';
+}
+
+fileInput.addEventListener('change', e => setQueue(e.target.files));
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('over');
+  setQueue(e.dataTransfer.files);
+});
+
+async function uploadQueued(){
+  if(!queued.length) return;
+  upBtn.disabled = true;
+  logEl.textContent = '';
+  let okCount = 0;
+  for(let i=0;i<queued.length;i++){
+    const f = queued[i];
+    upStatus.textContent = 'Uploading ' + (i+1) + '/' + queued.length + ': ' + f.name;
+    upBar.style.width = Math.round((i / queued.length) * 100) + '%';
+    const fd = new FormData();
+    fd.append('file', f, f.name);
+    try{
+      const r = await fetch('/api/fs/upload', { method:'POST', body:fd });
+      const j = await r.json();
+      if(r.ok && j.ok){
+        okCount++;
+        addLog('[OK] ' + j.path + ' (' + fmtBytes(j.bytes) + ')');
+      } else {
+        addLog('[ERR] ' + f.name + ': ' + (j.error || r.status));
+      }
+    }catch(err){
+      addLog('[ERR] ' + f.name + ': ' + err.message);
+    }
+  }
+  upBar.style.width = '100%';
+  upStatus.textContent = 'Done: ' + okCount + '/' + queued.length + ' uploaded.';
+  queued = [];
+  fileInput.value = '';
+  upBtn.textContent = 'Upload Selected (0)';
+  await loadList();
+}
+
+async function delFile(path){
+  if(!confirm('Delete ' + path + '?')) return;
+  const r = await fetch('/api/fs/delete?path=' + encodeURIComponent(path), { method:'POST' });
+  if(r.ok) await loadList();
+}
+
+async function rebootHub(){
+  if(!confirm('Reboot device now?')) return;
+  await fetch('/api/reboot', { method:'POST' });
+  upStatus.textContent = 'Rebooting...';
+}
+
+async function loadList(){
+  try{
+    const r = await fetch('/api/fs/list', { cache:'no-store' });
+    const d = await r.json();
+    document.getElementById('stBoard').textContent = d.board + ' / ' + d.fsType;
+    document.getElementById('stUsed').textContent = fmtBytes(d.usedBytes) + ' / ' + fmtBytes(d.totalBytes);
+    document.getElementById('stFree').textContent = fmtBytes(d.freeBytes);
+    document.getElementById('stPsram').textContent = d.psramOk ? fmtBytes(d.psramTotalBytes) : 'Off';
+    const pct = d.totalBytes ? Math.min(100, (d.usedBytes / d.totalBytes) * 100) : 0;
+    document.getElementById('stBar').style.width = pct.toFixed(1) + '%';
+    document.getElementById('fCount').textContent = d.files.length;
+    const tb = document.getElementById('fBody');
+    if(!d.files.length){
+      tb.innerHTML = '<tr><td colspan="3" style="color:var(--mut)">No files in flash yet. Upload your data/ files above.</td></tr>';
+      return;
+    }
+    d.files.sort((a,b)=>a.name.localeCompare(b.name));
+    tb.innerHTML = d.files.map(f =>
+      '<tr><td>' + f.name + '</td><td class="sz">' + fmtBytes(f.size) +
+      '</td><td class="act"><button class="del" onclick="delFile(\'' + f.name.replace(/'/g,"\\'") + '\')">Delete</button></td></tr>'
+    ).join('');
+  }catch(e){
+    document.getElementById('fBody').innerHTML = '<tr><td colspan="3" style="color:var(--err)">Failed to read flash list</td></tr>';
+  }
+}
+loadList();
+</script>
+</body>
+</html>)rawliteral";
+
+// ============================================================================
+// 5. GLOBAL OBJECTS, I2C DISPLAY HOOK & THREAD SAFETY
 // ============================================================================
 AsyncWebServer server(80);
 Preferences prefs;
-Ticker apLedTicker;
 
 SemaphoreHandle_t fsMutex = nullptr;
 SemaphoreHandle_t asyncReqMutex = nullptr;
+
+// Future 128x64 I2C Display detection state (0 = not connected yet)
+uint8_t detectedI2cDisplayAddr = 0;
 
 // Unique per-boot token so frontend resets lockout state after ESP32 restart
 static char bootIdStr[12] = "00000000";
 
 // ============================================================================
-// 3. RUNTIME CONFIGURATION STATE (PERSISTED IN NVS FOR FAST BOOT)
+// 6. RUNTIME CONFIGURATION STATE (PERSISTED IN NVS FOR FAST BOOT)
 // ============================================================================
 struct HubNetworkConfig {
   bool dhcp = true;
@@ -85,13 +431,15 @@ long gmtOffsetSec = 19800L;
 String lastSyncTimeStr = "Never";
 
 // ============================================================================
-// 4. VOLATILE FLAGS & NON-BLOCKING STATE MACHINES
+// 7. VOLATILE FLAGS & NON-BLOCKING STATE MACHINES
 // ============================================================================
 volatile bool wifiGotIpFlag = false;
 volatile bool wifiDisconnectedFlag = false;
 volatile bool timeSynced = false;
 volatile bool syncTimestampPending = false;
-volatile bool apLedState = false;
+volatile bool apLedBlinkActive = false;
+volatile bool notifyRgbPulsePending = false;
+TaskHandle_t apLedTaskHandle = nullptr;
 
 bool webServerRunning = false;
 bool mdnsRunning = false;
@@ -148,6 +496,18 @@ struct StreamUploadSession {
 };
 StreamUploadSession uploadSession;
 
+// Streaming Multipart Upload Session (for /api/fs/upload)
+struct FsFileUploadSession {
+  bool active = false;
+  AsyncWebServerRequest *owner = nullptr;
+  File file;
+  char path[64] = "";
+  size_t bytesWritten = 0;
+  bool ok = false;
+  char errorMsg[64] = "";
+};
+FsFileUploadSession fsUploadSession;
+
 // Lightweight fixed buffer for tiny JSON POSTs (/api/time/sync, /api/wifi/portal)
 struct SmallJsonBody {
   char data[MAX_SMALL_JSON_BYTES + 1];
@@ -156,32 +516,94 @@ struct SmallJsonBody {
 };
 
 // ============================================================================
-// 5. FORWARD DECLARATIONS
+// 8. FORWARD DECLARATIONS
 // ============================================================================
 void setupWebServer();
 bool syncTime();
 void startOrRefreshMdns();
 
 // ============================================================================
-// 6. CRASH GUARD & HARDWARE FEEDBACK
+// 9. CRASH GUARD, BOARD-SAFE BUILT-IN LED, I2C BUS & HARDWARE FEEDBACK
 // ============================================================================
 static void oomNewHandler() {
   ets_printf("[OOM] Heap allocation failed - restarting cleanly\n");
   esp_restart();
 }
 
+// Safely drives either the classic ESP32 GPIO 2 LED or the ESP32-S3 WS2812B RGB LED
+void setBuiltinLed(bool on, uint8_t r = 0, uint8_t g = 18, uint8_t b = 48) {
+#if HAS_BUILTIN_RGB_LED
+  uint8_t rv = on ? r : 0;
+  uint8_t gv = on ? g : 0;
+  uint8_t bv = on ? b : 0;
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  rgbLedWrite(S3_RGB_LED_PIN, rv, gv, bv);
+#else
+  neopixelWrite(S3_RGB_LED_PIN, rv, gv, bv);
+#endif
+#else
+  (void)r;
+  (void)g;
+  (void)b;
+  digitalWrite(BUILTIN_LED_PIN, on ? HIGH : LOW);
+#endif
+}
+
+// FreeRTOS task for AP portal blinking (100% RMT/NeoPixel-safe on ESP32-S3)
+void apLedBlinkTask(void *param) {
+  (void)param;
+  bool state = false;
+  while (apLedBlinkActive) {
+    state = !state;
+    setBuiltinLed(state, 0, 18, 48);  // Soft cyan-blue on S3 RGB, solid ON on classic ESP32
+    digitalWrite(LED_PIN, state ? HIGH : LOW);
+    vTaskDelay(pdMS_TO_TICKS(250));
+  }
+  setBuiltinLed(false);
+  digitalWrite(LED_PIN, LOW);
+  apLedTaskHandle = nullptr;
+  vTaskDelete(nullptr);
+}
+
+void startApLedBlink() {
+  if (apLedTaskHandle != nullptr) return;
+  apLedBlinkActive = true;
+  xTaskCreate(apLedBlinkTask, "apLedBlink", 2048, nullptr, 1, &apLedTaskHandle);
+}
+
+void stopApLedBlink() {
+  apLedBlinkActive = false;
+  unsigned long deadline = millis() + 600;
+  while (apLedTaskHandle != nullptr && millis() < deadline) {
+    delay(10);
+  }
+  setBuiltinLed(false);
+  digitalWrite(LED_PIN, LOW);
+}
+
 void notifyStorage() {
   digitalWrite(LED_PIN, HIGH);
   digitalWrite(BUZZER_PIN, HIGH);
+  notifyRgbPulsePending = true;
   notifyStorageOffAt = millis() + 90;
   if (notifyStorageOffAt == 0) notifyStorageOffAt = 1;
 }
 
 void serviceNotifyStorage() {
+  if (notifyRgbPulsePending) {
+    notifyRgbPulsePending = false;
+#if HAS_BUILTIN_RGB_LED
+    setBuiltinLed(true, 0, 36, 0);  // Brief subtle green confirmation pulse on S3
+#endif
+  }
+
   if (notifyStorageOffAt && (int32_t)(millis() - notifyStorageOffAt) >= 0) {
     notifyStorageOffAt = 0;
     digitalWrite(BUZZER_PIN, LOW);
     digitalWrite(LED_PIN, LOW);
+#if HAS_BUILTIN_RGB_LED
+    setBuiltinLed(false);
+#endif
   }
 }
 
@@ -194,8 +616,33 @@ void beepShort(uint8_t count = 1) {
   }
 }
 
+// Initializes default I2C bus for future 128x64 I2C LCD/OLED display (SSD1306/SH1106)
+void initI2cDisplayBus() {
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  Wire.setClock(I2C_CLOCK_HZ);
+
+  // Quick non-blocking probe of standard 128x64 I2C display addresses (0x3C, 0x3D)
+  const uint8_t probeAddrs[2] = { 0x3C, 0x3D };
+  detectedI2cDisplayAddr = 0;
+  for (uint8_t addr : probeAddrs) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() == 0) {
+      detectedI2cDisplayAddr = addr;
+      break;
+    }
+  }
+
+  if (detectedI2cDisplayAddr) {
+    Serial.printf("[I2C] 128x64 display detected at 0x%02X (SDA=%u, SCL=%u, 400kHz)\n",
+                  detectedI2cDisplayAddr, I2C_SDA_PIN, I2C_SCL_PIN);
+  } else {
+    Serial.printf("[I2C] Bus ready for future 128x64 display (SDA=%u, SCL=%u, 400kHz)\n",
+                  I2C_SDA_PIN, I2C_SCL_PIN);
+  }
+}
+
 // ============================================================================
-// 7. STRING, HOSTNAME & TIME UTILITIES
+// 10. STRING, HOSTNAME & TIME UTILITIES
 // ============================================================================
 String sanitizeMdnsHost(String raw) {
   raw.trim();
@@ -216,6 +663,17 @@ String sanitizeMdnsHost(String raw) {
   while (clean.startsWith("-")) clean.remove(0, 1);
   while (clean.endsWith("-")) clean.remove(clean.length() - 1);
   return clean.isEmpty() ? String("homeaccess") : clean;
+}
+
+String sanitizeUploadPath(String raw) {
+  raw.trim();
+  int slash = raw.lastIndexOf('/');
+  int bslash = raw.lastIndexOf('\\');
+  int cut = (slash > bslash) ? slash : bslash;
+  if (cut >= 0) raw = raw.substring(cut + 1);
+  raw.trim();
+  if (raw.isEmpty() || raw.indexOf("..") >= 0 || raw.length() > 56) return "";
+  return String("/") + raw;
 }
 
 void formatUptimeStr(char *out, size_t outSize) {
@@ -288,7 +746,7 @@ bool syncTime() {
 }
 
 // ============================================================================
-// 8. NVS PERSISTENCE (NETWORK, WIFI & TIME SETTINGS)
+// 11. NVS PERSISTENCE (NETWORK, WIFI & TIME SETTINGS)
 // ============================================================================
 void loadNetworkAndTimeFromNvs() {
   Preferences p;
@@ -374,16 +832,17 @@ void clearSavedWifiCredentials() {
   p.end();
 }
 
-// Extracts ONLY `network` and `admin.time` from /config.tmp using ArduinoJson Filter (< 1.5 KB RAM)
+// Extracts ONLY `network` and `admin.time` from /config.tmp using ArduinoJson Filter (PSRAM-backed on S3)
 bool syncRuntimeFromConfigFile(const char *path) {
-  File f = SPIFFS.open(path, "r");
+  if (!hubFS) return false;
+  File f = hubFS->open(path, "r");
   if (!f) return false;
 
-  JsonDocument filter;
+  JsonDocument filter(&psramAllocator);
   filter["network"] = true;
   filter["admin"]["time"] = true;
 
-  JsonDocument doc;
+  JsonDocument doc(&psramAllocator);
   DeserializationError err = deserializeJson(doc, f, DeserializationOption::Filter(filter));
   f.close();
 
@@ -472,7 +931,7 @@ bool syncRuntimeFromConfigFile(const char *path) {
 }
 
 // ============================================================================
-// 9. WIFI, STATIC IP, mDNS & CONFIG PORTAL MANAGEMENT
+// 12. WIFI, STATIC IP, mDNS & CONFIG PORTAL MANAGEMENT
 // ============================================================================
 bool applyStationIpConfig() {
   WiFi.mode(WIFI_STA);
@@ -537,12 +996,7 @@ bool runWifiConfigPortal(bool forgetBeforeStart = false, bool restartOnSuccess =
   wm.setConnectTimeout(15);
   wm.setBreakAfterConfig(true);
 
-  apLedState = false;
-  apLedTicker.attach_ms(250, []() {
-    apLedState = !apLedState;
-    digitalWrite(BUILTIN_LED_PIN, apLedState ? HIGH : LOW);
-    digitalWrite(LED_PIN, apLedState ? HIGH : LOW);
-  });
+  startApLedBlink();
 
   bool connected = false;
   if (netCfg.apPass.length() >= 8 && netCfg.apPass.length() <= 63) {
@@ -551,10 +1005,7 @@ bool runWifiConfigPortal(bool forgetBeforeStart = false, bool restartOnSuccess =
     connected = wm.startConfigPortal(netCfg.apName.c_str());
   }
 
-  apLedTicker.detach();
-  apLedState = false;
-  digitalWrite(BUILTIN_LED_PIN, LOW);
-  digitalWrite(LED_PIN, LOW);
+  stopApLedBlink();
 
   if (connected && WiFi.status() == WL_CONNECTED) {
     Serial.printf("[WIFI] Connected via Portal: %s (%s)\n",
@@ -614,20 +1065,105 @@ bool connectToSavedWiFi() {
 }
 
 // ============================================================================
-// 10. SAFE STREAMING UPLOAD HELPERS (ZERO-LEAK, ZERO-BUFFER)
+// 13. SAFE STREAMING UPLOAD HELPERS (CONFIG/DESIGN + /api/fs/upload)
 // ============================================================================
 void abortUploadIfOwner(AsyncWebServerRequest *req) {
   if (!fsMutex) return;
   if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(500)) == pdTRUE) {
     if (uploadSession.active && uploadSession.owner == req) {
       if (uploadSession.file) uploadSession.file.close();
-      if (uploadSession.tmpPath && SPIFFS.exists(uploadSession.tmpPath)) {
-        SPIFFS.remove(uploadSession.tmpPath);
+      if (hubFS && uploadSession.tmpPath && hubFS->exists(uploadSession.tmpPath)) {
+        hubFS->remove(uploadSession.tmpPath);
       }
       uploadSession.active = false;
       uploadSession.owner = nullptr;
     }
     xSemaphoreGive(fsMutex);
+  }
+}
+
+void abortFsFileUploadIfOwner(AsyncWebServerRequest *req) {
+  if (!fsMutex) return;
+  if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(500)) == pdTRUE) {
+    if (fsUploadSession.active && fsUploadSession.owner == req) {
+      if (fsUploadSession.file) fsUploadSession.file.close();
+      fsUploadSession.active = false;
+      fsUploadSession.owner = nullptr;
+    }
+    xSemaphoreGive(fsMutex);
+  }
+}
+
+void handleFsFileUploadChunk(AsyncWebServerRequest *req, const String &filename,
+                             size_t index, uint8_t *data, size_t len, bool final) {
+  if (!fsMutex) return;
+
+  if (index == 0) {
+    if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) != pdTRUE) return;
+
+    if (fsUploadSession.active) {
+      xSemaphoreGive(fsMutex);
+      return;
+    }
+
+    fsUploadSession.active = true;
+    fsUploadSession.owner = req;
+    fsUploadSession.bytesWritten = 0;
+    fsUploadSession.ok = false;
+    fsUploadSession.path[0] = '\0';
+    fsUploadSession.errorMsg[0] = '\0';
+
+    req->onDisconnect([req]() {
+      abortFsFileUploadIfOwner(req);
+    });
+
+    String cleanPath = sanitizeUploadPath(filename);
+    if (!hubFS) {
+      strncpy(fsUploadSession.errorMsg, "Filesystem not mounted", sizeof(fsUploadSession.errorMsg) - 1);
+    } else if (cleanPath.isEmpty()) {
+      strncpy(fsUploadSession.errorMsg, "Invalid filename", sizeof(fsUploadSession.errorMsg) - 1);
+    } else {
+      strncpy(fsUploadSession.path, cleanPath.c_str(), sizeof(fsUploadSession.path) - 1);
+      if (hubFS->exists(fsUploadSession.path)) hubFS->remove(fsUploadSession.path);
+      fsUploadSession.file = hubFS->open(fsUploadSession.path, "w");
+      if (!fsUploadSession.file) {
+        strncpy(fsUploadSession.errorMsg, "Failed to create file in flash", sizeof(fsUploadSession.errorMsg) - 1);
+      } else {
+        fsUploadSession.ok = true;
+      }
+    }
+    xSemaphoreGive(fsMutex);
+  }
+
+  if (len > 0) {
+    if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+      if (fsUploadSession.active && fsUploadSession.owner == req && fsUploadSession.ok && fsUploadSession.file) {
+        size_t written = fsUploadSession.file.write(data, len);
+        fsUploadSession.bytesWritten += written;
+        if (written != len) {
+          fsUploadSession.ok = false;
+          strncpy(fsUploadSession.errorMsg, "Flash write failed (storage full)", sizeof(fsUploadSession.errorMsg) - 1);
+        }
+      }
+      xSemaphoreGive(fsMutex);
+    }
+  }
+
+  if (final) {
+    if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+      if (fsUploadSession.active && fsUploadSession.owner == req) {
+        if (fsUploadSession.file) {
+          fsUploadSession.file.flush();
+          fsUploadSession.file.close();
+        }
+        clearPsramCacheLocked();
+        Serial.printf("[UPLOAD] %s -> %s (%u B)\n",
+                      fsUploadSession.ok ? "OK" : "FAIL",
+                      fsUploadSession.path,
+                      (unsigned)fsUploadSession.bytesWritten);
+      }
+      xSemaphoreGive(fsMutex);
+    }
   }
 }
 
@@ -661,7 +1197,11 @@ void handleStreamBody(AsyncWebServerRequest *req, uint8_t *data, size_t len,
       abortUploadIfOwner(req);
     });
 
-    if (ESP.getFreeHeap() < MIN_FREE_HEAP_FOR_UPLOAD) {
+    if (!hubFS) {
+      uploadSession.failed = true;
+      uploadSession.errorCode = 500;
+      strncpy(uploadSession.errorMsg, "Filesystem not mounted", sizeof(uploadSession.errorMsg) - 1);
+    } else if (ESP.getFreeHeap() < MIN_FREE_HEAP_FOR_UPLOAD) {
       uploadSession.failed = true;
       uploadSession.errorCode = 503;
       strncpy(uploadSession.errorMsg, "Low memory", sizeof(uploadSession.errorMsg) - 1);
@@ -670,8 +1210,8 @@ void handleStreamBody(AsyncWebServerRequest *req, uint8_t *data, size_t len,
       uploadSession.errorCode = 413;
       strncpy(uploadSession.errorMsg, "Payload exceeds storage limit", sizeof(uploadSession.errorMsg) - 1);
     } else {
-      if (SPIFFS.exists(tmpPath)) SPIFFS.remove(tmpPath);
-      uploadSession.file = SPIFFS.open(tmpPath, "w");
+      if (hubFS->exists(tmpPath)) hubFS->remove(tmpPath);
+      uploadSession.file = hubFS->open(tmpPath, "w");
       if (!uploadSession.file) {
         uploadSession.failed = true;
         uploadSession.errorCode = 500;
@@ -702,7 +1242,7 @@ void handleStreamBody(AsyncWebServerRequest *req, uint8_t *data, size_t len,
       if (written != len) {
         uploadSession.failed = true;
         uploadSession.errorCode = 507;
-        strncpy(uploadSession.errorMsg, "SPIFFS write failed (storage full)", sizeof(uploadSession.errorMsg) - 1);
+        strncpy(uploadSession.errorMsg, "Flash write failed (storage full)", sizeof(uploadSession.errorMsg) - 1);
       }
     }
   }
@@ -710,8 +1250,8 @@ void handleStreamBody(AsyncWebServerRequest *req, uint8_t *data, size_t len,
 }
 
 void finalizeStreamUpload(AsyncWebServerRequest *req) {
-  if (!fsMutex) {
-    req->send(500, "application/json", "{\"ok\":false,\"error\":\"Mutex error\"}");
+  if (!fsMutex || !hubFS) {
+    req->send(500, "application/json", "{\"ok\":false,\"error\":\"Storage unavailable\"}");
     return;
   }
 
@@ -758,16 +1298,16 @@ void finalizeStreamUpload(AsyncWebServerRequest *req) {
   }
 
   if (ok) {
-    if (SPIFFS.exists(finalPath)) SPIFFS.remove(finalPath);
-    if (!SPIFFS.rename(tmpPath, finalPath)) {
+    if (hubFS->exists(finalPath)) hubFS->remove(finalPath);
+    if (!hubFS->rename(tmpPath, finalPath)) {
       ok = false;
       errCode = 500;
       errMsg = "Atomic file commit failed";
     }
   }
 
-  if (!ok && tmpPath && SPIFFS.exists(tmpPath)) {
-    SPIFFS.remove(tmpPath);
+  if (!ok && tmpPath && hubFS->exists(tmpPath)) {
+    hubFS->remove(tmpPath);
   }
 
   uploadSession.active = false;
@@ -775,7 +1315,7 @@ void finalizeStreamUpload(AsyncWebServerRequest *req) {
   xSemaphoreGive(fsMutex);
 
   if (!ok) {
-    JsonDocument d;
+    JsonDocument d(&psramAllocator);
     d["ok"] = false;
     d["error"] = errMsg.isEmpty() ? "Save failed" : errMsg;
     AsyncResponseStream *res = req->beginResponseStream("application/json");
@@ -820,20 +1360,141 @@ void handleSmallJsonBody(AsyncWebServerRequest *req, uint8_t *data, size_t len,
 }
 
 // ============================================================================
-// 11. STATIC FILE & JSON STREAMING HELPERS
+// 14. STATIC FILE (WITH S3 PSRAM CACHE) & JSON STREAMING HELPERS
 // ============================================================================
+bool getOrLoadPsramAsset(const char *path, const uint8_t *&outData,
+                         size_t &outLen, bool &outIsGzip) {
+  if (!hasPsram || !hubFS || !fsMutex) return false;
+
+  if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(500)) != pdTRUE) return false;
+
+  // 1. Cache hit check
+  for (size_t i = 0; i < MAX_PSRAM_CACHE_ENTRIES; i++) {
+    if (psramCache[i].valid && strcmp(psramCache[i].path, path) == 0) {
+      outData = psramCache[i].data;
+      outLen = psramCache[i].len;
+      outIsGzip = psramCache[i].isGzip;
+      xSemaphoreGive(fsMutex);
+      return true;
+    }
+  }
+
+  // 2. Find an empty slot
+  int freeSlot = -1;
+  for (size_t i = 0; i < MAX_PSRAM_CACHE_ENTRIES; i++) {
+    if (!psramCache[i].valid) {
+      freeSlot = (int)i;
+      break;
+    }
+  }
+  if (freeSlot < 0) {
+    xSemaphoreGive(fsMutex);
+    return false;
+  }
+
+  // 3. Locate .gz version first, else plain file
+  char gzPath[48];
+  snprintf(gzPath, sizeof(gzPath), "%s.gz", path);
+
+  const char *actualPath = nullptr;
+  bool isGz = false;
+  if (hubFS->exists(gzPath)) {
+    actualPath = gzPath;
+    isGz = true;
+  } else if (hubFS->exists(path)) {
+    actualPath = path;
+    isGz = false;
+  } else {
+    xSemaphoreGive(fsMutex);
+    return false;
+  }
+
+  File f = hubFS->open(actualPath, "r");
+  if (!f) {
+    xSemaphoreGive(fsMutex);
+    return false;
+  }
+
+  size_t sz = f.size();
+  if (sz == 0 || sz > MAX_PSRAM_CACHE_FILE_BYTES || ESP.getFreePsram() < (sz + 262144UL)) {
+    f.close();
+    xSemaphoreGive(fsMutex);
+    return false;
+  }
+
+  uint8_t *buf = static_cast<uint8_t *>(
+    heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+  if (!buf) {
+    f.close();
+    xSemaphoreGive(fsMutex);
+    return false;
+  }
+
+  size_t readBytes = f.read(buf, sz);
+  f.close();
+
+  if (readBytes != sz) {
+    free(buf);
+    xSemaphoreGive(fsMutex);
+    return false;
+  }
+
+  strncpy(psramCache[freeSlot].path, path, sizeof(psramCache[freeSlot].path) - 1);
+  psramCache[freeSlot].path[sizeof(psramCache[freeSlot].path) - 1] = '\0';
+  psramCache[freeSlot].data = buf;
+  psramCache[freeSlot].len = sz;
+  psramCache[freeSlot].isGzip = isGz;
+  psramCache[freeSlot].valid = true;
+  psramCacheTotalBytes += sz;
+
+  outData = buf;
+  outLen = sz;
+  outIsGzip = isGz;
+  xSemaphoreGive(fsMutex);
+
+  Serial.printf("[PSRAM] Cached %s (%u B, gzip=%d)\n", actualPath, (unsigned)sz, isGz ? 1 : 0);
+  return true;
+}
+
 void sendWebFile(AsyncWebServerRequest *req, const char *path,
                  const char *contentType, bool cacheStatic = false) {
+  if (!hubFS) {
+    req->send(500, "text/plain", "Filesystem not mounted");
+    return;
+  }
   if (ESP.getFreeHeap() < MIN_FREE_HEAP_FOR_FILES) {
     req->send(503, "text/plain", "Low memory - retry shortly");
     return;
   }
 
+  // Fast path on ESP32-S3 with 8 MB OPI PSRAM: serve directly from RAM
+  if (hasPsram) {
+    const uint8_t *data = nullptr;
+    size_t len = 0;
+    bool isGzip = false;
+    if (getOrLoadPsramAsset(path, data, len, isGzip)) {
+      AsyncWebServerResponse *res = req->beginChunkedResponse(
+        contentType,
+        [data, len](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+          if (index >= len) return 0;
+          size_t toCopy = len - index;
+          if (toCopy > maxLen) toCopy = maxLen;
+          memcpy(buffer, data + index, toCopy);
+          return toCopy;
+        });
+      if (isGzip) res->addHeader("Content-Encoding", "gzip");
+      res->addHeader("Cache-Control", cacheStatic ? "public, max-age=86400" : "no-store");
+      req->send(res);
+      return;
+    }
+  }
+
+  // Standard direct-from-flash streaming path (Classic ESP32 or PSRAM disabled)
   char gzPath[48];
   snprintf(gzPath, sizeof(gzPath), "%s.gz", path);
 
-  if (SPIFFS.exists(gzPath)) {
-    File f = SPIFFS.open(gzPath, "r");
+  if (hubFS->exists(gzPath)) {
+    File f = hubFS->open(gzPath, "r");
     uint8_t magic[2] = { 0, 0 };
     size_t sz = 0;
     if (f) {
@@ -845,32 +1506,43 @@ void sendWebFile(AsyncWebServerRequest *req, const char *path,
                   req->url().c_str(), gzPath, (unsigned)sz, magic[0], magic[1]);
 
     // Pass uncompressed `path` so ESPAsyncWebServer auto-serves `.gz` with ONE Content-Encoding header
-    AsyncWebServerResponse *res = req->beginResponse(SPIFFS, String(path), contentType, false);
+    AsyncWebServerResponse *res = req->beginResponse(*hubFS, String(path), contentType, false);
     res->addHeader("Cache-Control", cacheStatic ? "public, max-age=86400" : "no-store");
     req->send(res);
     return;
   }
 
-  if (SPIFFS.exists(path)) {
-    AsyncWebServerResponse *res = req->beginResponse(SPIFFS, String(path), contentType, false);
+  if (hubFS->exists(path)) {
+    AsyncWebServerResponse *res = req->beginResponse(*hubFS, String(path), contentType, false);
     res->addHeader("Cache-Control", cacheStatic ? "public, max-age=86400" : "no-store");
     req->send(res);
+    return;
+  }
+
+  // Auto-open built-in /upload page when main dashboard files haven't been uploaded yet
+  if (strcmp(path, "/index.html") == 0) {
+    Serial.println("[HTTP] /index.html missing -> redirecting to /upload");
+    req->redirect("/upload");
     return;
   }
 
   Serial.printf("[HTTP] 404 Missing: %s\n", path);
-  req->send(404, "text/plain", "File not found in SPIFFS");
+  req->send(404, "text/plain", "File not found in flash storage (open /upload to add files)");
 }
 
 void sendStoredJsonFile(AsyncWebServerRequest *req, const char *path,
                         const char *emptyFallback) {
+  if (!hubFS) {
+    req->send(500, "application/json", "{\"error\":\"Filesystem not mounted\"}");
+    return;
+  }
   if (ESP.getFreeHeap() < MIN_FREE_HEAP_FOR_FILES) {
     req->send(503, "application/json", "{\"error\":\"Low memory\"}");
     return;
   }
 
-  if (SPIFFS.exists(path)) {
-    AsyncWebServerResponse *res = req->beginResponse(SPIFFS, path, "application/json");
+  if (hubFS->exists(path)) {
+    AsyncWebServerResponse *res = req->beginResponse(*hubFS, path, "application/json");
     res->addHeader("Cache-Control", "no-store");
     req->send(res);
     return;
@@ -882,7 +1554,7 @@ void sendStoredJsonFile(AsyncWebServerRequest *req, const char *path,
 }
 
 // ============================================================================
-// 12. BACKGROUND SERVICERS (BOOT BUTTON, FORGET-BOOT & NATIVE mDNS SCANNER)
+// 15. BACKGROUND SERVICERS (BOOT BUTTON, FORGET-BOOT & NATIVE mDNS SCANNER)
 // ============================================================================
 void serviceBootButtonAndForgetAuth() {
   unsigned long now = millis();
@@ -957,18 +1629,17 @@ void serviceNativeMdnsScan() {
     xSemaphoreGive(asyncReqMutex);
   }
 
-  JsonDocument doc;
+  JsonDocument doc(&psramAllocator);
   JsonArray arr = doc.to<JsonArray>();
 
   if (WiFi.status() == WL_CONNECTED && mdnsRunning) {
     String selfIp = WiFi.localIP().toString();
     int added = 0;
-    const int MAX_SCAN_RESULTS = 24;
 
     auto queryServiceType = [&](const char *service, const char *proto,
                                 const char *defaultType) {
       int n = MDNS.queryService(service, proto);
-      for (int i = 0; i < n && added < MAX_SCAN_RESULTS; i++) {
+      for (int i = 0; i < n && added < MAX_MDNS_SCAN_RESULTS; i++) {
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
         String ip = MDNS.address(i).toString();
 #else
@@ -1005,7 +1676,7 @@ void serviceNativeMdnsScan() {
     };
 
     queryServiceType("http", "tcp", "ESP / HTTP Node");
-    if (localWantMqtt && added < MAX_SCAN_RESULTS) {
+    if (localWantMqtt && added < MAX_MDNS_SCAN_RESULTS) {
       queryServiceType("mqtt", "tcp", "MQTT Broker");
     }
   }
@@ -1023,7 +1694,7 @@ void serviceNativeMdnsScan() {
 }
 
 // ============================================================================
-// 13. WEB SERVER ROUTES (REGISTERED ONCE - SAFE RELAUNCH ON RECONNECT)
+// 16. WEB SERVER ROUTES (REGISTERED ONCE - SAFE RELAUNCH ON RECONNECT)
 // ============================================================================
 void setupWebServer() {
   static bool routesRegistered = false;
@@ -1047,6 +1718,134 @@ void setupWebServer() {
   server.on("/ping", ASYNC_GET, [](AsyncWebServerRequest *req) {
     Serial.println("[HTTP] 200 /ping");
     req->send(200, "text/plain", "pong");
+  });
+
+  // --- Built-in Flash Uploader Page (/upload) ---
+  server.on("/upload", ASYNC_GET, [](AsyncWebServerRequest *req) {
+    size_t totalLen = sizeof(UPLOAD_HTML) - 1;
+    AsyncWebServerResponse *res = req->beginChunkedResponse(
+      "text/html",
+      [totalLen](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+        if (index >= totalLen) return 0;
+        size_t toCopy = totalLen - index;
+        if (toCopy > maxLen) toCopy = maxLen;
+        memcpy_P(buffer, UPLOAD_HTML + index, toCopy);
+        return toCopy;
+      });
+    res->addHeader("Cache-Control", "no-store");
+    req->send(res);
+  });
+
+  // --- GET /api/fs/list (Lists flash storage & files for /upload) ---
+  server.on("/api/fs/list", ASYNC_GET, [](AsyncWebServerRequest *req) {
+    JsonDocument doc(&psramAllocator);
+    uint64_t totalB = fsTotalBytes();
+    uint64_t usedB = fsUsedBytes();
+    doc["board"] = HUB_BOARD_NAME;
+    doc["fsType"] = fsTypeName;
+    doc["usedBytes"] = usedB;
+    doc["totalBytes"] = totalB;
+    doc["freeBytes"] = (totalB > usedB) ? (totalB - usedB) : 0;
+    doc["psramOk"] = hasPsram;
+    doc["psramTotalBytes"] = hasPsram ? ESP.getPsramSize() : 0;
+
+    JsonArray arr = doc["files"].to<JsonArray>();
+    if (hubFS && xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+      File root = hubFS->open("/");
+      if (root) {
+        for (File f = root.openNextFile(); f; f = root.openNextFile()) {
+          if (f.isDirectory()) continue;
+          String name = String(f.name());
+          if (!name.startsWith("/")) name = String("/") + name;
+          JsonObject item = arr.add<JsonObject>();
+          item["name"] = name;
+          item["size"] = (uint32_t)f.size();
+        }
+        root.close();
+      }
+      xSemaphoreGive(fsMutex);
+    }
+
+    AsyncResponseStream *res = req->beginResponseStream("application/json");
+    res->addHeader("Cache-Control", "no-store");
+    serializeJson(doc, *res);
+    req->send(res);
+  });
+
+  // --- POST /api/fs/upload (Streams uploaded files straight into FFat/SPIFFS) ---
+  server.on(
+    "/api/fs/upload", ASYNC_POST,
+    [](AsyncWebServerRequest *req) {
+      bool ok = false;
+      size_t bytes = 0;
+      String path;
+      String err;
+
+      if (fsMutex && xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+        if (fsUploadSession.active && fsUploadSession.owner == req) {
+          if (fsUploadSession.file) {
+            fsUploadSession.file.flush();
+            fsUploadSession.file.close();
+          }
+          ok = fsUploadSession.ok;
+          bytes = fsUploadSession.bytesWritten;
+          path = fsUploadSession.path;
+          err = fsUploadSession.errorMsg;
+          fsUploadSession.active = false;
+          fsUploadSession.owner = nullptr;
+        } else {
+          err = "No file received or uploader busy";
+        }
+        xSemaphoreGive(fsMutex);
+      } else {
+        err = "Storage busy";
+      }
+
+      JsonDocument out(&psramAllocator);
+      out["ok"] = ok;
+      if (ok) {
+        out["path"] = path;
+        out["bytes"] = (uint32_t)bytes;
+        notifyStorage();
+      } else {
+        out["error"] = err.isEmpty() ? "Upload failed" : err;
+      }
+
+      AsyncResponseStream *res = req->beginResponseStream("application/json");
+      res->setCode(ok ? 200 : 500);
+      res->addHeader("Cache-Control", "no-store");
+      serializeJson(out, *res);
+      req->send(res);
+    },
+    handleFsFileUploadChunk);
+
+  // --- POST /api/fs/delete?path=/filename ---
+  server.on("/api/fs/delete", ASYNC_POST, [](AsyncWebServerRequest *req) {
+    if (!hubFS || !req->hasParam("path")) {
+      req->send(400, "application/json", "{\"ok\":false,\"error\":\"Missing path\"}");
+      return;
+    }
+    String p = sanitizeUploadPath(req->getParam("path")->value());
+    if (p.isEmpty()) {
+      req->send(400, "application/json", "{\"ok\":false,\"error\":\"Invalid path\"}");
+      return;
+    }
+
+    bool removed = false;
+    if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+      if (hubFS->exists(p.c_str())) {
+        removed = hubFS->remove(p.c_str());
+      }
+      clearPsramCacheLocked();
+      xSemaphoreGive(fsMutex);
+    }
+
+    if (removed) {
+      notifyStorage();
+      req->send(200, "application/json", "{\"ok\":true}");
+    } else {
+      req->send(404, "application/json", "{\"ok\":false,\"error\":\"File not found\"}");
+    }
   });
 
   // --- 4 Core Web Pages ---
@@ -1082,11 +1881,15 @@ void setupWebServer() {
 
   // --- GET /api/status (Telemetry for index.html, config.html, layout.html) ---
   server.on("/api/status", ASYNC_GET, [](AsyncWebServerRequest *req) {
-    JsonDocument d;
+    JsonDocument d(&psramAllocator);
     bool connected = (WiFi.status() == WL_CONNECTED);
     uint32_t totalHeap = ESP.getHeapSize();
     uint32_t freeHeap = ESP.getFreeHeap();
     uint32_t usedHeap = (totalHeap > freeHeap) ? (totalHeap - freeHeap) : 0;
+
+    uint32_t psramTotal = hasPsram ? ESP.getPsramSize() : 0;
+    uint32_t psramFree = hasPsram ? ESP.getFreePsram() : 0;
+    uint32_t psramUsed = (psramTotal > psramFree) ? (psramTotal - psramFree) : 0;
 
     char uptimeBuf[24];
     formatUptimeStr(uptimeBuf, sizeof(uptimeBuf));
@@ -1108,10 +1911,25 @@ void setupWebServer() {
     d["freeHeap"] = freeHeap;
     d["minHeap"] = ESP.getMinFreeHeap();
     d["maxBlock"] = ESP.getMaxAllocHeap();
-    d["storageUsedKb"] = roundf((SPIFFS.usedBytes() / 1024.0f) * 10.0f) / 10.0f;
-    d["storageTotalKb"] = roundf((SPIFFS.totalBytes() / 1024.0f) * 10.0f) / 10.0f;
+    d["storageUsedKb"] = roundf((fsUsedBytes() / 1024.0f) * 10.0f) / 10.0f;
+    d["storageTotalKb"] = roundf((fsTotalBytes() / 1024.0f) * 10.0f) / 10.0f;
     d["timeSynced"] = timeSynced;
     d["lastSync"] = lastSyncTimeStr;
+
+    // Extended hardware & S3 PSRAM / 16MB flash telemetry (non-breaking)
+    d["board"] = HUB_BOARD_NAME;
+    d["chip"] = ESP.getChipModel();
+    d["cpuMhz"] = ESP.getCpuFreqMHz();
+    d["flashMb"] = ESP.getFlashChipSize() / (1024UL * 1024UL);
+    d["fsType"] = fsTypeName;
+    d["psramOk"] = hasPsram;
+    d["psramTotalKb"] = psramTotal / 1024;
+    d["psramUsedKb"] = psramUsed / 1024;
+    d["psramFreeKb"] = psramFree / 1024;
+    d["psramCacheKb"] = roundf((psramCacheTotalBytes / 1024.0f) * 10.0f) / 10.0f;
+    d["i2cSda"] = I2C_SDA_PIN;
+    d["i2cScl"] = I2C_SCL_PIN;
+    d["displayAddr"] = detectedI2cDisplayAddr;
 
     AsyncResponseStream *res = req->beginResponseStream("application/json");
     res->addHeader("Cache-Control", "no-store");
@@ -1141,7 +1959,7 @@ void setupWebServer() {
     sendStoredJsonFile(req, DESIGN_PATH, "[]");
   });
 
-  // --- POST /api/design (Zero-RAM-buffer streaming write up to 64 KB) ---
+  // --- POST /api/design (Zero-RAM-buffer streaming write) ---
   server.on(
     "/api/design", ASYNC_POST,
     [](AsyncWebServerRequest *req) {
@@ -1159,7 +1977,7 @@ void setupWebServer() {
     [](AsyncWebServerRequest *req) {
       SmallJsonBody *buf = static_cast<SmallJsonBody *>(req->_tempObject);
       if (buf && !buf->overflow && buf->len > 0) {
-        JsonDocument doc;
+        JsonDocument doc(&psramAllocator);
         if (!deserializeJson(doc, buf->data)) {
           String srv = String(doc["ntpServer"] | (const char *)ntpServerBuf);
           srv.trim();
@@ -1188,7 +2006,7 @@ void setupWebServer() {
         saveTimeToNvs();
       }
 
-      JsonDocument out;
+      JsonDocument out(&psramAllocator);
       out["ok"] = started;
       out["synced"] = timeSynced;
       out["formattedTime"] = (const char *)formatted;
@@ -1206,7 +2024,7 @@ void setupWebServer() {
       bool forget = false;
       SmallJsonBody *buf = static_cast<SmallJsonBody *>(req->_tempObject);
       if (buf && !buf->overflow && buf->len > 0) {
-        JsonDocument doc;
+        JsonDocument doc(&psramAllocator);
         if (!deserializeJson(doc, buf->data)) {
           forget = doc["forget"] | false;
           String apN = String(doc["apName"] | netCfg.apName.c_str());
@@ -1324,11 +2142,10 @@ void setupWebServer() {
     mode.toLowerCase();
 
     if (mode == "data") {
-      // 1. RESET DATA: Erase 2D designs in SPIFFS
-      //    (devices, shortcuts, groups, favorites are saved via /api/config)
-      if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        if (SPIFFS.exists(DESIGN_PATH)) SPIFFS.remove(DESIGN_PATH);
-        if (SPIFFS.exists(DESIGN_TMP_PATH)) SPIFFS.remove(DESIGN_TMP_PATH);
+      // 1. RESET DATA: Erase 2D designs in flash storage
+      if (hubFS && xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+        if (hubFS->exists(DESIGN_PATH)) hubFS->remove(DESIGN_PATH);
+        if (hubFS->exists(DESIGN_TMP_PATH)) hubFS->remove(DESIGN_TMP_PATH);
         xSemaphoreGive(fsMutex);
       }
       notifyStorage();
@@ -1366,12 +2183,12 @@ void setupWebServer() {
     }
 
     if (mode == "factory") {
-      // 3. FACTORY RESET: Erase SPIFFS files + hubnet + hubtime + WiFi (wfcfg) + Reboot
-      if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        if (SPIFFS.exists(CONFIG_PATH)) SPIFFS.remove(CONFIG_PATH);
-        if (SPIFFS.exists(CONFIG_TMP_PATH)) SPIFFS.remove(CONFIG_TMP_PATH);
-        if (SPIFFS.exists(DESIGN_PATH)) SPIFFS.remove(DESIGN_PATH);
-        if (SPIFFS.exists(DESIGN_TMP_PATH)) SPIFFS.remove(DESIGN_TMP_PATH);
+      // 3. FACTORY RESET: Erase flash config/design + hubnet + hubtime + WiFi (wfcfg) + Reboot
+      if (hubFS && xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+        if (hubFS->exists(CONFIG_PATH)) hubFS->remove(CONFIG_PATH);
+        if (hubFS->exists(CONFIG_TMP_PATH)) hubFS->remove(CONFIG_TMP_PATH);
+        if (hubFS->exists(DESIGN_PATH)) hubFS->remove(DESIGN_PATH);
+        if (hubFS->exists(DESIGN_TMP_PATH)) hubFS->remove(DESIGN_TMP_PATH);
         xSemaphoreGive(fsMutex);
       }
 
@@ -1419,50 +2236,80 @@ void setupWebServer() {
 
   server.begin();
   webServerRunning = true;
-  Serial.println("[SERVER] Web server listening on port 80");
+  Serial.println("[SERVER] Web server listening on port 80 (Uploader: /upload)");
 }
 
 // ============================================================================
-// 14. SETUP
+// 17. SETUP
 // ============================================================================
 void setup() {
   std::set_new_handler(oomNewHandler);
+  setCpuFrequencyMhz(240);
 
   fsMutex = xSemaphoreCreateMutex();
   asyncReqMutex = xSemaphoreCreateMutex();
 
   pinMode(LED_PIN, OUTPUT);
-  pinMode(BUILTIN_LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(BOOT_BUTTON, INPUT_PULLUP);
   digitalWrite(LED_PIN, LOW);
-  digitalWrite(BUILTIN_LED_PIN, LOW);
   digitalWrite(BUZZER_PIN, LOW);
+
+#if !HAS_BUILTIN_RGB_LED
+  pinMode(BUILTIN_LED_PIN, OUTPUT);
+#endif
+  setBuiltinLed(false);
 
   snprintf(bootIdStr, sizeof(bootIdStr), "%08lX", (unsigned long)esp_random());
 
   Serial.begin(115200);
-  Serial.println("\n==================================");
-  Serial.println("  ESP32 Smart Hub Starting");
-  Serial.printf("  Boot ID: %s | Heap: %lu B\n", bootIdStr, (unsigned long)ESP.getFreeHeap());
-  Serial.println("==================================");
+#if defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
+  unsigned long serialWaitStart = millis();
+  while (!Serial && (millis() - serialWaitStart < 1500)) {
+    delay(10);
+  }
+#endif
+
+  // Detect & activate full 8 MB OPI PSRAM on ESP32-S3 N16R8
+  hasPsram = psramFound() && (ESP.getPsramSize() > 0);
+
+  Serial.println("\n==========================================");
+  Serial.printf("  ESP32 Smart Hub Starting (%s)\n", HUB_BOARD_NAME);
+  Serial.printf("  Chip: %s @ %lu MHz | Flash: %lu MB\n",
+                ESP.getChipModel(),
+                (unsigned long)ESP.getCpuFreqMHz(),
+                (unsigned long)(ESP.getFlashChipSize() / (1024UL * 1024UL)));
+  Serial.printf("  Boot ID: %s | Internal Heap: %lu B\n",
+                bootIdStr, (unsigned long)ESP.getFreeHeap());
+  if (hasPsram) {
+    Serial.printf("  PSRAM: ACTIVE (%lu KB free / %lu KB total)\n",
+                  (unsigned long)(ESP.getFreePsram() / 1024UL),
+                  (unsigned long)(ESP.getPsramSize() / 1024UL));
+  } else {
+    Serial.println("  PSRAM: Not present / disabled");
+  }
+  Serial.println("==========================================");
+
+  initI2cDisplayBus();
 
   beepShort(1);
   delay(1200);
 
-  if (!SPIFFS.begin(true, "/spiffs", 10)) {
-    Serial.println("[ERROR] SPIFFS mount failed!");
+  if (!initStorage()) {
+    Serial.println("[ERROR] No usable SPIFFS or FFat partition mounted!");
   } else {
     // Clean any incomplete temporary files left by an unexpected power loss
-    if (SPIFFS.exists(CONFIG_TMP_PATH)) SPIFFS.remove(CONFIG_TMP_PATH);
-    if (SPIFFS.exists(DESIGN_TMP_PATH)) SPIFFS.remove(DESIGN_TMP_PATH);
-    Serial.printf("[OK] SPIFFS mounted (%lu / %lu B used)\n",
-                  (unsigned long)SPIFFS.usedBytes(), (unsigned long)SPIFFS.totalBytes());
+    if (hubFS->exists(CONFIG_TMP_PATH)) hubFS->remove(CONFIG_TMP_PATH);
+    if (hubFS->exists(DESIGN_TMP_PATH)) hubFS->remove(DESIGN_TMP_PATH);
+    Serial.printf("[OK] %s mounted (%llu / %llu KB used)\n",
+                  fsTypeName,
+                  (unsigned long long)(fsUsedBytes() / 1024ULL),
+                  (unsigned long long)(fsTotalBytes() / 1024ULL));
 
-    File root = SPIFFS.open("/");
+    File root = hubFS->open("/");
     if (root) {
       for (File f = root.openNextFile(); f; f = root.openNextFile()) {
-        Serial.printf("  [SPIFFS] %s (%u B)\n", f.name(), (unsigned)f.size());
+        Serial.printf("  [%s] %s (%u B)\n", fsTypeName, f.name(), (unsigned)f.size());
       }
       root.close();
     }
@@ -1501,12 +2348,14 @@ void setup() {
     wifiGotIpFlag = false;  // Already initialized above
   }
 
-  Serial.printf("[READY] Free Heap: %lu B | Min Heap: %lu B\n",
-                (unsigned long)ESP.getFreeHeap(), (unsigned long)ESP.getMinFreeHeap());
+  Serial.printf("[READY] Free Heap: %lu B | Min Heap: %lu B | Free PSRAM: %lu KB\n",
+                (unsigned long)ESP.getFreeHeap(),
+                (unsigned long)ESP.getMinFreeHeap(),
+                hasPsram ? (unsigned long)(ESP.getFreePsram() / 1024UL) : 0UL);
 }
 
 // ============================================================================
-// 15. MAIN LOOP (NON-BLOCKING & SELF-HEALING)
+// 18. MAIN LOOP (NON-BLOCKING & SELF-HEALING)
 // ============================================================================
 void loop() {
   unsigned long now = millis();
@@ -1515,7 +2364,9 @@ void loop() {
   if (wifiGotIpFlag) {
     wifiGotIpFlag = false;
     WiFi.setSleep(false);
-    Serial.printf("[WIFI] IP Ready: %s\n", WiFi.localIP().toString().c_str());
+    Serial.printf("[WIFI] IP Ready: %s (Uploader: http://%s/upload)\n",
+                  WiFi.localIP().toString().c_str(),
+                  WiFi.localIP().toString().c_str());
 
     setupWebServer();  // Safe: starts server if stopped, never duplicates routes
     startOrRefreshMdns();
