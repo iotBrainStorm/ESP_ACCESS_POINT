@@ -956,7 +956,7 @@
           <span>BACK</span>
         </a>
         <div class="header-title">Hub Configuration</div>
-        <span class="nvs-badge" id="headerNvsSize">0 B / 16 KB</span>
+        <span class="nvs-badge" id="headerNvsSize">-- / --</span>
       </div>
     </header>
 
@@ -3442,12 +3442,39 @@
         return new TextEncoder().encode(JSON.stringify(config)).length;
       }
 
+      let liveStorageInfo = { usedKb: null, totalKb: null };
+
+      function fmtKbOrMb(kb) {
+        return kb >= 1024
+          ? `${(kb / 1024).toFixed(2)} MB`
+          : `${Math.round(kb)} KB`;
+      }
+
+      function updateHeaderStorageBadge(usedKb, totalKb) {
+        const el = document.getElementById("headerNvsSize");
+        if (!el) return;
+        if (usedKb !== null && Number(totalKb) > 0) {
+          liveStorageInfo.usedKb = Number(usedKb);
+          liveStorageInfo.totalKb = Number(totalKb);
+          const pct = Math.min(100, Math.round((usedKb / totalKb) * 100));
+          el.textContent = `${pct}% (${fmtKbOrMb(usedKb)} / ${fmtKbOrMb(totalKb)})`;
+          el.style.color = pct > 85 ? "var(--err)" : "";
+        } else {
+          const bytes = getPayloadByteSize();
+          const pct = Math.min(100, Math.round((bytes / NVS_MAX_BYTES) * 100));
+          el.textContent = `${pct}% (${(bytes / 1024).toFixed(1)} KB / 16 KB)`;
+        }
+      }
+
       function updateNvsMeter() {
         const bytes = getPayloadByteSize();
         const pct = Math.min(100, Math.round((bytes / NVS_MAX_BYTES) * 100));
 
-        document.getElementById("headerNvsSize").textContent =
-          `${(bytes / 1024).toFixed(1)} KB / 16 KB`;
+        // Keep actual ESP32 flash storage in header; only fallback in offline preview
+        if (liveStorageInfo.totalKb === null) {
+          updateHeaderStorageBadge(null, null);
+        }
+
         document.getElementById("nvsByteText").textContent =
           `${bytes.toLocaleString()} bytes used (${pct}%)`;
         const fill = document.getElementById("nvsMeterFill");
@@ -3833,6 +3860,15 @@
                 liveNetInfo.subnet = stData.subnet;
               if (liveNetInfo.gateway || liveNetInfo.ip)
                 liveNetInfo.source = "ESP32";
+              if (
+                stData.storageUsedKb !== undefined &&
+                stData.storageTotalKb !== undefined
+              ) {
+                updateHeaderStorageBadge(
+                  stData.storageUsedKb,
+                  stData.storageTotalKb,
+                );
+              }
 
               if (
                 stData.bootId &&
@@ -6796,9 +6832,6 @@
           } catch (_) {}
         }
 
-        const fmtKbOrMb = (kb) =>
-          kb >= 1024 ? `${(kb / 1024).toFixed(2)} MB` : `${Math.round(kb)} KB`;
-
         const ramPct = Math.min(
           100,
           Math.round((d.ramUsedKb / (d.ramTotalKb || 1)) * 100),
@@ -6843,6 +6876,7 @@
         document.getElementById("perfStorageText").textContent =
           `${storPct}% (${fmtKbOrMb(d.storageUsedKb)} / ${fmtKbOrMb(d.storageTotalKb)})`;
         document.getElementById("perfStorageBar").style.width = `${storPct}%`;
+        updateHeaderStorageBadge(d.storageUsedKb, d.storageTotalKb);
       }
 
       /* ============================================================================
@@ -7121,6 +7155,16 @@
           document.getElementById("saveStatus").textContent = isOfflinePreview
             ? "Saved to Browser Storage (Preview Mode)"
             : "Saved to ESP32 NVS successfully";
+          if (!isOfflinePreview) {
+            fetch("/api/status", { cache: "no-store" })
+              .then((r) => (r.ok ? r.json() : null))
+              .then((st) => {
+                if (st && st.storageTotalKb !== undefined) {
+                  updateHeaderStorageBadge(st.storageUsedKb, st.storageTotalKb);
+                }
+              })
+              .catch(() => {});
+          }
           showToast(
             hadDesigns
               ? "Configuration & designs saved!"
