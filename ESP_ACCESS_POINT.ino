@@ -5,6 +5,8 @@
 #include "time.h"
 #include <Arduino.h>
 #include <WiFi.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include <WiFiManager.h>
 #include <Wire.h>
 #include <new>
@@ -318,7 +320,7 @@ static const char UPLOAD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     <div class="card">
       <div class="drop" id="dropZone" onclick="fileInput.click()">
         <div id="dzEmpty">
-          <div style="font-size:15px;font-weight:600">Click to select files or drag &amp; drop here</div>
+          <div style="font-size:15px;font-weight:600">Drag &amp; drop the files here</div>
           <div style="font-size:12px;color:var(--mut);margin-top:4px">Supports multiple files (index.html.gz, config.html.gz, layout.html.gz, design.html.gz, *.svg.gz)</div>
         </div>
         <div id="dzFilled" class="hidden">
@@ -331,7 +333,7 @@ static const char UPLOAD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
         <input id="fileInput" type="file" multiple style="display:none">
       </div>
       <div class="row">
-        <button id="upBtn" onclick="uploadQueued()" disabled>Upload Selected (0)</button>
+        <button id="upBtn" onclick="uploadQueued()" disabled>Upload (0)</button>
         <button id="clrBtn" class="sec" onclick="clearQueue()" disabled>Clear Queue</button>
         <button class="sec" onclick="loadList()">Refresh List</button>
         <span id="upStatus" style="font-size:13px;color:var(--mut)"></span>
@@ -405,7 +407,7 @@ function addLog(msg){
 
 // --- IN-DROPZONE QUEUE RENDERER ---
 function renderDropZone(){
-  upBtn.textContent = 'Upload Selected (' + queued.length + ')';
+  upBtn.textContent = 'Upload (' + queued.length + ')';
   upBtn.disabled = queued.length === 0;
   clrBtn.disabled = queued.length === 0;
   if(!queued.length){
@@ -662,8 +664,53 @@ Preferences prefs;
 SemaphoreHandle_t fsMutex = nullptr;
 SemaphoreHandle_t asyncReqMutex = nullptr;
 
-// Future 128x64 I2C Display detection state (0 = not connected yet)
+// 128x64 I2C OLED Object & State
 uint8_t detectedI2cDisplayAddr = 0;
+#define OLED_WIDTH 128
+#define OLED_HEIGHT 64
+#define OLED_RESET -1
+Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, OLED_RESET);
+bool oledReady = false;
+
+// Emergency / Priority Alert State (thread-safe via asyncReqMutex)
+struct OledAlertState {
+  bool active = false;
+  bool critical = false;
+  char title[22] = "";
+  char line1[22] = "";
+  char line2[22] = "";
+  char line3[22] = "";
+  unsigned long expiresAt = 0;  // 0 = persistent until cleared
+};
+OledAlertState oledAlert;
+volatile bool oledForceRedraw = false;
+unsigned long lastOledDrawMs = 0;
+
+// Boot Console Rolling Log (3 lines)
+static char oledBootLog[3][22] = { "", "", "" };
+
+// Automatic Device Online/Offline Tracker (reads /config.json)
+static constexpr uint8_t MAX_TRACKED_DEVICES = 32;
+static constexpr unsigned long DEVICE_CHECK_INTERVAL_MS = 4000UL;  // Check 1 device every 4s
+struct TrackedDevice {
+  char host[48];
+  uint16_t port;
+  bool online;
+  bool checked;
+};
+TrackedDevice trackedDevices[MAX_TRACKED_DEVICES];
+uint8_t trackedDeviceCount = 0;
+uint8_t trackedCheckIdx = 0;
+uint8_t devicesOnlineCount = 0;
+uint8_t devicesOfflineCount = 0;
+bool deviceListReloadPending = false;
+unsigned long lastDeviceCheckMs = 0;
+
+// Optional: live override if index.html pushes counts to /api/oled/devices
+bool webDeviceOverrideActive = false;
+unsigned long webDeviceOverrideUntil = 0;
+uint8_t webDevicesOnline = 0;
+uint8_t webDevicesOffline = 0;
 
 // Unique per-boot token so frontend resets lockout state after ESP32 restart
 static char bootIdStr[12] = "00000000";
@@ -798,6 +845,8 @@ char ufStatusMsg[96] = "";
 void setupWebServer();
 bool syncTime();
 void startOrRefreshMdns();
+bool readCurrentLocalTime(struct tm *ti);
+bool getSavedWifiCredentials(String &ssid, String &pass);
 
 // ============================================================================
 // 9. CRASH GUARD, BOARD-SAFE BUILT-IN LED, I2C BUS & HARDWARE FEEDBACK
@@ -893,12 +942,107 @@ void beepShort(uint8_t count = 1) {
   }
 }
 
-// Initializes default I2C bus for future 128x64 I2C LCD/OLED display (SSD1306/SH1106)
+// ============================================================================
+// 9.5. 128x64 I2C OLED DISPLAY MANAGER & DEVICE ONLINE/OFFLINE MONITOR
+// ============================================================================
+void oledShowBoot(const char *msg, uint8_t progressPct = 0) {
+  if (!oledReady) return;
+
+  // Scroll rolling 3-line setup log upward
+  strncpy(oledBootLog[0], oledBootLog[1], sizeof(oledBootLog[0]) - 1);
+  strncpy(oledBootLog[1], oledBootLog[2], sizeof(oledBootLog[1]) - 1);
+  strncpy(oledBootLog[2], msg, sizeof(oledBootLog[2]) - 1);
+  oledBootLog[2][sizeof(oledBootLog[2]) - 1] = '\0';
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  // Header (Y=0..15)
+  display.setCursor(0, 2);
+  display.printf("HUB SETUP [%s]", HUB_BOARD_NAME);
+  display.drawFastHLine(0, 14, 128, SSD1306_WHITE);
+
+  // Rolling 3 setup messages
+  for (int i = 0; i < 3; i++) {
+    if (oledBootLog[i][0] != '\0') {
+      display.setCursor(0, 18 + (i * 11));
+      display.print(i == 2 ? ">" : " ");
+      display.print(oledBootLog[i]);
+    }
+  }
+
+  // Progress bar at bottom
+  if (progressPct > 100) progressPct = 100;
+  display.drawRect(0, 54, 128, 9, SSD1306_WHITE);
+  int fillW = (int)((124UL * progressPct) / 100UL);
+  if (fillW > 0) display.fillRect(2, 56, fillW, 5, SSD1306_WHITE);
+
+  display.display();
+}
+
+// Thread-safe alert trigger (safe to call from HTTP routes or WiFi callbacks)
+void oledPostAlert(const char *title, const char *l1, const char *l2 = "",
+                   const char *l3 = "", unsigned long durationMs = 4000, bool critical = false) {
+  if (!asyncReqMutex) return;
+  if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    oledAlert.active = true;
+    oledAlert.critical = critical;
+    strncpy(oledAlert.title, title ? title : "", sizeof(oledAlert.title) - 1);
+    oledAlert.title[sizeof(oledAlert.title) - 1] = '\0';
+    strncpy(oledAlert.line1, l1 ? l1 : "", sizeof(oledAlert.line1) - 1);
+    oledAlert.line1[sizeof(oledAlert.line1) - 1] = '\0';
+    strncpy(oledAlert.line2, l2 ? l2 : "", sizeof(oledAlert.line2) - 1);
+    oledAlert.line2[sizeof(oledAlert.line2) - 1] = '\0';
+    strncpy(oledAlert.line3, l3 ? l3 : "", sizeof(oledAlert.line3) - 1);
+    oledAlert.line3[sizeof(oledAlert.line3) - 1] = '\0';
+    oledAlert.expiresAt = (durationMs == 0) ? 0 : (millis() + durationMs);
+    oledForceRedraw = true;
+    xSemaphoreGive(asyncReqMutex);
+  }
+}
+
+void oledClearAlert() {
+  if (!asyncReqMutex) return;
+  if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    oledAlert.active = false;
+    oledForceRedraw = true;
+    xSemaphoreGive(asyncReqMutex);
+  }
+}
+
+// Immediate screen drawn right before blocking WiFiManager AP portal starts
+void oledShowApMode() {
+  if (!oledReady) return;
+  display.clearDisplay();
+  display.fillRect(0, 0, 128, 14, SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_BLACK);
+  display.setCursor(14, 3);
+  display.print("!! AP SETUP MODE !!");
+
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 18);
+  display.print("SSID: ");
+  display.print(netCfg.apName.substring(0, 15));
+
+  display.setCursor(0, 29);
+  display.print("PASS: ");
+  if (netCfg.apPass.length() >= 8) display.print(netCfg.apPass.substring(0, 15));
+  else display.print("(OPEN)");
+
+  display.setCursor(0, 41);
+  display.print("OPEN: 192.168.4.1");
+
+  display.setCursor(0, 53);
+  display.printf("Timeout: %ds", netCfg.apTimeout);
+  display.display();
+}
+
 void initI2cDisplayBus() {
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
   Wire.setClock(I2C_CLOCK_HZ);
 
-  // Quick non-blocking probe of standard 128x64 I2C display addresses (0x3C, 0x3D)
   const uint8_t probeAddrs[2] = { 0x3C, 0x3D };
   detectedI2cDisplayAddr = 0;
   for (uint8_t addr : probeAddrs) {
@@ -910,12 +1054,354 @@ void initI2cDisplayBus() {
   }
 
   if (detectedI2cDisplayAddr) {
-    Serial.printf("[I2C] 128x64 display detected at 0x%02X (SDA=%u, SCL=%u, 400kHz)\n",
-                  detectedI2cDisplayAddr, I2C_SDA_PIN, I2C_SCL_PIN);
+    // Last two 'false' args keep our custom SDA/SCL pins intact on ESP32-S3
+    if (display.begin(SSD1306_SWITCHCAPVCC, detectedI2cDisplayAddr, false, false)) {
+      oledReady = true;
+      display.cp437(true);
+      display.setTextWrap(false);
+      display.clearDisplay();
+      display.display();
+      Serial.printf("[I2C] 128x64 OLED ACTIVE at 0x%02X (SDA=%u, SCL=%u)\n",
+                    detectedI2cDisplayAddr, I2C_SDA_PIN, I2C_SCL_PIN);
+      oledShowBoot("OLED Ready", 5);
+    } else {
+      Serial.println("[I2C] Display found but SSD1306 init failed!");
+    }
   } else {
-    Serial.printf("[I2C] Bus ready for future 128x64 display (SDA=%u, SCL=%u, 400kHz)\n",
-                  I2C_SDA_PIN, I2C_SCL_PIN);
+    Serial.printf("[I2C] No OLED detected (SDA=%u, SCL=%u)\n", I2C_SDA_PIN, I2C_SCL_PIN);
   }
+}
+
+// Helper: extracts host/IP & port from a device JSON object in /config.json
+bool extractDeviceEndpoint(JsonObjectConst obj, char *outHost, size_t hostSz, uint16_t &outPort) {
+  if (obj["enabled"].is<bool>() && !obj["enabled"].as<bool>()) return false;
+
+  String raw = obj["ip"] | (obj["host"] | (obj["address"] | (obj["mdns"] | (obj["url"] | ""))));
+  raw.trim();
+  if (raw.isEmpty()) return false;
+
+  if (raw.startsWith("http://")) raw.remove(0, 7);
+  else if (raw.startsWith("https://")) raw.remove(0, 8);
+
+  int slashIdx = raw.indexOf('/');
+  if (slashIdx >= 0) raw = raw.substring(0, slashIdx);
+
+  uint16_t port = obj["port"] | 80;
+  int colonIdx = raw.lastIndexOf(':');
+  if (colonIdx > 0) {
+    int p = raw.substring(colonIdx + 1).toInt();
+    if (p > 0 && p <= 65535) port = (uint16_t)p;
+    raw = raw.substring(0, colonIdx);
+  }
+  raw.trim();
+  if (raw.isEmpty() || raw == "0.0.0.0") return false;
+
+  strncpy(outHost, raw.c_str(), hostSz - 1);
+  outHost[hostSz - 1] = '\0';
+  outPort = (port == 0) ? 80 : port;
+  return true;
+}
+
+// Loads all configured devices from /config.json so the OLED tracks ON/OFF counts
+void reloadDevicesFromConfig() {
+  trackedDeviceCount = 0;
+  trackedCheckIdx = 0;
+  devicesOnlineCount = 0;
+  devicesOfflineCount = 0;
+
+  if (!hubFS || !fsMutex) return;
+  if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) != pdTRUE) return;
+
+  if (hubFS->exists(CONFIG_PATH)) {
+    File f = hubFS->open(CONFIG_PATH, "r");
+    if (f) {
+      JsonDocument doc(&psramAllocator);
+      if (!deserializeJson(doc, f)) {
+        auto addFromArray = [&](JsonArrayConst arr) {
+          for (JsonVariantConst v : arr) {
+            if (trackedDeviceCount >= MAX_TRACKED_DEVICES) break;
+            if (!v.is<JsonObjectConst>()) continue;
+            char host[48];
+            uint16_t port = 80;
+            if (extractDeviceEndpoint(v.as<JsonObjectConst>(), host, sizeof(host), port)) {
+              // Skip duplicates
+              bool dup = false;
+              for (uint8_t i = 0; i < trackedDeviceCount; i++) {
+                if (strcmp(trackedDevices[i].host, host) == 0 && trackedDevices[i].port == port) {
+                  dup = true;
+                  break;
+                }
+              }
+              if (!dup) {
+                strncpy(trackedDevices[trackedDeviceCount].host, host, sizeof(trackedDevices[0].host) - 1);
+                trackedDevices[trackedDeviceCount].host[sizeof(trackedDevices[0].host) - 1] = '\0';
+                trackedDevices[trackedDeviceCount].port = port;
+                trackedDevices[trackedDeviceCount].online = false;
+                trackedDevices[trackedDeviceCount].checked = false;
+                trackedDeviceCount++;
+              }
+            }
+          }
+        };
+
+        // Supports flat arrays or grouped/roomed arrays in /config.json
+        if (doc["devices"].is<JsonArrayConst>()) addFromArray(doc["devices"].as<JsonArrayConst>());
+        if (doc["nodes"].is<JsonArrayConst>()) addFromArray(doc["nodes"].as<JsonArrayConst>());
+        if (doc["groups"].is<JsonArrayConst>()) {
+          for (JsonVariantConst g : doc["groups"].as<JsonArrayConst>()) {
+            if (g["devices"].is<JsonArrayConst>()) addFromArray(g["devices"].as<JsonArrayConst>());
+          }
+        }
+        if (doc["rooms"].is<JsonArrayConst>()) {
+          for (JsonVariantConst r : doc["rooms"].as<JsonArrayConst>()) {
+            if (r["devices"].is<JsonArrayConst>()) addFromArray(r["devices"].as<JsonArrayConst>());
+          }
+        }
+      }
+      f.close();
+    }
+  }
+  xSemaphoreGive(fsMutex);
+
+  devicesOfflineCount = trackedDeviceCount;
+  Serial.printf("[OLED] Loaded %u devices from %s for status tracking\n", trackedDeviceCount, CONFIG_PATH);
+  oledForceRedraw = true;
+}
+
+// Checks 1 device per interval (non-intrusive; skipped during uploads/resets)
+void serviceDeviceHealthCheck() {
+  if (deviceListReloadPending) {
+    deviceListReloadPending = false;
+    reloadDevicesFromConfig();
+  }
+
+  if (trackedDeviceCount == 0 || WiFi.status() != WL_CONNECTED) return;
+  if (uploadSession.active || fsUploadSession.active || ufState != UF_IDLE || portalPending || restartPending) return;
+
+  unsigned long now = millis();
+  if (now - lastDeviceCheckMs < DEVICE_CHECK_INTERVAL_MS) return;
+  lastDeviceCheckMs = now;
+
+  TrackedDevice &dev = trackedDevices[trackedCheckIdx];
+  WiFiClient probe;
+  IPAddress ip;
+  bool ok = false;
+  if (ip.fromString(dev.host)) {
+    ok = probe.connect(ip, dev.port, 250);
+  } else {
+    ok = probe.connect(dev.host, dev.port, 350);
+  }
+  if (ok) probe.stop();
+
+  dev.online = ok;
+  dev.checked = true;
+
+  trackedCheckIdx = (trackedCheckIdx + 1) % trackedDeviceCount;
+
+  // Recalculate totals
+  uint8_t onCnt = 0, offCnt = 0;
+  for (uint8_t i = 0; i < trackedDeviceCount; i++) {
+    if (trackedDevices[i].online) onCnt++;
+    else offCnt++;
+  }
+  if (onCnt != devicesOnlineCount || offCnt != devicesOfflineCount) {
+    devicesOnlineCount = onCnt;
+    devicesOfflineCount = offCnt;
+    oledForceRedraw = true;
+  }
+}
+
+void drawWifiSignalBars(int x, int y, int rssi) {
+  int bars = 0;
+  if (rssi >= -55) bars = 4;
+  else if (rssi >= -67) bars = 3;
+  else if (rssi >= -77) bars = 2;
+  else if (rssi >= -88) bars = 1;
+
+  for (int i = 0; i < 4; i++) {
+    int h = (i + 1) * 2 + 1;  // heights: 3, 5, 7, 9 px
+    int bx = x + (i * 4);
+    int by = y + (9 - h);
+    if (i < bars) display.fillRect(bx, by, 3, h, SSD1306_WHITE);
+    else display.drawRect(bx, by, 3, h, SSD1306_WHITE);
+  }
+}
+
+void drawOledAlertBox(const char *title, const char *l1, const char *l2, const char *l3, bool invertedHeader) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  if (invertedHeader) {
+    display.fillRect(0, 0, 128, 14, SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
+  } else {
+    display.setTextColor(SSD1306_WHITE);
+    display.drawFastHLine(0, 14, 128, SSD1306_WHITE);
+  }
+  display.setCursor(3, 3);
+  display.print(title);
+
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 19);
+  display.print(l1);
+  display.setCursor(0, 32);
+  display.print(l2);
+  display.setCursor(0, 46);
+  display.print(l3);
+  display.display();
+}
+
+// Main OLED renderer (MUST ONLY BE CALLED FROM loop())
+void serviceOledDisplay() {
+  if (!oledReady) return;
+
+  unsigned long now = millis();
+  unsigned long refreshPeriod = (ufState == UF_WAIT_PRESS || ufState == UF_HOLDING) ? 200UL : 1000UL;
+  if (!oledForceRedraw && (now - lastOledDrawMs < refreshPeriod)) return;
+  oledForceRedraw = false;
+  lastOledDrawMs = now;
+
+  // --- PRIORITY 1: Explicit Emergency / Timed Alert ---
+  OledAlertState localAlert;
+  bool showLocalAlert = false;
+  if (asyncReqMutex && xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+    if (oledAlert.active) {
+      if (oledAlert.expiresAt != 0 && (int32_t)(now - oledAlert.expiresAt) >= 0) {
+        oledAlert.active = false;
+      } else {
+        localAlert = oledAlert;
+        showLocalAlert = true;
+      }
+    }
+    xSemaphoreGive(asyncReqMutex);
+  }
+  if (showLocalAlert) {
+    drawOledAlertBox(localAlert.title, localAlert.line1, localAlert.line2, localAlert.line3, localAlert.critical);
+    return;
+  }
+
+  // --- PRIORITY 2: Physical BOOT Button Hold Flow ---
+  if (ufState == UF_WAIT_PRESS || ufState == UF_HOLDING) {
+    display.clearDisplay();
+    display.fillRect(0, 0, 128, 14, SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_BLACK);
+    display.setCursor(10, 3);
+    display.print("HARDWARE VERIFY");
+    display.setTextColor(SSD1306_WHITE);
+
+    if (ufState == UF_WAIT_PRESS) {
+      uint32_t rem = ((int32_t)(ufWindowDeadlineMs - now) > 0) ? (uint32_t)(ufWindowDeadlineMs - now) : 0;
+      display.setCursor(0, 20);
+      display.print("Press & Hold BOOT");
+      display.setCursor(0, 33);
+      display.printf("Window: %.1fs left", rem / 1000.0f);
+      int w = (int)((124UL * (UPLOAD_FORGET_PRESS_WINDOW_MS - rem)) / UPLOAD_FORGET_PRESS_WINDOW_MS);
+      display.drawRect(0, 50, 128, 10, SSD1306_WHITE);
+      if (w > 0) display.fillRect(2, 52, w, 6, SSD1306_WHITE);
+    } else {
+      uint32_t held = (uint32_t)(now - ufHoldStartMs);
+      if (held > UPLOAD_FORGET_HOLD_MS) held = UPLOAD_FORGET_HOLD_MS;
+      display.setCursor(0, 20);
+      display.print("KEEP HOLDING BOOT...");
+      display.setCursor(0, 33);
+      display.printf("Held: %.1fs / 10.0s", held / 1000.0f);
+      int w = (int)((124UL * held) / UPLOAD_FORGET_HOLD_MS);
+      display.drawRect(0, 50, 128, 10, SSD1306_WHITE);
+      if (w > 0) display.fillRect(2, 52, w, 6, SSD1306_WHITE);
+    }
+    display.display();
+    return;
+  }
+
+  // --- PRIORITY 3: Persistent Emergency Conditions ---
+  if (uploadAuthLocked) {
+    drawOledAlertBox("!! AUTH LOCKED !!", "3 Failed Logins!", "Restart ESP32 or", "use Forget + BOOT", true);
+    return;
+  }
+  if (!hubFS) {
+    drawOledAlertBox("!! STORAGE ERROR !!", "Filesystem failed!", "Check Flash/FFat", "partition settings", true);
+    return;
+  }
+  if (!webServerRunning) {
+    drawOledAlertBox("!! SERVER ERROR !!", "Web server stopped", "Port 80 offline", "Check WiFi / Reboot", true);
+    return;
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    String ssid, pass;
+    char l2[22] = "No saved WiFi";
+    if (getSavedWifiCredentials(ssid, pass)) {
+      snprintf(l2, sizeof(l2), "SSID: %.15s", ssid.c_str());
+    }
+    drawOledAlertBox("! WIFI DISCONNECTED !", "Reconnecting...", l2, "Retry every 15s", true);
+    return;
+  }
+
+  // --- PRIORITY 4: NORMAL DASHBOARD SCREEN ---
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  // Header (Y=0..15): Time + Date + WiFi Bars
+  struct tm ti;
+  if (readCurrentLocalTime(&ti)) {
+    static const char *MON[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+    display.setCursor(0, 3);
+    display.printf("%02d:%02d:%02d", ti.tm_hour, ti.tm_min, ti.tm_sec);
+    display.setCursor(55, 3);
+    display.printf("%02d %s", ti.tm_mday, MON[ti.tm_mon % 12]);
+  } else {
+    display.setCursor(0, 3);
+    display.print("--:--:-- NTP WAIT");
+  }
+  drawWifiSignalBars(112, 2, WiFi.RSSI());
+  display.drawFastHLine(0, 15, 128, SSD1306_WHITE);
+
+  // Middle Body (Y=19..41): IP Address & mDNS Address
+  display.setCursor(0, 19);
+  display.print("IP: ");
+  display.print(WiFi.localIP().toString());
+
+  display.setCursor(0, 31);
+  display.print("MD: ");
+  if (netCfg.mdnsEnabled && mdnsRunning) {
+    String md = netCfg.mdnsHost + ".local";
+    display.print(md.substring(0, 17));
+  } else {
+    display.print("Disabled");
+  }
+  display.drawFastHLine(0, 43, 128, SSD1306_WHITE);
+
+  // Bottom Bar (Y=48..63): Online / Offline Devices
+  if (webDeviceOverrideActive && (int32_t)(now - webDeviceOverrideUntil) >= 0) {
+    webDeviceOverrideActive = false;
+  }
+  uint8_t onCnt = webDeviceOverrideActive ? webDevicesOnline : devicesOnlineCount;
+  uint8_t offCnt = webDeviceOverrideActive ? webDevicesOffline : devicesOfflineCount;
+  uint8_t totCnt = onCnt + offCnt;
+
+  display.setCursor(0, 50);
+  if (totCnt == 0) {
+    display.print("DEV: No devices");
+  } else {
+    // Inverted badge for ON count
+    display.fillRoundRect(0, 48, 44, 13, 2, SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
+    display.setCursor(4, 51);
+    display.printf("ON:%u", onCnt);
+
+    // Outlined badge for OFF count
+    display.setTextColor(SSD1306_WHITE);
+    display.drawRoundRect(48, 48, 48, 13, 2, SSD1306_WHITE);
+    display.setCursor(52, 51);
+    display.printf("OFF:%u", offCnt);
+
+    // Total count on the right
+    display.setCursor(100, 51);
+    display.printf("T:%u", totCnt);
+  }
+
+  display.display();
 }
 
 // ============================================================================
@@ -1204,6 +1690,7 @@ bool syncRuntimeFromConfigFile(const char *path) {
     ipReapplyAt = millis() + 900;  // Wait for HTTP 200 to flush first
   }
 
+  deviceListReloadPending = true;
   return true;
 }
 
@@ -1221,6 +1708,7 @@ bool applyStationIpConfig() {
       return true;
     }
     Serial.println("[WIFI] Static IP invalid - falling back to DHCP");
+    oledPostAlert("WIFI WARNING", "Static IP invalid!", "Fallback to DHCP", "", 4000, true);
   }
 
   IPAddress zero(0, 0, 0, 0);
@@ -1274,6 +1762,7 @@ bool runWifiConfigPortal(bool forgetBeforeStart = false, bool restartOnSuccess =
   wm.setBreakAfterConfig(true);
 
   startApLedBlink();
+  oledShowApMode();
 
   bool connected = false;
   if (netCfg.apPass.length() >= 8 && netCfg.apPass.length() <= 63) {
@@ -1326,11 +1815,14 @@ bool connectToSavedWiFi() {
   WiFi.setSleep(false);
   WiFi.begin(ssid.c_str(), pass.c_str());
 
+  oledShowBoot(("WiFi:" + ssid.substring(0, 14)).c_str(), 70);
+
   for (int i = 0; i < WIFI_BOOT_MAX_ATTEMPTS; i++) {
     if (WiFi.status() == WL_CONNECTED) {
       Serial.printf("[WIFI] Connected! IP: %s  GW: %s\n",
                     WiFi.localIP().toString().c_str(),
                     WiFi.gatewayIP().toString().c_str());
+      oledShowBoot(("IP:" + WiFi.localIP().toString()).c_str(), 82);
       WiFi.setSleep(false);
       return true;
     }
@@ -1608,6 +2100,7 @@ void serviceUploadForgetButton() {
     } else if ((int32_t)(now - ufWindowDeadlineMs) >= 0) {
       ufState = UF_TIMEOUT;
       strncpy(ufStatusMsg, "Timed out: BOOT button was not pressed within 5 seconds.", sizeof(ufStatusMsg) - 1);
+      oledPostAlert("RESET TIMEOUT", "BOOT not pressed", "within 5 seconds", "", 4000, false);
       digitalWrite(LED_PIN, LOW);
       setBuiltinLed(false);
     }
@@ -1620,6 +2113,7 @@ void serviceUploadForgetButton() {
       if (now - ufReleaseSinceMs >= UPLOAD_FORGET_DEBOUNCE_MS) {
         ufState = UF_RELEASED_EARLY;
         strncpy(ufStatusMsg, "Cancelled: BOOT button was released before 10 seconds.", sizeof(ufStatusMsg) - 1);
+        oledPostAlert("RESET CANCELLED", "BOOT released", "before 10 seconds", "", 4000, false);
         digitalWrite(LED_PIN, LOW);
         setBuiltinLed(false);
         return;
@@ -1638,6 +2132,7 @@ void serviceUploadForgetButton() {
           strncpy(ufStatusMsg, "All users erased. Default admin esp / 456456 created.", sizeof(ufStatusMsg) - 1);
           ufStatusMsg[sizeof(ufStatusMsg) - 1] = '\0';
           notifyStorage();
+          oledPostAlert("RESET COMPLETE", ufResetUsersOnDone ? "Default: esp/456456" : "BOOT Verified OK", "", "", 5000, false);
         } else {
           ufState = UF_RELEASED_EARLY;
           strncpy(ufStatusMsg, "Flash write error while resetting users.", sizeof(ufStatusMsg) - 1);
@@ -2255,6 +2750,20 @@ void setupWebServer() {
     req->send(200, "text/plain", "pong");
   });
 
+  // --- POST/GET /api/oled/devices?on=4&off=1 ---
+  server.on("/api/oled/devices", ASYNC_GET, [](AsyncWebServerRequest *req) {
+    if (req->hasParam("on") && req->hasParam("off")) {
+      webDevicesOnline = (uint8_t)req->getParam("on")->value().toInt();
+      webDevicesOffline = (uint8_t)req->getParam("off")->value().toInt();
+      webDeviceOverrideActive = true;
+      webDeviceOverrideUntil = millis() + 60000UL;  // Valid for 60s, then ESP32 auto-checker resumes
+      oledForceRedraw = true;
+      req->send(200, "application/json", "{\"ok\":true}");
+      return;
+    }
+    req->send(400, "application/json", "{\"ok\":false}");
+  });
+
   // --- Built-in Flash Uploader Page (/upload) ---
   server.on("/upload", ASYNC_GET, [](AsyncWebServerRequest *req) {
     size_t totalLen = sizeof(UPLOAD_HTML) - 1;
@@ -2339,6 +2848,7 @@ void setupWebServer() {
           if (uploadAuthFailedAttempts >= UPLOAD_AUTH_MAX_ATTEMPTS) {
             uploadAuthLocked = true;
             invalidateUploadSession();
+            oledForceRedraw = true;
           }
           uint8_t rem = (uploadAuthFailedAttempts >= UPLOAD_AUTH_MAX_ATTEMPTS)
                           ? 0
@@ -2434,6 +2944,7 @@ void setupWebServer() {
     }
     req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Restarting...\"}");
     restartPending = true;
+    oledPostAlert("REBOOTING HUB", "Restart requested", "Please wait...", "", 0, true);
     restartAt = millis() + 600;
   });
 
@@ -2812,6 +3323,7 @@ void setupWebServer() {
     }
     req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Restarting...\"}");
     restartPending = true;
+    oledPostAlert("REBOOTING HUB", "Restart requested", "Please wait...", "", 0, true);
     restartAt = millis() + 600;
   });
 
@@ -2896,6 +3408,7 @@ void setupWebServer() {
       req->send(200, "application/json", "{\"ok\":true,\"mode\":\"factory\",\"rebooting\":true}");
 
       factoryWifiWipePending = true;
+      oledPostAlert("!! FACTORY RESET !!", "Erasing all data", "Wiping WiFi...", "Rebooting now", 0, true);
       restartPending = true;
       restartAt = millis() + 800;
       return;
@@ -2975,12 +3488,14 @@ void setup() {
   Serial.println("==========================================");
 
   initI2cDisplayBus();
+  oledShowBoot(hasPsram ? "PSRAM: Active" : "PSRAM: Off", 15);
 
   beepShort(1);
   delay(1200);
 
   if (!initStorage()) {
     Serial.println("[ERROR] No usable SPIFFS or FFat partition mounted!");
+    oledShowBoot("FS MOUNT FAILED!", 30);
   } else {
     // Clean any incomplete temporary files left by an unexpected power loss
     if (hubFS->exists(CONFIG_TMP_PATH)) hubFS->remove(CONFIG_TMP_PATH);
@@ -2989,6 +3504,7 @@ void setup() {
                   fsTypeName,
                   (unsigned long long)(fsUsedBytes() / 1024ULL),
                   (unsigned long long)(fsTotalBytes() / 1024ULL));
+    oledShowBoot((String("FS: ") + fsTypeName + " OK").c_str(), 35);
 
     File root = hubFS->open("/");
     if (root) {
@@ -3000,9 +3516,13 @@ void setup() {
   }
 
   loadNetworkAndTimeFromNvs();
+  oledShowBoot("NVS Config Loaded", 48);
+  reloadDevicesFromConfig();
+  oledShowBoot(("Devices: " + String(trackedDeviceCount)).c_str(), 55);
 
   // Hold BOOT at startup to recover WiFi / reset Static IP back to DHCP
   if (digitalRead(BOOT_BUTTON) == LOW) {
+    oledShowBoot("BOOT Held -> AP", 60);
     beepShort(2);
     netCfg.dhcp = true;
     saveNetworkToNvs();
@@ -3023,14 +3543,22 @@ void setup() {
   // Connect WiFi FIRST so lwIP & port 80 are clean if WiFiManager portal runs
   connectToSavedWiFi();
   setupWebServer();
+  oledShowBoot("Web Server: Port 80", 88);
   lastWifiRetryMs = millis();
 
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.setSleep(false);
     startOrRefreshMdns();
+    oledShowBoot(("mDNS:" + netCfg.mdnsHost).c_str(), 94);
     syncTime();
+    oledShowBoot("System Ready!", 100);
+    delay(1000);
     wifiGotIpFlag = false;  // Already initialized above
+  } else {
+    oledShowBoot("WiFi Pending...", 100);
+    delay(500);
   }
+  oledForceRedraw = true;
 
   Serial.printf("[READY] Free Heap: %lu B | Min Heap: %lu B | Free PSRAM: %lu KB\n",
                 (unsigned long)ESP.getFreeHeap(),
@@ -3051,6 +3579,7 @@ void loop() {
     Serial.printf("[WIFI] IP Ready: %s (Uploader: http://%s/upload)\n",
                   WiFi.localIP().toString().c_str(),
                   WiFi.localIP().toString().c_str());
+    oledPostAlert("WIFI CONNECTED", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), "Server & mDNS OK", 3000, false);
 
     setupWebServer();  // Safe: starts server if stopped, never duplicates routes
     startOrRefreshMdns();
@@ -3063,6 +3592,7 @@ void loop() {
     String ssid, pass;
     if (getSavedWifiCredentials(ssid, pass)) {
       Serial.println("[WIFI] Applying updated IP configuration...");
+      oledPostAlert("NETWORK UPDATE", "Applying new IP...", "Reconnecting WiFi", "", 4000, false);
       WiFi.disconnect(false, false);
       delay(100);
       applyStationIpConfig();
@@ -3110,6 +3640,8 @@ void loop() {
   serviceNotifyStorage();
   serviceUploadForgetButton();
   serviceNativeMdnsScan();
+  serviceDeviceHealthCheck();
+  serviceOledDisplay();
 
   // 7. Launch WiFi Config Portal safely after HTTP response has flushed
   if (portalPending && (int32_t)(now - portalStartAt) >= 0) {
@@ -3122,6 +3654,9 @@ void loop() {
     if (lowHeapSinceMs == 0) lowHeapSinceMs = now;
     if (!restartPending && (now - lowHeapSinceMs >= 5000UL)) {
       Serial.println("[MEM] Sustained critical low heap - restarting cleanly");
+      char heapBuf[22];
+      snprintf(heapBuf, sizeof(heapBuf), "Heap: %lu B", (unsigned long)ESP.getFreeHeap());
+      oledPostAlert("!! LOW MEMORY !!", heapBuf, "Critical threshold", "Auto-restarting...", 0, true);
       restartPending = true;
       restartAt = now + 200;
     }
