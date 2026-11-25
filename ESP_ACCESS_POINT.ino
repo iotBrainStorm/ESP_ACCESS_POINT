@@ -292,9 +292,6 @@ static const char UPLOAD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     <div id="forgetBox" class="hidden" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bd)">
       <div id="forgetText" style="font-size:13px;font-weight:600;margin-bottom:8px"></div>
       <div class="bar"><div id="forgetBar"></div></div>
-      <div style="font-size:11px;color:var(--mut);margin-top:6px">
-        Hardware reset erases all saved admin/normal users and restores default admin <b>esp</b> / <b>456456</b>.
-      </div>
     </div>
   </div>
 
