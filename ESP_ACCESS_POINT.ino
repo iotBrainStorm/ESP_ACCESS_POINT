@@ -686,9 +686,15 @@ unsigned long lastOledDrawMs = 0;
 static char oledBootLog[3][22] = { "", "", "" };
 
 // Automatic Device Online/Offline Tracker (reads /config.json)
-static constexpr unsigned long DEVICE_CHECK_INTERVAL_MS = 4000UL;  // Check 1 device every 4s
+static constexpr unsigned long DEVICE_CHECK_INTERVAL_MS = 3000UL;         // Steady-state check interval
+static constexpr unsigned long DEVICE_INITIAL_CHECK_INTERVAL_MS = 600UL;  // Fast first pass after boot/save
+// Set to 1 to match Home page (ignores devices with group "none" or hidden groups unless in visible Favorites).
+// Set to 0 if your Home page counts ALL saved devices in /config.json.
+#define OLED_ONLY_HOME_VISIBLE_DEVICES 1
+
 struct TrackedDevice {
   char host[48];
+  char altHost[48];
   uint16_t port;
   bool online;
   bool checked;
@@ -1067,13 +1073,10 @@ void initI2cDisplayBus() {
   }
 }
 
-// Helper: extracts host/IP & port from a device JSON object in /config.json
-bool extractDeviceEndpoint(JsonObjectConst obj, char *outHost, size_t hostSz, uint16_t &outPort) {
-  if (obj["enabled"].is<bool>() && !obj["enabled"].as<bool>()) return false;
-
-  String raw = obj["ip"] | (obj["host"] | (obj["address"] | (obj["mdns"] | (obj["url"] | ""))));
+// Cleans a single host/IP string and extracts an inline :port if present
+String cleanEndpointHost(String raw, uint16_t &portOut) {
   raw.trim();
-  if (raw.isEmpty()) return false;
+  if (raw.isEmpty()) return "";
 
   if (raw.startsWith("http://")) raw.remove(0, 7);
   else if (raw.startsWith("https://")) raw.remove(0, 8);
@@ -1081,28 +1084,109 @@ bool extractDeviceEndpoint(JsonObjectConst obj, char *outHost, size_t hostSz, ui
   int slashIdx = raw.indexOf('/');
   if (slashIdx >= 0) raw = raw.substring(0, slashIdx);
 
-  uint16_t port = obj["port"] | 80;
   int colonIdx = raw.lastIndexOf(':');
   if (colonIdx > 0) {
     int p = raw.substring(colonIdx + 1).toInt();
-    if (p > 0 && p <= 65535) port = (uint16_t)p;
+    if (p > 0 && p <= 65535) portOut = (uint16_t)p;
     raw = raw.substring(0, colonIdx);
   }
   raw.trim();
-  if (raw.isEmpty() || raw == "0.0.0.0") return false;
+  if (raw.isEmpty() || raw == "0.0.0.0") return "";
+  return raw;
+}
 
-  strncpy(outHost, raw.c_str(), hostSz - 1);
+// Extracts primary host (IP preferred, else mDNS) + fallback altHost + port
+bool extractDeviceEndpoint(JsonObjectConst obj, char *outHost, size_t hostSz,
+                           char *outAltHost, size_t altHostSz, uint16_t &outPort) {
+  if (obj["enabled"].is<bool>() && !obj["enabled"].as<bool>()) return false;
+
+  uint16_t port = obj["port"] | 80;
+  if (port == 0) port = 80;
+
+  // Explicitly check non-empty strings so `"ip": ""` properly falls back to `"mdns"`
+  String ipStr = cleanEndpointHost(String(obj["ip"] | ""), port);
+  if (ipStr.isEmpty()) ipStr = cleanEndpointHost(String(obj["host"] | ""), port);
+  if (ipStr.isEmpty()) ipStr = cleanEndpointHost(String(obj["address"] | ""), port);
+
+  String mdnsStr = cleanEndpointHost(String(obj["mdns"] | ""), port);
+  if (mdnsStr.isEmpty()) mdnsStr = cleanEndpointHost(String(obj["url"] | ""), port);
+
+  String primary = !ipStr.isEmpty() ? ipStr : mdnsStr;
+  String secondary = (!ipStr.isEmpty() && !mdnsStr.isEmpty() && !ipStr.equalsIgnoreCase(mdnsStr))
+                       ? mdnsStr
+                       : "";
+
+  if (primary.isEmpty()) return false;
+
+  strncpy(outHost, primary.c_str(), hostSz - 1);
   outHost[hostSz - 1] = '\0';
-  outPort = (port == 0) ? 80 : port;
+  strncpy(outAltHost, secondary.c_str(), altHostSz - 1);
+  outAltHost[altHostSz - 1] = '\0';
+  outPort = port;
   return true;
 }
 
-// Loads all configured devices from /config.json so the OLED tracks ON/OFF counts
+// Matches Home page visibility: device must be in a non-hidden Group or non-hidden Favorite
+bool isDeviceVisibleOnHome(JsonDocument &doc, JsonObjectConst dev) {
+#if !OLED_ONLY_HOME_VISIBLE_DEVICES
+  (void)doc;
+  (void)dev;
+  return true;
+#else
+  bool groupsEnabled = !doc["settings"]["enableGroups"].is<bool>() || doc["settings"]["enableGroups"].as<bool>();
+  bool favsEnabled = !doc["settings"]["enableFavorites"].is<bool>() || doc["settings"]["enableFavorites"].as<bool>();
+
+  auto isGroupVisible = [&](const char *gid) -> bool {
+    if (!gid || gid[0] == '\0' || strcmp(gid, "none") == 0) return false;
+    if (!doc["groups"].is<JsonArrayConst>()) return false;
+    for (JsonVariantConst gv : doc["groups"].as<JsonArrayConst>()) {
+      if (!gv.is<JsonObjectConst>()) continue;
+      const char *id = gv["id"] | "";
+      if (strcmp(id, gid) == 0) {
+        return !(gv["hidden"].is<bool>() && gv["hidden"].as<bool>());
+      }
+    }
+    return false;
+  };
+
+  // 1. Check assigned groups (supports both `groups: [...]` and legacy `group: "..."`)
+  if (groupsEnabled) {
+    if (dev["groups"].is<JsonArrayConst>()) {
+      for (JsonVariantConst gIdVar : dev["groups"].as<JsonArrayConst>()) {
+        if (isGroupVisible(gIdVar | "")) return true;
+      }
+    } else if (dev["group"].is<const char *>()) {
+      if (isGroupVisible(dev["group"] | "")) return true;
+    }
+  }
+
+  // 2. Check non-hidden Favorites referencing this device directly
+  if (favsEnabled && doc["favorites"].is<JsonArrayConst>()) {
+    const char *devId = dev["id"] | "";
+    if (devId[0] != '\0') {
+      for (JsonVariantConst fv : doc["favorites"].as<JsonArrayConst>()) {
+        if (!fv.is<JsonObjectConst>()) continue;
+        if (fv["hidden"].is<bool>() && fv["hidden"].as<bool>()) continue;
+        if (fv["deviceIds"].is<JsonArrayConst>()) {
+          for (JsonVariantConst idV : fv["deviceIds"].as<JsonArrayConst>()) {
+            if (strcmp(idV | "", devId) == 0) return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+#endif
+}
+
+// Loads configured devices from /config.json matching Home page count
 void reloadDevicesFromConfig() {
   trackedDeviceCount = 0;
   trackedCheckIdx = 0;
   devicesOnlineCount = 0;
   devicesOfflineCount = 0;
+  webDeviceOverrideActive = false;
 
   if (!hubFS || !fsMutex) return;
   if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) != pdTRUE) return;
@@ -1112,44 +1196,25 @@ void reloadDevicesFromConfig() {
     if (f) {
       JsonDocument doc(&psramAllocator);
       if (!deserializeJson(doc, f)) {
-        auto addFromArray = [&](JsonArrayConst arr) {
-          for (JsonVariantConst v : arr) {
+        if (doc["devices"].is<JsonArrayConst>()) {
+          for (JsonVariantConst v : doc["devices"].as<JsonArrayConst>()) {
             if (trackedDeviceCount >= MAX_TRACKED_DEVICES) break;
             if (!v.is<JsonObjectConst>()) continue;
-            char host[48];
-            uint16_t port = 80;
-            if (extractDeviceEndpoint(v.as<JsonObjectConst>(), host, sizeof(host), port)) {
-              // Skip duplicates
-              bool dup = false;
-              for (uint8_t i = 0; i < trackedDeviceCount; i++) {
-                if (strcmp(trackedDevices[i].host, host) == 0 && trackedDevices[i].port == port) {
-                  dup = true;
-                  break;
-                }
-              }
-              if (!dup) {
-                strncpy(trackedDevices[trackedDeviceCount].host, host, sizeof(trackedDevices[0].host) - 1);
-                trackedDevices[trackedDeviceCount].host[sizeof(trackedDevices[0].host) - 1] = '\0';
-                trackedDevices[trackedDeviceCount].port = port;
-                trackedDevices[trackedDeviceCount].online = false;
-                trackedDevices[trackedDeviceCount].checked = false;
-                trackedDeviceCount++;
-              }
-            }
-          }
-        };
+            JsonObjectConst devObj = v.as<JsonObjectConst>();
+            if (!isDeviceVisibleOnHome(doc, devObj)) continue;
 
-        // Supports flat arrays or grouped/roomed arrays in /config.json
-        if (doc["devices"].is<JsonArrayConst>()) addFromArray(doc["devices"].as<JsonArrayConst>());
-        if (doc["nodes"].is<JsonArrayConst>()) addFromArray(doc["nodes"].as<JsonArrayConst>());
-        if (doc["groups"].is<JsonArrayConst>()) {
-          for (JsonVariantConst g : doc["groups"].as<JsonArrayConst>()) {
-            if (g["devices"].is<JsonArrayConst>()) addFromArray(g["devices"].as<JsonArrayConst>());
-          }
-        }
-        if (doc["rooms"].is<JsonArrayConst>()) {
-          for (JsonVariantConst r : doc["rooms"].as<JsonArrayConst>()) {
-            if (r["devices"].is<JsonArrayConst>()) addFromArray(r["devices"].as<JsonArrayConst>());
+            char host[48], altHost[48];
+            uint16_t port = 80;
+            if (extractDeviceEndpoint(devObj, host, sizeof(host), altHost, sizeof(altHost), port)) {
+              strncpy(trackedDevices[trackedDeviceCount].host, host, sizeof(trackedDevices[0].host) - 1);
+              trackedDevices[trackedDeviceCount].host[sizeof(trackedDevices[0].host) - 1] = '\0';
+              strncpy(trackedDevices[trackedDeviceCount].altHost, altHost, sizeof(trackedDevices[0].altHost) - 1);
+              trackedDevices[trackedDeviceCount].altHost[sizeof(trackedDevices[0].altHost) - 1] = '\0';
+              trackedDevices[trackedDeviceCount].port = port;
+              trackedDevices[trackedDeviceCount].online = false;
+              trackedDevices[trackedDeviceCount].checked = false;
+              trackedDeviceCount++;
+            }
           }
         }
       }
@@ -1159,11 +1224,42 @@ void reloadDevicesFromConfig() {
   xSemaphoreGive(fsMutex);
 
   devicesOfflineCount = trackedDeviceCount;
-  Serial.printf("[OLED] Loaded %u devices from %s for status tracking\n", trackedDeviceCount, CONFIG_PATH);
+  Serial.printf("[OLED] Loaded %u Home-visible devices from %s\n", trackedDeviceCount, CONFIG_PATH);
   oledForceRedraw = true;
 }
 
-// Checks 1 device per interval (non-intrusive; skipped during uploads/resets)
+// Probes an IP or .local mDNS hostname properly on ESP32
+bool probeEndpointHost(const char *host, uint16_t port) {
+  if (!host || host[0] == '\0') return false;
+
+  WiFiClient probe;
+  IPAddress ip;
+
+  if (ip.fromString(host)) {
+    bool ok = probe.connect(ip, port, 750);
+    if (ok) probe.stop();
+    return ok;
+  }
+
+  // Resolve .local hostnames using mDNS (WiFiClient::connect only uses DNS)
+  String h = String(host);
+  h.toLowerCase();
+  if (h.endsWith(".local")) {
+    if (!mdnsRunning) return false;
+    h.remove(h.length() - 6);  // Strip ".local"
+    ip = MDNS.queryHost(h, 600);
+    if ((uint32_t)ip == 0 || ip == INADDR_NONE) return false;
+    bool ok = probe.connect(ip, port, 750);
+    if (ok) probe.stop();
+    return ok;
+  }
+
+  bool ok = probe.connect(host, port, 750);
+  if (ok) probe.stop();
+  return ok;
+}
+
+// Checks 1 device per interval (fast first pass after boot, then every 3s)
 void serviceDeviceHealthCheck() {
   if (deviceListReloadPending) {
     deviceListReloadPending = false;
@@ -1173,23 +1269,35 @@ void serviceDeviceHealthCheck() {
   if (trackedDeviceCount == 0 || WiFi.status() != WL_CONNECTED) return;
   if (uploadSession.active || fsUploadSession.active || ufState != UF_IDLE || portalPending || restartPending) return;
 
+  bool allCheckedOnce = true;
+  for (uint8_t i = 0; i < trackedDeviceCount; i++) {
+    if (!trackedDevices[i].checked) {
+      allCheckedOnce = false;
+      break;
+    }
+  }
+
   unsigned long now = millis();
-  if (now - lastDeviceCheckMs < DEVICE_CHECK_INTERVAL_MS) return;
+  unsigned long interval = allCheckedOnce ? DEVICE_CHECK_INTERVAL_MS : DEVICE_INITIAL_CHECK_INTERVAL_MS;
+  if (now - lastDeviceCheckMs < interval) return;
   lastDeviceCheckMs = now;
 
   TrackedDevice &dev = trackedDevices[trackedCheckIdx];
-  WiFiClient probe;
-  IPAddress ip;
-  bool ok = false;
-  if (ip.fromString(dev.host)) {
-    ok = probe.connect(ip, dev.port, 250);
-  } else {
-    ok = probe.connect(dev.host, dev.port, 350);
+  bool ok = probeEndpointHost(dev.host, dev.port);
+  if (!ok && dev.altHost[0] != '\0') {
+    ok = probeEndpointHost(dev.altHost, dev.port);
   }
-  if (ok) probe.stop();
 
   dev.online = ok;
   dev.checked = true;
+
+  // Sync any other device cards sharing the exact same endpoint from this single probe
+  for (uint8_t i = 0; i < trackedDeviceCount; i++) {
+    if (i != trackedCheckIdx && trackedDevices[i].port == dev.port && strcmp(trackedDevices[i].host, dev.host) == 0) {
+      trackedDevices[i].online = ok;
+      trackedDevices[i].checked = true;
+    }
+  }
 
   trackedCheckIdx = (trackedCheckIdx + 1) % trackedDeviceCount;
 
@@ -1392,8 +1500,10 @@ void serviceOledDisplay() {
     display.printf("OFF:%u", offCnt);
 
     // Total count on the right
-    display.setCursor(100, 51);
-    display.printf("T:%u", totCnt);
+    display.setTextColor(SSD1306_WHITE);
+    display.drawRoundRect(100, 48, 28, 13, 2, SSD1306_WHITE);
+    display.setCursor(104, 51);
+    display.printf("%u", totCnt);
   }
 
   display.display();
@@ -3341,6 +3451,7 @@ void setupWebServer() {
         if (hubFS->exists(DESIGN_TMP_PATH)) hubFS->remove(DESIGN_TMP_PATH);
         xSemaphoreGive(fsMutex);
       }
+      deviceListReloadPending = true;
       notifyStorage();
       Serial.println("[RESET] Data reset complete (/design.json removed)");
       req->send(200, "application/json", "{\"ok\":true,\"mode\":\"data\"}");
