@@ -17,6 +17,7 @@
 #include <Preferences.h>
 #include <SPIFFS.h>
 #include <math.h>
+#include "mbedtls/sha256.h"
 
 // Explicit ESPAsyncWebServer method bitmasks (avoids collision with WebServer.h included by WiFiManager.h)
 static constexpr WebRequestMethod ASYNC_GET = AsyncWebRequestMethod::HTTP_GET;
@@ -88,6 +89,14 @@ static const unsigned long FORGET_BOOT_WINDOW_MS = 5000UL;    // Matches 5.0s UI
 static const unsigned long BOOT_HOLD_PREARM_MS = 5000UL;
 static const unsigned long BOOT_HOLD_VALID_MS = 15000UL;
 static const unsigned long FORGET_HOLD_CONFIRM_MS = 350UL;  // Stable press during 5s window
+// Uploader Security & Forget-BOOT Reset Constants
+static constexpr uint8_t UPLOAD_AUTH_MAX_ATTEMPTS = 3;
+static const char *UPLOAD_DEFAULT_ADMIN_USER = "esp";
+static const char *UPLOAD_DEFAULT_ADMIN_PASS = "456456";
+static const unsigned long UPLOAD_SESSION_TTL_MS = 900000UL;        // 15 min inactivity timeout
+static const unsigned long UPLOAD_FORGET_PRESS_WINDOW_MS = 5000UL;  // 5s window to press BOOT
+static const unsigned long UPLOAD_FORGET_HOLD_MS = 10000UL;         // 10s continuous hold
+static const unsigned long UPLOAD_FORGET_DEBOUNCE_MS = 120UL;       // Switch bounce tolerance
 
 // ============================================================================
 // 2. PSRAM ALLOCATOR (ARDUINOJSON v7) & PSRAM STATIC ASSET CACHE
@@ -203,7 +212,7 @@ bool initStorage() {
 }
 
 // ============================================================================
-// 4. BUILT-IN /upload FILE MANAGER UI (SERVED FROM FLASH WITH ZERO HEAP)
+// 4. BUILT-IN /upload FILE MANAGER UI (PASSWORD PROTECTED + IN-BOX FILE LIST)
 // ============================================================================
 static const char UPLOAD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <html lang="en">
@@ -212,24 +221,42 @@ static const char UPLOAD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Smart Hub Flash Uploader</title>
 <style>
-  :root{--bg:#0d1117;--card:#161b22;--bd:#30363d;--tx:#e6edf3;--mut:#8b949e;--acc:#2f81f7;--ok:#3fb950;--err:#f85149}
+  :root{--bg:#0d1117;--card:#161b22;--bd:#30363d;--tx:#e6edf3;--mut:#8b949e;--acc:#2f81f7;--ok:#3fb950;--warn:#d29922;--err:#f85149}
   *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
   body{margin:0;background:var(--bg);color:var(--tx);padding:20px}
   .wrap{max-width:720px;margin:0 auto}
   .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:18px;margin-bottom:16px}
+  .hidden{display:none!important}
   h1{margin:0 0 6px;font-size:20px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
   .sub{color:var(--mut);font-size:13px;margin:0 0 14px}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:var(--mut);margin-bottom:5px;font-weight:600}
+  .field input{width:100%;background:#0d1117;border:1px solid var(--bd);border-radius:8px;padding:10px 12px;color:var(--tx);font-size:14px;outline:none}
+  .field input:focus{border-color:var(--acc)}
+  .alert{padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:12px;border:1px solid var(--bd);background:#0d1117}
+  .alert.err{border-color:rgba(248,81,73,.5);background:rgba(248,81,73,.1);color:#ffa198}
+  .alert.ok{border-color:rgba(63,185,80,.5);background:rgba(63,185,80,.1);color:#7ee787}
+  .alert.warn{border-color:rgba(210,153,34,.5);background:rgba(210,153,34,.1);color:#f2cc60}
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}
   .stat{background:#0d1117;border:1px solid var(--bd);border-radius:8px;padding:10px}
   .stat b{display:block;font-size:15px;margin-top:2px}
   .stat span{font-size:11px;color:var(--mut);text-transform:uppercase}
   .bar{height:8px;background:#21262d;border-radius:99px;overflow:hidden}
-  .bar>div{height:100%;background:var(--acc);width:0%;transition:width .2s}
-  .drop{border:2px dashed var(--bd);border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;transition:.15s}
+  .bar>div{height:100%;background:var(--acc);width:0%;transition:width .18s}
+  .drop{border:2px dashed var(--bd);border-radius:10px;padding:24px 16px;text-align:center;cursor:pointer;transition:.15s}
   .drop.over{border-color:var(--acc);background:rgba(47,129,247,.08)}
+  .drop.has-files{border-color:var(--ok);background:rgba(63,185,80,.04);text-align:left;padding:16px}
+  .dz-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap}
+  .dz-list{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto}
+  .dz-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0d1117;border:1px solid var(--bd);border-radius:8px;padding:7px 10px;font-size:13px}
+  .dz-name{font-family:ui-monospace,Consolas,monospace;word-break:break-all}
+  .dz-meta{display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .dz-sz{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--mut)}
+  .dz-rm{background:transparent;border:1px solid rgba(248,81,73,.4);color:var(--err);border-radius:6px;padding:2px 7px;font-size:12px;cursor:pointer}
   .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
   button,a.btn{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
   button.sec,a.sec{background:#21262d;border:1px solid var(--bd);color:var(--tx)}
+  button.warn{background:rgba(210,153,34,.18);border:1px solid rgba(210,153,34,.5);color:#f2cc60}
   button.del{background:transparent;border:1px solid rgba(248,81,73,.4);color:var(--err);padding:4px 9px;font-size:12px}
   button:disabled{opacity:.5;cursor:not-allowed}
   #log{margin-top:12px;font-family:ui-monospace,Consolas,monospace;font-size:12px;background:#0d1117;border:1px solid var(--bd);border-radius:8px;padding:10px;max-height:160px;overflow:auto;white-space:pre-wrap;display:none}
@@ -242,85 +269,320 @@ static const char UPLOAD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 </head>
 <body>
 <div class="wrap">
-  <div class="card">
-    <h1>
-      <span>Flash Storage Uploader</span>
-      <span style="display:flex;gap:8px">
-        <a class="btn sec" href="/">Open Hub</a>
-        <button class="sec" onclick="rebootHub()">Reboot</button>
-      </span>
-    </h1>
-    <p class="sub">Drop all <b>.gz</b> / web files from your <code>data/</code> folder here to upload directly into flash.</p>
-    <div class="stats">
-      <div class="stat"><span>Board / FS</span><b id="stBoard">-</b></div>
-      <div class="stat"><span>Storage Used</span><b id="stUsed">-</b></div>
-      <div class="stat"><span>Storage Free</span><b id="stFree">-</b></div>
-      <div class="stat"><span>PSRAM</span><b id="stPsram">-</b></div>
+  <!-- AUTH GATE -->
+  <div class="card" id="authCard" style="max-width:440px;margin:32px auto">
+    <h1><span>Protected Flash Uploader</span></h1>
+    <p class="sub">Sign in with an <b>Admin</b>. Maximum 3 failed attempts before hardware restart is required.</p>
+    <div id="authMsg" class="alert hidden"></div>
+    <form id="loginForm" onsubmit="doLogin(event)">
+      <div class="field">
+        <label for="uName">Admin Username</label>
+        <input id="uName" type="text" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="uPass">Password</label>
+        <input id="uPass" type="password" autocomplete="current-password" required>
+      </div>
+      <div class="row" style="justify-content:space-between">
+        <button id="loginBtn" type="submit">Unlock</button>
+        <button id="forgetBtn" type="button" class="warn" onclick="startForgetFlow()">Forget</button>
+      </div>
+    </form>
+
+    <div id="forgetBox" class="hidden" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bd)">
+      <div id="forgetText" style="font-size:13px;font-weight:600;margin-bottom:8px"></div>
+      <div class="bar"><div id="forgetBar"></div></div>
+      <div style="font-size:11px;color:var(--mut);margin-top:6px">
+        Hardware reset erases all saved admin/normal users and restores default admin <b>esp</b> / <b>456456</b>.
+      </div>
     </div>
-    <div class="bar"><div id="stBar"></div></div>
   </div>
 
-  <div class="card">
-    <div class="drop" id="dropZone" onclick="fileInput.click()">
-      <div style="font-size:15px;font-weight:600">Click to select files or drag &amp; drop here</div>
-      <div style="font-size:12px;color:var(--mut);margin-top:4px">Supports multiple files (index.html.gz, config.html.gz, layout.html.gz, design.html.gz, *.svg.gz)</div>
-      <input id="fileInput" type="file" multiple style="display:none">
+  <!-- UPLOADER WORKSPACE (ONLY SHOWN AFTER SERVER VERIFIES TOKEN) -->
+  <div id="uploaderApp" class="hidden">
+    <div class="card">
+      <h1>
+        <span>Flash Storage Uploader</span>
+        <span style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn sec" href="/">Open Hub</a>
+          <button class="sec" onclick="rebootHub()">Reboot</button>
+          <button class="del" onclick="doLogout()">Logout</button>
+        </span>
+      </h1>
+      <p class="sub">Drop all <b>.gz</b> / web files from your <code>data/</code> folder here to upload directly into flash.</p>
+      <div class="stats">
+        <div class="stat"><span>Board / FS</span><b id="stBoard">-</b></div>
+        <div class="stat"><span>Storage Used</span><b id="stUsed">-</b></div>
+        <div class="stat"><span>Storage Free</span><b id="stFree">-</b></div>
+        <div class="stat"><span>PSRAM</span><b id="stPsram">-</b></div>
+      </div>
+      <div class="bar"><div id="stBar"></div></div>
     </div>
-    <div class="row">
-      <button id="upBtn" onclick="uploadQueued()" disabled>Upload Selected (0)</button>
-      <button class="sec" onclick="loadList()">Refresh List</button>
-      <span id="upStatus" style="font-size:13px;color:var(--mut)"></span>
-    </div>
-    <div class="bar" style="margin-top:10px"><div id="upBar"></div></div>
-    <div id="log"></div>
-  </div>
 
-  <div class="card">
-    <h1 style="font-size:16px;margin-bottom:10px"><span>Files in Flash (<span id="fCount">0</span>)</span></h1>
-    <table>
-      <thead><tr><th>Path</th><th>Size</th><th style="text-align:right">Action</th></tr></thead>
-      <tbody id="fBody"><tr><td colspan="3" style="color:var(--mut)">Loading...</td></tr></tbody>
-    </table>
+    <div class="card">
+      <div class="drop" id="dropZone" onclick="fileInput.click()">
+        <div id="dzEmpty">
+          <div style="font-size:15px;font-weight:600">Click to select files or drag &amp; drop here</div>
+          <div style="font-size:12px;color:var(--mut);margin-top:4px">Supports multiple files (index.html.gz, config.html.gz, layout.html.gz, design.html.gz, *.svg.gz)</div>
+        </div>
+        <div id="dzFilled" class="hidden">
+          <div class="dz-head">
+            <span style="font-size:13px;font-weight:600;color:var(--ok)" id="dzSummary">0 files ready to upload</span>
+            <span style="font-size:12px;color:var(--mut)">Click or drop more files to add</span>
+          </div>
+          <div id="dropFileList" class="dz-list"></div>
+        </div>
+        <input id="fileInput" type="file" multiple style="display:none">
+      </div>
+      <div class="row">
+        <button id="upBtn" onclick="uploadQueued()" disabled>Upload Selected (0)</button>
+        <button id="clrBtn" class="sec" onclick="clearQueue()" disabled>Clear Queue</button>
+        <button class="sec" onclick="loadList()">Refresh List</button>
+        <span id="upStatus" style="font-size:13px;color:var(--mut)"></span>
+      </div>
+      <div class="bar" style="margin-top:10px"><div id="upBar"></div></div>
+      <div id="log"></div>
+    </div>
+
+    <div class="card">
+      <h1 style="font-size:16px;margin-bottom:10px"><span>Files in Flash (<span id="fCount">0</span>)</span></h1>
+      <table>
+        <thead><tr><th>Path</th><th>Size</th><th style="text-align:right">Action</th></tr></thead>
+        <tbody id="fBody"><tr><td colspan="3" style="color:var(--mut)">Loading...</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 <script>
+let authToken = '';
 let queued = [];
+let forgetTimer = null;
+
+const authCard = document.getElementById('authCard');
+const authMsg = document.getElementById('authMsg');
+const loginBtn = document.getElementById('loginBtn');
+const forgetBtn = document.getElementById('forgetBtn');
+const forgetBox = document.getElementById('forgetBox');
+const forgetText = document.getElementById('forgetText');
+const forgetBar = document.getElementById('forgetBar');
+const uploaderApp = document.getElementById('uploaderApp');
+
 const dropZone = document.getElementById('dropZone');
+const dzEmpty = document.getElementById('dzEmpty');
+const dzFilled = document.getElementById('dzFilled');
+const dzSummary = document.getElementById('dzSummary');
+const dropFileList = document.getElementById('dropFileList');
 const fileInput = document.getElementById('fileInput');
 const upBtn = document.getElementById('upBtn');
+const clrBtn = document.getElementById('clrBtn');
 const upStatus = document.getElementById('upStatus');
 const upBar = document.getElementById('upBar');
 const logEl = document.getElementById('log');
 
+function escHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 function fmtBytes(b){
   if(b >= 1048576) return (b/1048576).toFixed(2)+' MB';
   if(b >= 1024) return (b/1024).toFixed(1)+' KB';
   return b+' B';
+}
+function showAuthAlert(type, msg){
+  authMsg.className = 'alert ' + type;
+  authMsg.textContent = msg;
+  authMsg.classList.remove('hidden');
+}
+function authHeaders(){
+  return authToken ? { 'X-Upload-Token': authToken } : {};
+}
+function lockUiToAuth(msg){
+  authToken = '';
+  uploaderApp.classList.add('hidden');
+  authCard.classList.remove('hidden');
+  if(msg) showAuthAlert('err', msg);
 }
 function addLog(msg){
   logEl.style.display='block';
   logEl.textContent += msg + '\n';
   logEl.scrollTop = logEl.scrollHeight;
 }
-function setQueue(fileList){
-  queued = Array.from(fileList || []);
+
+// --- IN-DROPZONE QUEUE RENDERER ---
+function renderDropZone(){
   upBtn.textContent = 'Upload Selected (' + queued.length + ')';
   upBtn.disabled = queued.length === 0;
-  upStatus.textContent = queued.length ? queued.map(f=>f.name).join(', ') : '';
+  clrBtn.disabled = queued.length === 0;
+  if(!queued.length){
+    dropZone.classList.remove('has-files');
+    dzEmpty.classList.remove('hidden');
+    dzFilled.classList.add('hidden');
+    dropFileList.innerHTML = '';
+    return;
+  }
+  const totalBytes = queued.reduce((s, f) => s + f.size, 0);
+  dropZone.classList.add('has-files');
+  dzEmpty.classList.add('hidden');
+  dzFilled.classList.remove('hidden');
+  dzSummary.textContent = queued.length + ' file' + (queued.length > 1 ? 's' : '') + ' ready (' + fmtBytes(totalBytes) + ')';
+  dropFileList.innerHTML = queued.map((f, idx) =>
+    '<div class="dz-item" onclick="event.stopPropagation()">' +
+      '<span class="dz-name">' + escHtml(f.name) + '</span>' +
+      '<span class="dz-meta"><span class="dz-sz">' + fmtBytes(f.size) + '</span>' +
+      '<button type="button" class="dz-rm" title="Remove" onclick="removeQueued(' + idx + ',event)">&times;</button></span>' +
+    '</div>'
+  ).join('');
+}
+function addFilesToQueue(fileList){
+  const incoming = Array.from(fileList || []);
+  for(const f of incoming){
+    const existingIdx = queued.findIndex(x => x.name === f.name);
+    if(existingIdx >= 0) queued[existingIdx] = f;
+    else queued.push(f);
+  }
+  fileInput.value = '';
+  renderDropZone();
+}
+function removeQueued(idx, ev){
+  if(ev) ev.stopPropagation();
+  queued.splice(idx, 1);
+  renderDropZone();
+}
+function clearQueue(){
+  queued = [];
+  fileInput.value = '';
+  renderDropZone();
 }
 
-fileInput.addEventListener('change', e => setQueue(e.target.files));
+fileInput.addEventListener('change', e => addFilesToQueue(e.target.files));
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
   dropZone.classList.remove('over');
-  setQueue(e.dataTransfer.files);
+  addFilesToQueue(e.dataTransfer.files);
 });
 
+// --- AUTH & FORGET FLOW ---
+async function checkAuthStatus(){
+  try{
+    const r = await fetch('/api/upload-auth/status', { cache:'no-store' });
+    const d = await r.json();
+    if(d.locked){
+      loginBtn.disabled = true;
+      showAuthAlert('err', 'LOCKED: Maximum 3 failed attempts reached. A fresh hardware restart of the ESP32 is required (or use Forget with physical BOOT button).');
+    } else {
+      loginBtn.disabled = false;
+      if(d.failedAttempts > 0){
+        showAuthAlert('warn', 'Failed attempts: ' + d.failedAttempts + '/3. Remaining: ' + d.remainingAttempts);
+      }
+    }
+  }catch(e){}
+}
+
+async function doLogin(ev){
+  ev.preventDefault();
+  const username = document.getElementById('uName').value.trim();
+  const password = document.getElementById('uPass').value;
+  loginBtn.disabled = true;
+  try{
+    const r = await fetch('/api/upload-auth/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const d = await r.json();
+    if(r.ok && d.ok && d.token){
+      authToken = d.token;
+      document.getElementById('uPass').value = '';
+      authMsg.classList.add('hidden');
+      authCard.classList.add('hidden');
+      uploaderApp.classList.remove('hidden');
+      await loadList();
+      return;
+    }
+    if(d.locked){
+      loginBtn.disabled = true;
+      showAuthAlert('err', d.error || 'LOCKED after 3 failed attempts. Fresh hardware restart required.');
+    } else {
+      loginBtn.disabled = false;
+      showAuthAlert('err', (d.error || 'Invalid credentials') + ' (' + d.remainingAttempts + ' attempt(s) left)');
+    }
+  }catch(e){
+    loginBtn.disabled = false;
+    showAuthAlert('err', 'Connection error: ' + e.message);
+  }
+}
+
+async function doLogout(){
+  try{ await fetch('/api/upload-auth/logout', { method:'POST', headers: authHeaders() }); }catch(e){}
+  clearQueue();
+  lockUiToAuth('');
+  showAuthAlert('ok', 'Logged out securely.');
+}
+
+async function startForgetFlow(){
+  if(forgetTimer){ clearInterval(forgetTimer); forgetTimer = null; }
+  forgetBtn.disabled = true;
+  forgetBox.classList.remove('hidden');
+  forgetBar.style.width = '0%';
+  forgetBar.style.background = 'var(--warn)';
+  forgetText.textContent = 'Arming hardware reset...';
+  try{
+    const r = await fetch('/api/upload-auth/forget/start', { method:'POST' });
+    const d = await r.json();
+    if(!r.ok || !d.ok){
+      forgetBtn.disabled = false;
+      forgetText.textContent = d.error || 'Could not start forget process.';
+      return;
+    }
+    forgetTimer = setInterval(pollForgetStatus, 250);
+    pollForgetStatus();
+  }catch(e){
+    forgetBtn.disabled = false;
+    forgetText.textContent = 'Request failed: ' + e.message;
+  }
+}
+
+async function pollForgetStatus(){
+  try{
+    const r = await fetch('/api/upload-auth/forget/status', { cache:'no-store' });
+    const d = await r.json();
+    if(d.state === 'wait_press'){
+      const rem = (d.remainingMs / 1000).toFixed(1);
+      forgetBar.style.background = 'var(--warn)';
+      forgetBar.style.width = Math.min(100, ((5000 - d.remainingMs) / 5000) * 100) + '%';
+      forgetText.textContent = 'Step 1/2: Press & hold onboard BOOT button within ' + rem + 's...';
+    } else if(d.state === 'holding'){
+      const held = (d.heldMs / 1000).toFixed(1);
+      forgetBar.style.background = 'var(--acc)';
+      forgetBar.style.width = Math.min(100, (d.heldMs / 10000) * 100) + '%';
+      forgetText.textContent = 'Step 2/2: Keep holding BOOT button... ' + held + 's / 10.0s';
+    } else {
+      clearInterval(forgetTimer);
+      forgetTimer = null;
+      forgetBtn.disabled = false;
+      if(d.state === 'done'){
+        forgetBar.style.background = 'var(--ok)';
+        forgetBar.style.width = '100%';
+        forgetText.textContent = 'Reset complete!';
+        loginBtn.disabled = false;
+        document.getElementById('uName').value = 'esp';
+        document.getElementById('uPass').value = '';
+        showAuthAlert('ok', 'All saved users erased! Default admin created: esp / 456456');
+      } else {
+        forgetBar.style.background = 'var(--err)';
+        forgetText.textContent = d.message || 'Reset cancelled.';
+        showAuthAlert('err', d.message || 'Hardware verification failed. Try again.');
+      }
+    }
+  }catch(e){}
+}
+
+// --- PROTECTED FILE OPERATIONS ---
 async function uploadQueued(){
-  if(!queued.length) return;
+  if(!queued.length || !authToken) return;
   upBtn.disabled = true;
+  clrBtn.disabled = true;
   logEl.textContent = '';
   let okCount = 0;
   for(let i=0;i<queued.length;i++){
@@ -330,7 +592,8 @@ async function uploadQueued(){
     const fd = new FormData();
     fd.append('file', f, f.name);
     try{
-      const r = await fetch('/api/fs/upload', { method:'POST', body:fd });
+      const r = await fetch('/api/fs/upload', { method:'POST', headers: authHeaders(), body:fd });
+      if(r.status === 401){ lockUiToAuth('Session expired. Please login again.'); return; }
       const j = await r.json();
       if(r.ok && j.ok){
         okCount++;
@@ -344,27 +607,28 @@ async function uploadQueued(){
   }
   upBar.style.width = '100%';
   upStatus.textContent = 'Done: ' + okCount + '/' + queued.length + ' uploaded.';
-  queued = [];
-  fileInput.value = '';
-  upBtn.textContent = 'Upload Selected (0)';
+  clearQueue();
   await loadList();
 }
 
 async function delFile(path){
   if(!confirm('Delete ' + path + '?')) return;
-  const r = await fetch('/api/fs/delete?path=' + encodeURIComponent(path), { method:'POST' });
+  const r = await fetch('/api/fs/delete?path=' + encodeURIComponent(path), { method:'POST', headers: authHeaders() });
+  if(r.status === 401){ lockUiToAuth('Session expired. Please login again.'); return; }
   if(r.ok) await loadList();
 }
 
 async function rebootHub(){
   if(!confirm('Reboot device now?')) return;
-  await fetch('/api/reboot', { method:'POST' });
+  const r = await fetch('/api/fs/reboot', { method:'POST', headers: authHeaders() });
+  if(r.status === 401){ lockUiToAuth('Session expired. Please login again.'); return; }
   upStatus.textContent = 'Rebooting...';
 }
 
 async function loadList(){
   try{
-    const r = await fetch('/api/fs/list', { cache:'no-store' });
+    const r = await fetch('/api/fs/list', { cache:'no-store', headers: authHeaders() });
+    if(r.status === 401){ lockUiToAuth('Session expired. Please login again.'); return; }
     const d = await r.json();
     document.getElementById('stBoard').textContent = d.board + ' / ' + d.fsType;
     document.getElementById('stUsed').textContent = fmtBytes(d.usedBytes) + ' / ' + fmtBytes(d.totalBytes);
@@ -380,14 +644,15 @@ async function loadList(){
     }
     d.files.sort((a,b)=>a.name.localeCompare(b.name));
     tb.innerHTML = d.files.map(f =>
-      '<tr><td>' + f.name + '</td><td class="sz">' + fmtBytes(f.size) +
-      '</td><td class="act"><button class="del" onclick="delFile(\'' + f.name.replace(/'/g,"\\'") + '\')">Delete</button></td></tr>'
+      '<tr><td>' + escHtml(f.name) + '</td><td class="sz">' + fmtBytes(f.size) +
+      '</td><td class="act"><button class="del" onclick="delFile(\'' + f.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')">Delete</button></td></tr>'
     ).join('');
   }catch(e){
     document.getElementById('fBody').innerHTML = '<tr><td colspan="3" style="color:var(--err)">Failed to read flash list</td></tr>';
   }
 }
-loadList();
+
+checkAuthStatus();
 </script>
 </body>
 </html>)rawliteral";
@@ -514,6 +779,30 @@ struct SmallJsonBody {
   size_t len = 0;
   bool overflow = false;
 };
+
+// ============================================================================
+// UPLOADER HIGH-SECURITY AUTH & HARDWARE FORGET-BOOT STATE
+// ============================================================================
+uint8_t uploadAuthFailedAttempts = 0;
+bool uploadAuthLocked = false;          // Resets ONLY on fresh hardware restart or BOOT Forget
+char uploadSessionToken[65] = "";       // 256-bit random hex token (64 chars + NUL)
+IPAddress uploadSessionIp(0, 0, 0, 0);  // Token bound to client IP
+unsigned long uploadSessionLastSeenMs = 0;
+
+enum UploadForgetState : uint8_t {
+  UF_IDLE = 0,
+  UF_WAIT_PRESS,
+  UF_HOLDING,
+  UF_DONE,
+  UF_TIMEOUT,
+  UF_RELEASED_EARLY
+};
+
+UploadForgetState ufState = UF_IDLE;
+unsigned long ufWindowDeadlineMs = 0;
+unsigned long ufHoldStartMs = 0;
+unsigned long ufReleaseSinceMs = 0;
+char ufStatusMsg[96] = "";
 
 // ============================================================================
 // 8. FORWARD DECLARATIONS
@@ -1065,6 +1354,285 @@ bool connectToSavedWiFi() {
 }
 
 // ============================================================================
+// 12.5. UPLOADER AUTHENTICATION, CONSTANT-TIME CHECK & 5s+10s BOOT FORGET
+// ============================================================================
+bool secureEquals(const char *a, const char *b) {
+  if (!a || !b) return false;
+  size_t la = strlen(a);
+  size_t lb = strlen(b);
+  size_t maxLen = (la > lb) ? la : lb;
+  uint8_t diff = (uint8_t)(la ^ lb);
+  for (size_t i = 0; i < maxLen; i++) {
+    uint8_t ca = (i < la) ? (uint8_t)a[i] : 0;
+    uint8_t cb = (i < lb) ? (uint8_t)b[i] : 0;
+    diff |= (uint8_t)(ca ^ cb);
+  }
+  return diff == 0;
+}
+
+void sha256HexLower(const char *input, char outHex[65]) {
+  uint8_t hash[32];
+  mbedtls_sha256_context ctx;
+  mbedtls_sha256_init(&ctx);
+  mbedtls_sha256_starts(&ctx, 0);
+  mbedtls_sha256_update(&ctx, reinterpret_cast<const uint8_t *>(input), strlen(input));
+  mbedtls_sha256_finish(&ctx, hash);
+  mbedtls_sha256_free(&ctx);
+  static const char HEX_CHARS[] = "0123456789abcdef";
+  for (int i = 0; i < 32; i++) {
+    outHex[i * 2] = HEX_CHARS[(hash[i] >> 4) & 0x0F];
+    outHex[i * 2 + 1] = HEX_CHARS[hash[i] & 0x0F];
+  }
+  outHex[64] = '\0';
+}
+
+bool passwordMatchesStored(const String &storedRaw, const String &provided) {
+  if (storedRaw.isEmpty()) return false;
+  if (secureEquals(storedRaw.c_str(), provided.c_str())) return true;
+
+  // Also support SHA-256 hex hashes if config.html hashes passwords before saving
+  if (storedRaw.length() == 64) {
+    char computed[65];
+    sha256HexLower(provided.c_str(), computed);
+    String storedLower = storedRaw;
+    storedLower.toLowerCase();
+    if (secureEquals(storedLower.c_str(), computed)) return true;
+  }
+  return false;
+}
+
+bool isAdminRoleEntry(JsonObjectConst u) {
+  if (u["isAdmin"].is<bool>() && u["isAdmin"].as<bool>()) return true;
+  if (u["role"].is<const char *>()) {
+    String r = u["role"].as<const char *>();
+    r.trim();
+    r.toLowerCase();
+    return (r == "admin" || r == "superadmin" || r == "administrator");
+  }
+  return false;
+}
+
+bool verifyUploadAdminCredentials(const String &user, const String &pass) {
+  if (user.isEmpty() || pass.isEmpty()) return false;
+
+  bool anyAdminInConfig = false;
+  bool matched = false;
+
+  if (hubFS && fsMutex && xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+    if (hubFS->exists(CONFIG_PATH)) {
+      File f = hubFS->open(CONFIG_PATH, "r");
+      if (f) {
+        JsonDocument doc(&psramAllocator);
+        if (!deserializeJson(doc, f)) {
+          auto checkUserArray = [&](JsonArrayConst arr) {
+            for (JsonVariantConst item : arr) {
+              if (!item.is<JsonObjectConst>()) continue;
+              JsonObjectConst u = item.as<JsonObjectConst>();
+              if (!isAdminRoleEntry(u)) continue;
+
+              const char *uName = u["username"] | (u["user"] | (u["name"] | ""));
+              const char *uPass = u["password"] | (u["pass"] | (u["pin"] | ""));
+              if (uName[0] != '\0' && uPass[0] != '\0') {
+                anyAdminInConfig = true;
+                if (secureEquals(uName, user.c_str()) && passwordMatchesStored(String(uPass), pass)) {
+                  matched = true;
+                }
+              }
+            }
+          };
+
+          if (doc["admin"]["users"].is<JsonArrayConst>()) checkUserArray(doc["admin"]["users"].as<JsonArrayConst>());
+          if (doc["users"].is<JsonArrayConst>()) checkUserArray(doc["users"].as<JsonArrayConst>());
+          if (doc["auth"]["users"].is<JsonArrayConst>()) checkUserArray(doc["auth"]["users"].as<JsonArrayConst>());
+
+          // Support single-admin config object if present
+          const char *singleUser = doc["admin"]["username"] | "";
+          const char *singlePass = doc["admin"]["password"] | "";
+          if (singleUser[0] != '\0' && singlePass[0] != '\0') {
+            anyAdminInConfig = true;
+            if (secureEquals(singleUser, user.c_str()) && passwordMatchesStored(String(singlePass), pass)) {
+              matched = true;
+            }
+          }
+        }
+        f.close();
+      }
+    }
+    xSemaphoreGive(fsMutex);
+  }
+
+  // First boot (or no admin users defined yet): allow default admin esp / 456456
+  if (!anyAdminInConfig) {
+    return secureEquals(user.c_str(), UPLOAD_DEFAULT_ADMIN_USER) && secureEquals(pass.c_str(), UPLOAD_DEFAULT_ADMIN_PASS);
+  }
+  return matched;
+}
+
+void generateUploadSessionToken(IPAddress clientIp) {
+  uint8_t raw[32];
+  esp_fill_random(raw, sizeof(raw));
+  static const char HEX_CHARS[] = "0123456789abcdef";
+  for (int i = 0; i < 32; i++) {
+    uploadSessionToken[i * 2] = HEX_CHARS[(raw[i] >> 4) & 0x0F];
+    uploadSessionToken[i * 2 + 1] = HEX_CHARS[raw[i] & 0x0F];
+  }
+  uploadSessionToken[64] = '\0';
+  uploadSessionIp = clientIp;
+  uploadSessionLastSeenMs = millis();
+}
+
+void invalidateUploadSession() {
+  memset(uploadSessionToken, 0, sizeof(uploadSessionToken));
+  uploadSessionIp = IPAddress(0, 0, 0, 0);
+  uploadSessionLastSeenMs = 0;
+}
+
+bool isUploadRequestAuthorized(AsyncWebServerRequest *req) {
+  if (!req || !asyncReqMutex) return false;
+  if (!req->hasHeader("X-Upload-Token")) return false;
+  String hdr = req->getHeader("X-Upload-Token")->value();
+  if (hdr.length() != 64) return false;
+
+  bool ok = false;
+  if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+    if (!uploadAuthLocked && uploadSessionToken[0] != '\0') {
+      bool expired = (millis() - uploadSessionLastSeenMs) > UPLOAD_SESSION_TTL_MS;
+      bool ipMatch = (req->client() && req->client()->remoteIP() == uploadSessionIp);
+      if (!expired && ipMatch && secureEquals(uploadSessionToken, hdr.c_str())) {
+        uploadSessionLastSeenMs = millis();
+        ok = true;
+      } else if (expired) {
+        invalidateUploadSession();
+      }
+    }
+    xSemaphoreGive(asyncReqMutex);
+  }
+  return ok;
+}
+
+// Erases ALL saved admin & normal users in /config.json and creates ONLY default admin (esp / 456456)
+bool resetAllUsersToDefaultAdmin() {
+  if (!hubFS || !fsMutex) return false;
+  bool saved = false;
+
+  if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1500)) == pdTRUE) {
+    JsonDocument doc(&psramAllocator);
+
+    // Preserve existing non-user settings (network, relays, schedules, etc.) if /config.json exists
+    if (hubFS->exists(CONFIG_PATH)) {
+      File rf = hubFS->open(CONFIG_PATH, "r");
+      if (rf) {
+        DeserializationError err = deserializeJson(doc, rf);
+        rf.close();
+        if (err || !doc.is<JsonObject>()) {
+          doc.clear();
+          doc.to<JsonObject>();
+        }
+      }
+    } else {
+      doc.to<JsonObject>();
+    }
+
+    // 1. Erase every saved user list (admin + normal users)
+    doc.remove("users");
+    if (doc["auth"].is<JsonObject>()) doc["auth"].remove("users");
+    if (doc["admin"].is<JsonObject>()) {
+      doc["admin"].remove("users");
+      doc["admin"].remove("username");
+      doc["admin"].remove("password");
+    }
+
+    // 2. Create default admin user (Adjust key path here ONLY if config.html uses doc["users"] instead)
+    JsonArray users = doc["admin"]["users"].to<JsonArray>();
+    JsonObject defAdmin = users.add<JsonObject>();
+    defAdmin["username"] = UPLOAD_DEFAULT_ADMIN_USER;  // "esp"
+    defAdmin["password"] = UPLOAD_DEFAULT_ADMIN_PASS;  // "456456"
+    defAdmin["role"] = "admin";
+
+    // 3. Atomic write via /config.tmp -> /config.json
+    if (hubFS->exists(CONFIG_TMP_PATH)) hubFS->remove(CONFIG_TMP_PATH);
+    File wf = hubFS->open(CONFIG_TMP_PATH, "w");
+    if (wf) {
+      size_t written = serializeJson(doc, wf);
+      wf.flush();
+      wf.close();
+      if (written > 0) {
+        if (hubFS->exists(CONFIG_PATH)) hubFS->remove(CONFIG_PATH);
+        saved = hubFS->rename(CONFIG_TMP_PATH, CONFIG_PATH);
+      }
+      if (!saved && hubFS->exists(CONFIG_TMP_PATH)) hubFS->remove(CONFIG_TMP_PATH);
+    }
+    clearPsramCacheLocked();
+    xSemaphoreGive(fsMutex);
+  }
+
+  // Clear lockout & invalidate old tokens on success
+  if (saved && asyncReqMutex && xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(300)) == pdTRUE) {
+    uploadAuthFailedAttempts = 0;
+    uploadAuthLocked = false;
+    invalidateUploadSession();
+    xSemaphoreGive(asyncReqMutex);
+  }
+
+  Serial.printf("[AUTH] Hardware Forget Reset %s -> default admin '%s'\n",
+                saved ? "OK" : "FAILED", UPLOAD_DEFAULT_ADMIN_USER);
+  return saved;
+}
+
+void serviceUploadForgetButton() {
+  if (ufState != UF_WAIT_PRESS && ufState != UF_HOLDING) return;
+
+  unsigned long now = millis();
+  bool pressed = (digitalRead(BOOT_BUTTON) == LOW);
+
+  if (ufState == UF_WAIT_PRESS) {
+    if (pressed) {
+      ufState = UF_HOLDING;
+      ufHoldStartMs = now;
+      ufReleaseSinceMs = 0;
+      digitalWrite(LED_PIN, HIGH);
+      setBuiltinLed(true, 40, 24, 0);  // Amber indicator while holding
+      Serial.println("[AUTH] BOOT pressed in 5s window -> hold 10s to erase users");
+    } else if ((int32_t)(now - ufWindowDeadlineMs) >= 0) {
+      ufState = UF_TIMEOUT;
+      strncpy(ufStatusMsg, "Timed out: BOOT button was not pressed within 5 seconds.", sizeof(ufStatusMsg) - 1);
+      digitalWrite(LED_PIN, LOW);
+      setBuiltinLed(false);
+    }
+    return;
+  }
+
+  if (ufState == UF_HOLDING) {
+    if (!pressed) {
+      if (ufReleaseSinceMs == 0) ufReleaseSinceMs = now;
+      if (now - ufReleaseSinceMs >= UPLOAD_FORGET_DEBOUNCE_MS) {
+        ufState = UF_RELEASED_EARLY;
+        strncpy(ufStatusMsg, "Cancelled: BOOT button was released before 10 seconds.", sizeof(ufStatusMsg) - 1);
+        digitalWrite(LED_PIN, LOW);
+        setBuiltinLed(false);
+        return;
+      }
+    } else {
+      ufReleaseSinceMs = 0;
+    }
+
+    if (now - ufHoldStartMs >= UPLOAD_FORGET_HOLD_MS) {
+      digitalWrite(LED_PIN, LOW);
+      setBuiltinLed(false);
+      bool ok = resetAllUsersToDefaultAdmin();
+      if (ok) {
+        ufState = UF_DONE;
+        strncpy(ufStatusMsg, "All users erased. Default admin esp / 456456 created.", sizeof(ufStatusMsg) - 1);
+        notifyStorage();
+      } else {
+        ufState = UF_RELEASED_EARLY;
+        strncpy(ufStatusMsg, "Flash write error while resetting users.", sizeof(ufStatusMsg) - 1);
+      }
+    }
+  }
+}
+
+// ============================================================================
 // 13. SAFE STREAMING UPLOAD HELPERS (CONFIG/DESIGN + /api/fs/upload)
 // ============================================================================
 void abortUploadIfOwner(AsyncWebServerRequest *req) {
@@ -1099,6 +1667,7 @@ void handleFsFileUploadChunk(AsyncWebServerRequest *req, const String &filename,
   if (!fsMutex) return;
 
   if (index == 0) {
+    if (!isUploadRequestAuthorized(req)) return;
     if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) != pdTRUE) return;
 
     if (fsUploadSession.active) {
@@ -1557,6 +2126,7 @@ void sendStoredJsonFile(AsyncWebServerRequest *req, const char *path,
 // 15. BACKGROUND SERVICERS (BOOT BUTTON, FORGET-BOOT & NATIVE mDNS SCANNER)
 // ============================================================================
 void serviceBootButtonAndForgetAuth() {
+  if (ufState == UF_WAIT_PRESS || ufState == UF_HOLDING) return;
   unsigned long now = millis();
   bool pressed = (digitalRead(BOOT_BUTTON) == LOW);
 
@@ -1712,7 +2282,8 @@ void setupWebServer() {
   // CORS headers (do NOT add Connection: close here; ESPAsyncWebServer manages Connection itself)
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type, X-API-Key, X-Session-Token");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers",
+                                       "Content-Type, X-API-Key, X-Session-Token, X-Upload-Token");
 
   // --- Health Check ---
   server.on("/ping", ASYNC_GET, [](AsyncWebServerRequest *req) {
@@ -1736,8 +2307,176 @@ void setupWebServer() {
     req->send(res);
   });
 
+  // --- GET /api/upload-auth/status ---
+  server.on("/api/upload-auth/status", ASYNC_GET, [](AsyncWebServerRequest *req) {
+    JsonDocument d(&psramAllocator);
+    if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+      d["locked"] = uploadAuthLocked;
+      d["failedAttempts"] = uploadAuthFailedAttempts;
+      d["remainingAttempts"] = (uploadAuthFailedAttempts >= UPLOAD_AUTH_MAX_ATTEMPTS)
+                                 ? 0
+                                 : (UPLOAD_AUTH_MAX_ATTEMPTS - uploadAuthFailedAttempts);
+      xSemaphoreGive(asyncReqMutex);
+    }
+    AsyncResponseStream *res = req->beginResponseStream("application/json");
+    res->addHeader("Cache-Control", "no-store");
+    serializeJson(d, *res);
+    req->send(res);
+  });
+
+  // --- POST /api/upload-auth/login (Max 3 failed attempts -> locked until fresh restart) ---
+  server.on(
+    "/api/upload-auth/login", ASYNC_POST,
+    [](AsyncWebServerRequest *req) {
+      SmallJsonBody *buf = static_cast<SmallJsonBody *>(req->_tempObject);
+      String user, pass;
+      if (buf && !buf->overflow && buf->len > 0) {
+        JsonDocument in(&psramAllocator);
+        if (!deserializeJson(in, buf->data)) {
+          user = String(in["username"] | "");
+          pass = String(in["password"] | "");
+          user.trim();
+        }
+      }
+      if (buf) {
+        delete buf;
+        req->_tempObject = nullptr;
+      }
+
+      // 1. Check lockout state first
+      bool alreadyLocked = false;
+      if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+        alreadyLocked = uploadAuthLocked;
+        xSemaphoreGive(asyncReqMutex);
+      }
+      if (alreadyLocked) {
+        req->send(423, "application/json",
+                  "{\"ok\":false,\"locked\":true,\"remainingAttempts\":0,"
+                  "\"error\":\"Locked after 3 failed attempts. Fresh hardware restart required.\"}");
+        return;
+      }
+
+      // 2. Verify against admin users in /config.json (or esp/456456 on first boot)
+      bool valid = verifyUploadAdminCredentials(user, pass);
+
+      JsonDocument out(&psramAllocator);
+      int httpCode = 401;
+
+      if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(300)) == pdTRUE) {
+        if (valid) {
+          uploadAuthFailedAttempts = 0;
+          IPAddress ip = req->client() ? req->client()->remoteIP() : IPAddress(0, 0, 0, 0);
+          generateUploadSessionToken(ip);
+          out["ok"] = true;
+          out["token"] = (const char *)uploadSessionToken;
+          httpCode = 200;
+        } else {
+          if (uploadAuthFailedAttempts < UPLOAD_AUTH_MAX_ATTEMPTS) uploadAuthFailedAttempts++;
+          if (uploadAuthFailedAttempts >= UPLOAD_AUTH_MAX_ATTEMPTS) {
+            uploadAuthLocked = true;
+            invalidateUploadSession();
+          }
+          uint8_t rem = (uploadAuthFailedAttempts >= UPLOAD_AUTH_MAX_ATTEMPTS)
+                          ? 0
+                          : (UPLOAD_AUTH_MAX_ATTEMPTS - uploadAuthFailedAttempts);
+          out["ok"] = false;
+          out["locked"] = uploadAuthLocked;
+          out["remainingAttempts"] = rem;
+          out["error"] = uploadAuthLocked
+                           ? "Maximum attempts reached. Restart required."
+                           : "Invalid admin username or password";
+          httpCode = uploadAuthLocked ? 423 : 401;
+        }
+        xSemaphoreGive(asyncReqMutex);
+      }
+
+      AsyncResponseStream *res = req->beginResponseStream("application/json");
+      res->setCode(httpCode);
+      res->addHeader("Cache-Control", "no-store");
+      serializeJson(out, *res);
+      req->send(res);
+    },
+    nullptr, handleSmallJsonBody);
+
+  // --- POST /api/upload-auth/logout ---
+  server.on("/api/upload-auth/logout", ASYNC_POST, [](AsyncWebServerRequest *req) {
+    if (isUploadRequestAuthorized(req) && xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+      invalidateUploadSession();
+      xSemaphoreGive(asyncReqMutex);
+    }
+    req->send(200, "application/json", "{\"ok\":true}");
+  });
+
+  // --- POST /api/upload-auth/forget/start (Opens 5s window to press BOOT, then 10s hold) ---
+  server.on("/api/upload-auth/forget/start", ASYNC_POST, [](AsyncWebServerRequest *req) {
+    if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(200)) != pdTRUE) {
+      req->send(503, "application/json", "{\"ok\":false,\"error\":\"Busy\"}");
+      return;
+    }
+    ufState = UF_WAIT_PRESS;
+    ufWindowDeadlineMs = millis() + UPLOAD_FORGET_PRESS_WINDOW_MS;
+    ufHoldStartMs = 0;
+    ufReleaseSinceMs = 0;
+    ufStatusMsg[0] = '\0';
+    xSemaphoreGive(asyncReqMutex);
+    req->send(200, "application/json", "{\"ok\":true,\"pressWindowMs\":5000,\"holdMs\":10000}");
+  });
+
+  // --- GET /api/upload-auth/forget/status ---
+  server.on("/api/upload-auth/forget/status", ASYNC_GET, [](AsyncWebServerRequest *req) {
+    JsonDocument d(&psramAllocator);
+    unsigned long now = millis();
+    if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+      switch (ufState) {
+        case UF_WAIT_PRESS:
+          d["state"] = "wait_press";
+          d["remainingMs"] = ((int32_t)(ufWindowDeadlineMs - now) > 0) ? (uint32_t)(ufWindowDeadlineMs - now) : 0;
+          break;
+        case UF_HOLDING:
+          d["state"] = "holding";
+          d["heldMs"] = (uint32_t)(now - ufHoldStartMs);
+          break;
+        case UF_DONE:
+          d["state"] = "done";
+          d["message"] = (const char *)ufStatusMsg;
+          break;
+        case UF_TIMEOUT:
+          d["state"] = "timeout";
+          d["message"] = (const char *)ufStatusMsg;
+          break;
+        case UF_RELEASED_EARLY:
+          d["state"] = "released_early";
+          d["message"] = (const char *)ufStatusMsg;
+          break;
+        default:
+          d["state"] = "idle";
+          break;
+      }
+      xSemaphoreGive(asyncReqMutex);
+    }
+    AsyncResponseStream *res = req->beginResponseStream("application/json");
+    res->addHeader("Cache-Control", "no-store");
+    serializeJson(d, *res);
+    req->send(res);
+  });
+
+  // --- POST /api/fs/reboot (Authenticated reboot from /upload) ---
+  server.on("/api/fs/reboot", ASYNC_POST, [](AsyncWebServerRequest *req) {
+    if (!isUploadRequestAuthorized(req)) {
+      req->send(401, "application/json", "{\"ok\":false,\"error\":\"Unauthorized\"}");
+      return;
+    }
+    req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Restarting...\"}");
+    restartPending = true;
+    restartAt = millis() + 600;
+  });
+
   // --- GET /api/fs/list (Lists flash storage & files for /upload) ---
   server.on("/api/fs/list", ASYNC_GET, [](AsyncWebServerRequest *req) {
+    if (!isUploadRequestAuthorized(req)) {
+      req->send(401, "application/json", "{\"ok\":false,\"error\":\"Unauthorized\"}");
+      return;
+    }
     JsonDocument doc(&psramAllocator);
     uint64_t totalB = fsTotalBytes();
     uint64_t usedB = fsUsedBytes();
@@ -1776,6 +2515,10 @@ void setupWebServer() {
   server.on(
     "/api/fs/upload", ASYNC_POST,
     [](AsyncWebServerRequest *req) {
+      if (!isUploadRequestAuthorized(req)) {
+        req->send(401, "application/json", "{\"ok\":false,\"error\":\"Unauthorized\"}");
+        return;
+      }
       bool ok = false;
       size_t bytes = 0;
       String path;
@@ -1821,6 +2564,10 @@ void setupWebServer() {
 
   // --- POST /api/fs/delete?path=/filename ---
   server.on("/api/fs/delete", ASYNC_POST, [](AsyncWebServerRequest *req) {
+    if (!isUploadRequestAuthorized(req)) {
+      req->send(401, "application/json", "{\"ok\":false,\"error\":\"Unauthorized\"}");
+      return;
+    }
     if (!hubFS || !req->hasParam("path")) {
       req->send(400, "application/json", "{\"ok\":false,\"error\":\"Missing path\"}");
       return;
@@ -2130,6 +2877,10 @@ void setupWebServer() {
 
   // --- POST /api/reboot ---
   server.on("/api/reboot", ASYNC_POST, [](AsyncWebServerRequest *req) {
+    if (uploadAuthLocked) {
+      req->send(423, "application/json", "{\"ok\":false,\"error\":\"Locked - physical restart required\"}");
+      return;
+    }
     req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Restarting...\"}");
     restartPending = true;
     restartAt = millis() + 600;
@@ -2137,6 +2888,10 @@ void setupWebServer() {
 
   // --- POST /api/reset?mode=data|settings|factory ---
   server.on("/api/reset", ASYNC_POST, [](AsyncWebServerRequest *req) {
+    if (uploadAuthLocked) {
+      req->send(423, "application/json", "{\"ok\":false,\"error\":\"Locked - physical restart required\"}");
+      return;
+    }
     String mode = req->hasParam("mode") ? req->getParam("mode")->value() : "factory";
     mode.trim();
     mode.toLowerCase();
@@ -2424,6 +3179,7 @@ void loop() {
 
   // 6. Hardware LED/Buzzer feedback, BOOT button auth & native mDNS scan
   serviceNotifyStorage();
+  serviceUploadForgetButton();
   serviceBootButtonAndForgetAuth();
   serviceNativeMdnsScan();
 
