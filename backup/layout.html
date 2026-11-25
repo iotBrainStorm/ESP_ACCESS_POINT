@@ -3264,10 +3264,19 @@
               <h3 style="margin-bottom:4px;font-size:1rem">Login Required - Layout Studio</h3>
               <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:12px">Required permission: ${roleLabel}</p>
               <div class="field"><label>Username</label><input type="text" id="lyAuthUser" class="input" placeholder="esp" autocomplete="username" /></div>
-              <div class="field" style="margin-bottom:14px"><label>Password</label><input type="password" id="lyAuthPass" class="input" placeholder="••••••" autocomplete="current-password" /></div>
-              <div style="display:flex;justify-content:flex-end;gap:8px">
-                <button type="button" class="btn" id="lyAuthCancel">Cancel</button>
-                <button type="button" class="btn btn-primary" id="lyAuthSubmit">Verify</button>
+              <div class="field" style="margin-bottom:12px"><label>Password</label><input type="password" id="lyAuthPass" class="input" placeholder="••••••" autocomplete="current-password" /></div>
+              <div id="lyForgetBox" style="display:none;padding:9px;border-radius:9px;border:1px solid var(--warn);background:rgba(245,158,11,0.1);margin-bottom:12px;font-size:0.74rem">
+                <div id="lyForgetText" style="font-weight:700;color:var(--warn)">Arming hardware reset...</div>
+                <div style="width:100%;height:7px;background:var(--bg);border-radius:999px;overflow:hidden;border:1px solid var(--border);margin-top:6px">
+                  <div id="lyForgetBar" style="height:100%;width:0%;background:var(--warn);transition:width .15s"></div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <button type="button" class="btn btn-sm" style="border-color:rgba(239,68,68,0.45);color:var(--err)" id="lyAuthForget">Forget</button>
+                <div style="display:flex;gap:8px">
+                  <button type="button" class="btn" id="lyAuthCancel">Cancel</button>
+                  <button type="button" class="btn btn-primary" id="lyAuthSubmit">Verify</button>
+                </div>
               </div>
             </div>
           `;
@@ -3352,6 +3361,82 @@
 
           overlay.querySelector("#lyAuthCancel").onclick = () => finish(false);
           overlay.querySelector("#lyAuthSubmit").onclick = attempt;
+          let lyForgetTimer = null;
+          const origFinish = finish;
+          const cleanFinish = (ok) => {
+            clearInterval(lyForgetTimer);
+            origFinish(ok);
+          };
+          overlay.querySelector("#lyAuthCancel").onclick = () =>
+            cleanFinish(false);
+
+          overlay.querySelector("#lyAuthForget").onclick = async () => {
+            const box = overlay.querySelector("#lyForgetBox");
+            const txt = overlay.querySelector("#lyForgetText");
+            const bar = overlay.querySelector("#lyForgetBar");
+            clearInterval(lyForgetTimer);
+            box.style.display = "block";
+            bar.style.width = "0%";
+            txt.textContent = "Arming hardware reset...";
+
+            try {
+              const r = await fetch("/api/upload-auth/forget/start", {
+                method: "POST",
+              });
+              const d = await r.json();
+              if (!r.ok || !d.ok) {
+                box.style.display = "none";
+                return showToast(d.error || "Could not start forget process");
+              }
+            } catch {
+              box.style.display = "none";
+              return showToast("ESP32 unreachable");
+            }
+
+            const poll = async () => {
+              try {
+                const r = await fetch("/api/upload-auth/forget/status", {
+                  cache: "no-store",
+                });
+                const d = await r.json();
+                if (d.state === "wait_press") {
+                  bar.style.background = "var(--warn)";
+                  bar.style.width = `${Math.min(100, ((5000 - d.remainingMs) / 5000) * 100)}%`;
+                  txt.textContent = `Step 1/2: Press & hold BOOT within ${(d.remainingMs / 1000).toFixed(1)}s...`;
+                } else if (d.state === "holding") {
+                  bar.style.background = "var(--accent)";
+                  bar.style.width = `${Math.min(100, (d.heldMs / 10000) * 100)}%`;
+                  txt.textContent = `Step 2/2: Keep holding BOOT... ${(d.heldMs / 1000).toFixed(1)}s / 10.0s`;
+                } else {
+                  clearInterval(lyForgetTimer);
+                  if (d.state === "done") {
+                    bar.style.background = "var(--ok)";
+                    bar.style.width = "100%";
+                    txt.textContent = "Reset complete!";
+                    if (!config.admin) config.admin = {};
+                    config.admin.users = [
+                      {
+                        username: "esp",
+                        passHash: hashCredential("esp", "456456"),
+                        role: "admin",
+                      },
+                    ];
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+                    localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+                    uEl.value = "esp";
+                    pEl.value = "";
+                    setTimeout(() => (box.style.display = "none"), 1200);
+                    showToast("Users reset! Default admin: esp / 456456");
+                  } else {
+                    box.style.display = "none";
+                    showToast(d.message || "Forget aborted.");
+                  }
+                }
+              } catch {}
+            };
+            lyForgetTimer = setInterval(poll, 250);
+            poll();
+          };
           overlay.addEventListener("keydown", (e) => {
             if (e.key === "Enter") attempt();
             if (e.key === "Escape") finish(false);

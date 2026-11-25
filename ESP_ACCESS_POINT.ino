@@ -85,11 +85,10 @@ static const int WIFI_BOOT_MAX_ATTEMPTS = 12;                 // 12 * 500ms = 6s
 static const unsigned long WIFI_RETRY_INTERVAL_MS = 15000UL;  // Silent reconnect every 15s
 static const unsigned long NTP_RETRY_UNSYNCED_MS = 60000UL;   // Retry every 60s until synced
 static const unsigned long NTP_PERIODIC_SYNC_MS = 3600000UL;  // Hourly background sync
-static const unsigned long FORGET_BOOT_WINDOW_MS = 5000UL;    // Matches 5.0s UI progress bar
-static const unsigned long BOOT_HOLD_PREARM_MS = 5000UL;
-static const unsigned long BOOT_HOLD_VALID_MS = 15000UL;
-static const unsigned long FORGET_HOLD_CONFIRM_MS = 350UL;  // Stable press during 5s window
-// Uploader Security & Forget-BOOT Reset Constants
+// Shared Auth Salt (matches KEY_SALT in index.html, config.html, layout.html, design.html)
+static const char *HUB_AUTH_SALT = "esp32_nvs_hub_v1_secret";
+
+// Uploader & Hub Security / 5s+10s Forget-BOOT Constants
 static constexpr uint8_t UPLOAD_AUTH_MAX_ATTEMPTS = 3;
 static const char *UPLOAD_DEFAULT_ADMIN_USER = "esp";
 static const char *UPLOAD_DEFAULT_ADMIN_PASS = "456456";
@@ -723,15 +722,6 @@ unsigned long lastNtpSyncAttemptMs = 0;
 unsigned long lowHeapSinceMs = 0;
 unsigned long notifyStorageOffAt = 0;
 
-// BOOT button state
-unsigned long bootPressedAt = 0;
-unsigned long bootHoldSatisfiedAt = 0;
-bool bootHoldSatisfied = false;
-
-// Deferred Async Request: POST /api/auth/forget-boot
-AsyncWebServerRequest *pendingForgetBootReq = nullptr;
-unsigned long forgetBootDeadlineMs = 0;
-unsigned long forgetBootHoldStart = 0;
 
 // Deferred Async Request: GET /api/scan
 AsyncWebServerRequest *pendingScanReq = nullptr;
@@ -796,6 +786,7 @@ enum UploadForgetState : uint8_t {
 };
 
 UploadForgetState ufState = UF_IDLE;
+bool ufResetUsersOnDone = true;  // true = Forget (erase users), false = BOOT hold confirm for Reset Data/Settings/Factory
 unsigned long ufWindowDeadlineMs = 0;
 unsigned long ufHoldStartMs = 0;
 unsigned long ufReleaseSinceMs = 0;
@@ -1383,6 +1374,26 @@ void sha256HexLower(const char *input, char outHex[65]) {
   outHex[64] = '\0';
 }
 
+// Exact C++ match for hashCredential() in index.html, config.html, layout.html & design.html
+void hubHashCredential(const String &username, const String &password, char outBuf[21]) {
+  String cleanUser = username;
+  cleanUser.trim();
+  String raw = cleanUser + ":" + password + ":" + HUB_AUTH_SALT;
+
+  uint32_t h1 = 0xdeadbeefUL ^ (uint32_t)raw.length();
+  uint32_t h2 = 0x41c6ce57UL ^ (uint32_t)raw.length();
+
+  for (size_t i = 0; i < raw.length(); i++) {
+    uint32_t ch = (uint8_t)raw[i];
+    h1 = (h1 ^ ch) * 2654435761UL;
+    h2 = (h2 ^ ch) * 1597334677UL;
+  }
+  h1 = ((h1 ^ (h1 >> 16)) * 2246822507UL) ^ ((h2 ^ (h2 >> 13)) * 3266489909UL);
+  h2 = ((h2 ^ (h2 >> 16)) * 2246822507UL) ^ ((h1 ^ (h1 >> 13)) * 3266489909UL);
+
+  snprintf(outBuf, 21, "sha:%08lx%08lx", (unsigned long)h2, (unsigned long)h1);
+}
+
 bool passwordMatchesStored(const String &storedRaw, const String &provided) {
   if (storedRaw.isEmpty()) return false;
   if (secureEquals(storedRaw.c_str(), provided.c_str())) return true;
@@ -1410,7 +1421,12 @@ bool isAdminRoleEntry(JsonObjectConst u) {
 }
 
 bool verifyUploadAdminCredentials(const String &user, const String &pass) {
-  if (user.isEmpty() || pass.isEmpty()) return false;
+  String cleanUser = user;
+  cleanUser.trim();
+  if (cleanUser.isEmpty() || pass.isEmpty()) return false;
+
+  char computedHubHash[21];
+  hubHashCredential(cleanUser, pass, computedHubHash);
 
   bool anyAdminInConfig = false;
   bool matched = false;
@@ -1428,11 +1444,16 @@ bool verifyUploadAdminCredentials(const String &user, const String &pass) {
               if (!isAdminRoleEntry(u)) continue;
 
               const char *uName = u["username"] | (u["user"] | (u["name"] | ""));
+              const char *uHash = u["passHash"] | "";
               const char *uPass = u["password"] | (u["pass"] | (u["pin"] | ""));
-              if (uName[0] != '\0' && uPass[0] != '\0') {
+              if (uName[0] != '\0' && (uHash[0] != '\0' || uPass[0] != '\0')) {
                 anyAdminInConfig = true;
-                if (secureEquals(uName, user.c_str()) && passwordMatchesStored(String(uPass), pass)) {
-                  matched = true;
+                if (secureEquals(uName, cleanUser.c_str())) {
+                  if (uHash[0] != '\0' && secureEquals(uHash, computedHubHash)) {
+                    matched = true;
+                  } else if (uPass[0] != '\0' && passwordMatchesStored(String(uPass), pass)) {
+                    matched = true;
+                  }
                 }
               }
             }
@@ -1441,16 +1462,6 @@ bool verifyUploadAdminCredentials(const String &user, const String &pass) {
           if (doc["admin"]["users"].is<JsonArrayConst>()) checkUserArray(doc["admin"]["users"].as<JsonArrayConst>());
           if (doc["users"].is<JsonArrayConst>()) checkUserArray(doc["users"].as<JsonArrayConst>());
           if (doc["auth"]["users"].is<JsonArrayConst>()) checkUserArray(doc["auth"]["users"].as<JsonArrayConst>());
-
-          // Support single-admin config object if present
-          const char *singleUser = doc["admin"]["username"] | "";
-          const char *singlePass = doc["admin"]["password"] | "";
-          if (singleUser[0] != '\0' && singlePass[0] != '\0') {
-            anyAdminInConfig = true;
-            if (secureEquals(singleUser, user.c_str()) && passwordMatchesStored(String(singlePass), pass)) {
-              matched = true;
-            }
-          }
         }
         f.close();
       }
@@ -1460,7 +1471,7 @@ bool verifyUploadAdminCredentials(const String &user, const String &pass) {
 
   // First boot (or no admin users defined yet): allow default admin esp / 456456
   if (!anyAdminInConfig) {
-    return secureEquals(user.c_str(), UPLOAD_DEFAULT_ADMIN_USER) && secureEquals(pass.c_str(), UPLOAD_DEFAULT_ADMIN_PASS);
+    return secureEquals(cleanUser.c_str(), UPLOAD_DEFAULT_ADMIN_USER) && secureEquals(pass.c_str(), UPLOAD_DEFAULT_ADMIN_PASS);
   }
   return matched;
 }
@@ -1539,11 +1550,14 @@ bool resetAllUsersToDefaultAdmin() {
       doc["admin"].remove("password");
     }
 
-    // 2. Create default admin user (Adjust key path here ONLY if config.html uses doc["users"] instead)
+    // 2. Create default admin user using exact passHash expected by all HTML pages
+    char defaultHash[21];
+    hubHashCredential(UPLOAD_DEFAULT_ADMIN_USER, UPLOAD_DEFAULT_ADMIN_PASS, defaultHash);
+
     JsonArray users = doc["admin"]["users"].to<JsonArray>();
     JsonObject defAdmin = users.add<JsonObject>();
     defAdmin["username"] = UPLOAD_DEFAULT_ADMIN_USER;  // "esp"
-    defAdmin["password"] = UPLOAD_DEFAULT_ADMIN_PASS;  // "456456"
+    defAdmin["passHash"] = (const char *)defaultHash;  // 100% synced with index/config/layout/design.html
     defAdmin["role"] = "admin";
 
     // 3. Atomic write via /config.tmp -> /config.json
@@ -1568,6 +1582,7 @@ bool resetAllUsersToDefaultAdmin() {
     uploadAuthFailedAttempts = 0;
     uploadAuthLocked = false;
     invalidateUploadSession();
+    snprintf(bootIdStr, sizeof(bootIdStr), "%08lX", (unsigned long)esp_random());
     xSemaphoreGive(asyncReqMutex);
   }
 
@@ -1616,14 +1631,23 @@ void serviceUploadForgetButton() {
     if (now - ufHoldStartMs >= UPLOAD_FORGET_HOLD_MS) {
       digitalWrite(LED_PIN, LOW);
       setBuiltinLed(false);
-      bool ok = resetAllUsersToDefaultAdmin();
-      if (ok) {
-        ufState = UF_DONE;
-        strncpy(ufStatusMsg, "All users erased. Default admin esp / 456456 created.", sizeof(ufStatusMsg) - 1);
-        notifyStorage();
+      if (ufResetUsersOnDone) {
+        bool ok = resetAllUsersToDefaultAdmin();
+        if (ok) {
+          ufState = UF_DONE;
+          strncpy(ufStatusMsg, "All users erased. Default admin esp / 456456 created.", sizeof(ufStatusMsg) - 1);
+          ufStatusMsg[sizeof(ufStatusMsg) - 1] = '\0';
+          notifyStorage();
+        } else {
+          ufState = UF_RELEASED_EARLY;
+          strncpy(ufStatusMsg, "Flash write error while resetting users.", sizeof(ufStatusMsg) - 1);
+          ufStatusMsg[sizeof(ufStatusMsg) - 1] = '\0';
+        }
       } else {
-        ufState = UF_RELEASED_EARLY;
-        strncpy(ufStatusMsg, "Flash write error while resetting users.", sizeof(ufStatusMsg) - 1);
+        ufState = UF_DONE;
+        strncpy(ufStatusMsg, "BOOT button verified. Proceeding with reset...", sizeof(ufStatusMsg) - 1);
+        ufStatusMsg[sizeof(ufStatusMsg) - 1] = '\0';
+        notifyStorage();
       }
     }
   }
@@ -2122,63 +2146,6 @@ void sendStoredJsonFile(AsyncWebServerRequest *req, const char *path,
 // ============================================================================
 // 15. BACKGROUND SERVICERS (BOOT BUTTON, FORGET-BOOT & NATIVE mDNS SCANNER)
 // ============================================================================
-void serviceBootButtonAndForgetAuth() {
-  if (ufState == UF_WAIT_PRESS || ufState == UF_HOLDING) return;
-  unsigned long now = millis();
-  bool pressed = (digitalRead(BOOT_BUTTON) == LOW);
-
-  // Track general 5-second pre-hold gesture
-  if (pressed) {
-    if (bootPressedAt == 0) bootPressedAt = now;
-    if (!bootHoldSatisfied && (now - bootPressedAt >= BOOT_HOLD_PREARM_MS)) {
-      bootHoldSatisfied = true;
-      bootHoldSatisfiedAt = now;
-      Serial.println("[BOOT] Pre-armed 5s hold detected");
-    }
-  } else {
-    bootPressedAt = 0;
-    if (bootHoldSatisfied && (now - bootHoldSatisfiedAt > BOOT_HOLD_VALID_MS)) {
-      bootHoldSatisfied = false;
-    }
-  }
-
-  // Service active POST /api/auth/forget-boot request cleanly in loop()
-  if (!pendingForgetBootReq) return;
-
-  bool confirmed = false;
-  bool timedOut = false;
-
-  if (bootHoldSatisfied) {
-    bootHoldSatisfied = false;
-    confirmed = true;
-  } else if (pressed) {
-    if (forgetBootHoldStart == 0) forgetBootHoldStart = now;
-    if (now - forgetBootHoldStart >= FORGET_HOLD_CONFIRM_MS) {
-      confirmed = true;
-    }
-  } else {
-    forgetBootHoldStart = 0;
-  }
-
-  if (!confirmed && (int32_t)(now - forgetBootDeadlineMs) >= 0) {
-    timedOut = true;
-  }
-
-  if (confirmed || timedOut) {
-    if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-      if (pendingForgetBootReq) {
-        pendingForgetBootReq->send(
-          200, "application/json",
-          confirmed ? "{\"bootHeld\":true}" : "{\"bootHeld\":false}");
-        pendingForgetBootReq = nullptr;
-      }
-      xSemaphoreGive(asyncReqMutex);
-    }
-    forgetBootHoldStart = 0;
-    if (confirmed) notifyStorage();
-  }
-}
-
 void serviceNativeMdnsScan() {
   if (!pendingScanReq) return;
 
@@ -2404,12 +2371,14 @@ void setupWebServer() {
     req->send(200, "application/json", "{\"ok\":true}");
   });
 
-  // --- POST /api/upload-auth/forget/start (Opens 5s window to press BOOT, then 10s hold) ---
+  // --- POST /api/upload-auth/forget/start (5s press window + 10s hold; ?mode=confirm for Danger Zone resets) ---
   server.on("/api/upload-auth/forget/start", ASYNC_POST, [](AsyncWebServerRequest *req) {
     if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(200)) != pdTRUE) {
       req->send(503, "application/json", "{\"ok\":false,\"error\":\"Busy\"}");
       return;
     }
+    bool confirmOnly = req->hasParam("mode") && req->getParam("mode")->value() == "confirm";
+    ufResetUsersOnDone = !confirmOnly;
     ufState = UF_WAIT_PRESS;
     ufWindowDeadlineMs = millis() + UPLOAD_FORGET_PRESS_WINDOW_MS;
     ufHoldStartMs = 0;
@@ -2794,43 +2763,6 @@ void setupWebServer() {
     },
     nullptr, handleSmallJsonBody);
 
-  // --- POST /api/auth/forget-boot (Non-blocking 5s BOOT button verification) ---
-  server.on("/api/auth/forget-boot", ASYNC_POST, [](AsyncWebServerRequest *req) {
-    if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(200)) != pdTRUE) {
-      req->send(503, "application/json", "{\"bootHeld\":false}");
-      return;
-    }
-
-    if (bootHoldSatisfied) {
-      bootHoldSatisfied = false;
-      xSemaphoreGive(asyncReqMutex);
-      notifyStorage();
-      req->send(200, "application/json", "{\"bootHeld\":true}");
-      return;
-    }
-
-    if (pendingForgetBootReq != nullptr) {
-      xSemaphoreGive(asyncReqMutex);
-      req->send(409, "application/json", "{\"bootHeld\":false,\"error\":\"Already waiting\"}");
-      return;
-    }
-
-    pendingForgetBootReq = req;
-    forgetBootDeadlineMs = millis() + FORGET_BOOT_WINDOW_MS;
-    forgetBootHoldStart = 0;
-
-    req->onDisconnect([req]() {
-      if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-        if (pendingForgetBootReq == req) {
-          pendingForgetBootReq = nullptr;
-        }
-        xSemaphoreGive(asyncReqMutex);
-      }
-    });
-
-    xSemaphoreGive(asyncReqMutex);
-  });
-
   // --- GET /api/scan (Non-blocking mDNS service discovery in loop()) ---
   server.on("/api/scan", ASYNC_GET, [](AsyncWebServerRequest *req) {
     if (xSemaphoreTake(asyncReqMutex, pdMS_TO_TICKS(200)) != pdTRUE) {
@@ -3177,7 +3109,6 @@ void loop() {
   // 6. Hardware LED/Buzzer feedback, BOOT button auth & native mDNS scan
   serviceNotifyStorage();
   serviceUploadForgetButton();
-  serviceBootButtonAndForgetAuth();
   serviceNativeMdnsScan();
 
   // 7. Launch WiFi Config Portal safely after HTTP response has flushed

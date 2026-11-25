@@ -7552,44 +7552,79 @@
         const box = document.getElementById("forgetBootBox");
         const txt = document.getElementById("forgetBootText");
         const bar = document.getElementById("forgetBootBar");
+        clearInterval(forgetBootTimer);
+
         box.style.display = "block";
-        let remainingMs = 5000;
-        clearInterval(forgetBootTimer);
-        const bootPromise = fetch("/api/auth/forget-boot", { method: "POST" })
-          .then((r) => r.json())
-          .catch(() => ({ bootHeld: false }));
-        forgetBootTimer = setInterval(() => {
-          remainingMs -= 100;
-          txt.textContent = `Hold ESP32 BOOT button within ${Math.max(0, remainingMs / 1000).toFixed(1)}s...`;
-          bar.style.width = `${(remainingMs / 5000) * 100}%`;
-          if (remainingMs <= 0) clearInterval(forgetBootTimer);
-        }, 100);
-        const result = await bootPromise;
-        clearInterval(forgetBootTimer);
-        box.style.display = "none";
-        if (result?.bootHeld) {
-          const hubCfg = getHubConfig();
-          if (hubCfg?.admin) {
-            hubCfg.admin.users = [
-              {
-                username: "esp",
-                passHash: hashCredential("esp", "456456"),
-                role: "admin",
-              },
-            ];
-            localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
-            await fetch("/api/config", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(hubCfg),
-            }).catch(() => {});
+        bar.style.width = "0%";
+        bar.style.background = "var(--warn)";
+        txt.textContent = "Arming hardware reset...";
+
+        try {
+          const startRes = await fetch("/api/upload-auth/forget/start", {
+            method: "POST",
+          });
+          const startData = await startRes.json();
+          if (!startRes.ok || !startData.ok) {
+            box.style.display = "none";
+            return showToast(
+              startData.error || "Could not start forget process",
+            );
           }
-          localStorage.removeItem(LOCKOUT_STORAGE_KEY);
-          refreshAuthModalLiveStatus();
-          showToast("Users reset! Default is now esp / 456456");
-        } else {
-          showToast("Forget aborted: BOOT button was not held within 5s");
+        } catch {
+          box.style.display = "none";
+          return showToast("ESP32 unreachable");
         }
+
+        const poll = async () => {
+          try {
+            const r = await fetch("/api/upload-auth/forget/status", {
+              cache: "no-store",
+            });
+            const d = await r.json();
+            if (d.state === "wait_press") {
+              const rem = (d.remainingMs / 1000).toFixed(1);
+              bar.style.background = "var(--warn)";
+              bar.style.width = `${Math.min(100, ((5000 - d.remainingMs) / 5000) * 100)}%`;
+              txt.textContent = `Step 1/2: Press & hold BOOT button within ${rem}s...`;
+            } else if (d.state === "holding") {
+              const held = (d.heldMs / 1000).toFixed(1);
+              bar.style.background = "var(--accent)";
+              bar.style.width = `${Math.min(100, (d.heldMs / 10000) * 100)}%`;
+              txt.textContent = `Step 2/2: Keep holding BOOT button... ${held}s / 10.0s`;
+            } else {
+              clearInterval(forgetBootTimer);
+              forgetBootTimer = null;
+              if (d.state === "done") {
+                bar.style.background = "var(--ok)";
+                bar.style.width = "100%";
+                txt.textContent = "Reset complete!";
+                const hubCfg = getHubConfig();
+                if (hubCfg?.admin) {
+                  hubCfg.admin.users = [
+                    {
+                      username: "esp",
+                      passHash: hashCredential("esp", "456456"),
+                      role: "admin",
+                    },
+                  ];
+                  localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+                }
+                localStorage.removeItem(LOCKOUT_STORAGE_KEY);
+                refreshAuthModalLiveStatus();
+                document.getElementById("authUser").value = "esp";
+                document.getElementById("authPass").value = "";
+                setTimeout(() => (box.style.display = "none"), 1200);
+                showToast("Users reset! Default admin: esp / 456456");
+              } else {
+                box.style.display = "none";
+                showToast(d.message || "Forget aborted.");
+              }
+            }
+          } catch {}
+        };
+
+        forgetBootTimer = setInterval(poll, 250);
+        poll();
       }
 
       async function verifyDesignAction(label) {

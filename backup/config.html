@@ -1954,11 +1954,32 @@
                 color: var(--text-muted);
               "
             >
-              <span>RAM Usage</span>
+              <span>Internal RAM Usage</span>
               <span id="perfRamText">--% (-- KB / -- KB)</span>
             </div>
             <div class="meter-bar">
               <div class="meter-fill" id="perfRamBar" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <div id="perfPsramWrap" style="margin-top: 10px; display: none">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.78rem;
+                color: var(--text-muted);
+              "
+            >
+              <span>PSRAM Usage</span>
+              <span id="perfPsramText">--% (-- / 8.00 MB)</span>
+            </div>
+            <div class="meter-bar">
+              <div
+                class="meter-fill"
+                id="perfPsramBar"
+                style="width: 0%; background: var(--ok)"
+              ></div>
             </div>
           </div>
 
@@ -2752,6 +2773,41 @@
           </button>
           <button class="btn btn-sm" onclick="closeDesignListModal()">
             Close
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 7: Hardware 5s+10s BOOT Confirmation (For Reset Data / Settings / Factory) -->
+    <div class="modal-backdrop" id="bootConfirmModal" style="z-index: 96">
+      <div class="modal" style="max-width: 380px">
+        <div class="modal-head">
+          <h3 id="bootConfirmTitle">Hardware Confirmation</h3>
+          <button class="btn btn-sm" onclick="cancelBootConfirm()">
+            &times;
+          </button>
+        </div>
+        <div
+          id="bootConfirmText"
+          style="
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--warn);
+            margin-bottom: 10px;
+          "
+        >
+          Arming hardware verification...
+        </div>
+        <div class="meter-bar">
+          <div
+            class="meter-fill"
+            id="bootConfirmBar"
+            style="width: 0%; background: var(--warn)"
+          ></div>
+        </div>
+        <div class="modal-foot" style="justify-content: flex-end">
+          <button class="btn btn-sm" onclick="cancelBootConfirm()">
+            Abort
           </button>
         </div>
       </div>
@@ -3616,39 +3672,18 @@
         const box = document.getElementById("forgetBootBox");
         const txt = document.getElementById("forgetBootText");
         const bar = document.getElementById("forgetBootBar");
+        clearInterval(forgetBootTimer);
+
         box.style.display = "block";
+        bar.style.width = "0%";
+        bar.style.background = "var(--warn)";
+        txt.textContent = "Arming hardware reset...";
 
-        let remainingMs = 5000;
-        clearInterval(forgetBootTimer);
-
-        const bootPromise = !isOfflinePreview
-          ? fetch("/api/auth/forget-boot", { method: "POST" })
-              .then((r) => r.json())
-              .catch(() => ({ bootHeld: false }))
-          : new Promise((res) => {
-              setTimeout(
-                () =>
-                  res({
-                    bootHeld: confirm(
-                      "Preview Mode: Simulate holding ESP32 BOOT button?",
-                    ),
-                  }),
-                1500,
-              );
-            });
-
-        forgetBootTimer = setInterval(() => {
-          remainingMs -= 100;
-          const sec = Math.max(0, (remainingMs / 1000).toFixed(1));
-          txt.textContent = `Hold ESP32 BOOT button within ${sec}s...`;
-          bar.style.width = `${(remainingMs / 5000) * 100}%`;
-          if (remainingMs <= 0) clearInterval(forgetBootTimer);
-        }, 100);
-
-        const result = await bootPromise;
-        clearInterval(forgetBootTimer);
-
-        if (result && result.bootHeld) {
+        if (isOfflinePreview) {
+          box.style.display = "none";
+          if (!confirm("Preview Mode: Simulate 5s press + 10s BOOT hold?")) {
+            return showToast("Forget aborted.");
+          }
           config.admin.users = [
             {
               username: "esp",
@@ -3659,20 +3694,73 @@
           clearLockoutData();
           refreshAuthModalLiveStatus();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-          if (!isOfflinePreview) {
-            await fetch("/api/config", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(config),
-            }).catch(() => {});
-          }
-          if (typeof renderUserList === "function") renderUserList();
-          box.style.display = "none";
-          showToast("Users reset! Default is now esp / 456456");
-        } else {
-          box.style.display = "none";
-          showToast("Forget aborted: BOOT button was not held within 5s");
+          return showToast("Users reset! Default is now esp / 456456");
         }
+
+        try {
+          const startRes = await fetch("/api/upload-auth/forget/start", {
+            method: "POST",
+          });
+          const startData = await startRes.json();
+          if (!startRes.ok || !startData.ok) {
+            box.style.display = "none";
+            return showToast(
+              startData.error || "Could not start forget process",
+            );
+          }
+        } catch {
+          box.style.display = "none";
+          return showToast("ESP32 unreachable");
+        }
+
+        const poll = async () => {
+          try {
+            const r = await fetch("/api/upload-auth/forget/status", {
+              cache: "no-store",
+            });
+            const d = await r.json();
+            if (d.state === "wait_press") {
+              const rem = (d.remainingMs / 1000).toFixed(1);
+              bar.style.background = "var(--warn)";
+              bar.style.width = `${Math.min(100, ((5000 - d.remainingMs) / 5000) * 100)}%`;
+              txt.textContent = `Step 1/2: Press & hold BOOT button within ${rem}s...`;
+            } else if (d.state === "holding") {
+              const held = (d.heldMs / 1000).toFixed(1);
+              bar.style.background = "var(--accent)";
+              bar.style.width = `${Math.min(100, (d.heldMs / 10000) * 100)}%`;
+              txt.textContent = `Step 2/2: Keep holding BOOT button... ${held}s / 10.0s`;
+            } else {
+              clearInterval(forgetBootTimer);
+              forgetBootTimer = null;
+              if (d.state === "done") {
+                bar.style.background = "var(--ok)";
+                bar.style.width = "100%";
+                txt.textContent = "Reset complete!";
+                config.admin.users = [
+                  {
+                    username: "esp",
+                    passHash: hashCredential("esp", "456456"),
+                    role: "admin",
+                  },
+                ];
+                clearLockoutData();
+                refreshAuthModalLiveStatus();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+                if (typeof renderUserList === "function") renderUserList();
+                document.getElementById("authUser").value = "esp";
+                document.getElementById("authPass").value = "";
+                setTimeout(() => (box.style.display = "none"), 1200);
+                showToast("Users reset! Default admin: esp / 456456");
+              } else {
+                box.style.display = "none";
+                showToast(d.message || "Forget aborted.");
+              }
+            }
+          } catch {}
+        };
+
+        forgetBootTimer = setInterval(poll, 250);
+        poll();
       }
 
       async function verifyAction(actionKey, label) {
@@ -6692,6 +6780,9 @@
           uptime: "3d 14h 22m",
           ramUsedKb: 138,
           ramTotalKb: 320,
+          psramOk: false,
+          psramUsedKb: 0,
+          psramTotalKb: 0,
           storageUsedKb: Number((nvsUsed / 1024).toFixed(1)),
           storageTotalKb: 16,
           ssid: "Home_Fiber_2.4G",
@@ -6706,13 +6797,16 @@
           } catch (_) {}
         }
 
+        const fmtKbOrMb = (kb) =>
+          kb >= 1024 ? `${(kb / 1024).toFixed(2)} MB` : `${Math.round(kb)} KB`;
+
         const ramPct = Math.min(
           100,
-          Math.round((d.ramUsedKb / d.ramTotalKb) * 100),
+          Math.round((d.ramUsedKb / (d.ramTotalKb || 1)) * 100),
         );
         const storPct = Math.min(
           100,
-          Math.round((d.storageUsedKb / d.storageTotalKb) * 100),
+          Math.round((d.storageUsedKb / (d.storageTotalKb || 1)) * 100),
         );
         const sigPct = rssiToPct(d.rssi);
 
@@ -6729,8 +6823,26 @@
           `${ramPct}% (${d.ramUsedKb} KB / ${d.ramTotalKb} KB)`;
         document.getElementById("perfRamBar").style.width = `${ramPct}%`;
 
+        // Show 8 MB PSRAM bar ONLY when hardware PSRAM is active (hidden on normal ESP32 Dev Kit)
+        const psramWrap = document.getElementById("perfPsramWrap");
+        if (psramWrap) {
+          if (d.psramOk && Number(d.psramTotalKb) > 0) {
+            const psramPct = Math.min(
+              100,
+              Math.round((d.psramUsedKb / d.psramTotalKb) * 100),
+            );
+            psramWrap.style.display = "block";
+            document.getElementById("perfPsramText").textContent =
+              `${psramPct}% (${fmtKbOrMb(d.psramUsedKb)} / ${fmtKbOrMb(d.psramTotalKb)})`;
+            document.getElementById("perfPsramBar").style.width =
+              `${psramPct}%`;
+          } else {
+            psramWrap.style.display = "none";
+          }
+        }
+
         document.getElementById("perfStorageText").textContent =
-          `${storPct}% (${d.storageUsedKb} KB / ${d.storageTotalKb} KB)`;
+          `${storPct}% (${fmtKbOrMb(d.storageUsedKb)} / ${fmtKbOrMb(d.storageTotalKb)})`;
         document.getElementById("perfStorageBar").style.width = `${storPct}%`;
       }
 
@@ -7170,6 +7282,98 @@
         setTimeout(() => (location.href = "index.html"), 4000);
       }
 
+      let bootConfirmTimer = null;
+      let bootConfirmResolver = null;
+
+      function cancelBootConfirm() {
+        clearInterval(bootConfirmTimer);
+        bootConfirmTimer = null;
+        document.getElementById("bootConfirmModal")?.classList.remove("open");
+        syncModalScrollLock();
+        if (bootConfirmResolver) {
+          const res = bootConfirmResolver;
+          bootConfirmResolver = null;
+          res(false);
+        }
+      }
+
+      function waitForBootHoldConfirm(titleText) {
+        if (isOfflinePreview) {
+          return Promise.resolve(
+            confirm(
+              `Preview Mode: Simulate 5s press + 10s BOOT hold for "${titleText}"?`,
+            ),
+          );
+        }
+
+        return new Promise(async (resolve) => {
+          bootConfirmResolver = resolve;
+          const modal = document.getElementById("bootConfirmModal");
+          const txt = document.getElementById("bootConfirmText");
+          const bar = document.getElementById("bootConfirmBar");
+
+          document.getElementById("bootConfirmTitle").textContent = titleText;
+          txt.textContent = "Arming hardware verification...";
+          bar.style.width = "0%";
+          bar.style.background = "var(--warn)";
+          modal.classList.add("open");
+          syncModalScrollLock();
+
+          try {
+            const startRes = await fetch(
+              "/api/upload-auth/forget/start?mode=confirm",
+              {
+                method: "POST",
+              },
+            );
+            const startData = await startRes.json();
+            if (!startRes.ok || !startData.ok) {
+              showToast(startData.error || "Could not start BOOT confirmation");
+              return cancelBootConfirm();
+            }
+          } catch {
+            showToast("ESP32 unreachable");
+            return cancelBootConfirm();
+          }
+
+          const poll = async () => {
+            try {
+              const r = await fetch("/api/upload-auth/forget/status", {
+                cache: "no-store",
+              });
+              const d = await r.json();
+              if (d.state === "wait_press") {
+                const rem = (d.remainingMs / 1000).toFixed(1);
+                bar.style.background = "var(--warn)";
+                bar.style.width = `${Math.min(100, ((5000 - d.remainingMs) / 5000) * 100)}%`;
+                txt.textContent = `Step 1/2: Press & hold BOOT button within ${rem}s...`;
+              } else if (d.state === "holding") {
+                const held = (d.heldMs / 1000).toFixed(1);
+                bar.style.background = "var(--accent)";
+                bar.style.width = `${Math.min(100, (d.heldMs / 10000) * 100)}%`;
+                txt.textContent = `Step 2/2: Keep holding BOOT button... ${held}s / 10.0s`;
+              } else {
+                clearInterval(bootConfirmTimer);
+                bootConfirmTimer = null;
+                modal.classList.remove("open");
+                syncModalScrollLock();
+                const resFn = bootConfirmResolver;
+                bootConfirmResolver = null;
+                if (d.state === "done") {
+                  if (resFn) resFn(true);
+                } else {
+                  showToast(d.message || "Reset aborted.");
+                  if (resFn) resFn(false);
+                }
+              }
+            } catch {}
+          };
+
+          bootConfirmTimer = setInterval(poll, 250);
+          poll();
+        });
+      }
+
       // 1. Reset Data Only (Erases Devices, Shortcuts, Groups, Favorites & 2D Designs)
       async function resetDataOnly() {
         const verified = await promptVerification(
@@ -7192,6 +7396,7 @@
         )
           return;
 
+        if (!(await waitForBootHoldConfirm("Confirm: Reset Data"))) return;
         config.devices = [];
         config.shortcuts = [];
         config.groups = [{ id: "g1", name: "General", color: "#38bdf8" }];
@@ -7238,6 +7443,7 @@
           )
         )
           return;
+        if (!(await waitForBootHoldConfirm("Confirm: Reset Settings"))) return;
 
         const defaults = sanitizeConfig(null);
         config.settings = defaults.settings;
@@ -7285,6 +7491,7 @@
           )
         )
           return;
+        if (!(await waitForBootHoldConfirm("Confirm: Factory Reset"))) return;
 
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(DESIGN_STORAGE_KEY);
