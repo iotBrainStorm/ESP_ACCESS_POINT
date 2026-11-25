@@ -37,25 +37,22 @@ static constexpr WebRequestMethod ASYNC_OPTIONS = AsyncWebRequestMethod::HTTP_OP
 #define S3_RGB_LED_PIN 48
 
 // Safe GPIOs on ESP32-S3 N16R8:
-// - Avoids OPI PSRAM pins (35, 36, 37) and Flash pins (26-32)
-// - Avoids Native USB pins (19, 20)
-// - Avoids Default I2C pins (SDA=8, SCL=9) reserved for future 128x64 display
 #define LED_PIN 16
 #define BUZZER_PIN 17
 #define BOOT_BUTTON 0
 
-static constexpr size_t MAX_CONFIG_BYTES = 131072;    // 128 KB on S3
-static constexpr size_t MAX_DESIGN_BYTES = 524288;    // 512 KB on S3
+static constexpr size_t MAX_CONFIG_BYTES = 524288;    // 512 KB on S3 (use 1048576 for 1 MB)
+static constexpr size_t MAX_DESIGN_BYTES = 2097152;   // 2 MB on S3 (use 3145728 for 3 MB)
 static constexpr size_t MAX_SMALL_JSON_BYTES = 4096;  // 4 KB
 static constexpr uint8_t FS_MAX_OPEN_FILES = 16;
 static constexpr int MAX_MDNS_SCAN_RESULTS = 64;
+static constexpr uint8_t MAX_TRACKED_DEVICES = 128;  // Track up to 128 devices on S3
 #else
 #define HUB_BOARD_NAME "ESP32-Dev"
 #define HAS_BUILTIN_RGB_LED 0
 #define BUILTIN_LED_PIN 2
 
 // Safe GPIOs on Classic ESP32 Dev Module:
-// - Avoids Default I2C pins (SDA=21, SCL=22) reserved for future 128x64 display
 #define LED_PIN 16
 #define BUZZER_PIN 17
 #define BOOT_BUTTON 0
@@ -65,9 +62,9 @@ static constexpr size_t MAX_DESIGN_BYTES = 69632;     // 68 KB (64 KB UI + margi
 static constexpr size_t MAX_SMALL_JSON_BYTES = 1024;  // 1 KB
 static constexpr uint8_t FS_MAX_OPEN_FILES = 10;
 static constexpr int MAX_MDNS_SCAN_RESULTS = 24;
+static constexpr uint8_t MAX_TRACKED_DEVICES = 32;
 #endif
 
-// Default board I2C bus reserved for future 128x64 I2C OLED/LCD display:
 // - Classic ESP32 Dev Module: SDA = 21, SCL = 22
 // - ESP32-S3 N16R8 Module:    SDA = 8,  SCL = 9
 static constexpr uint8_t I2C_SDA_PIN = SDA;
@@ -178,7 +175,6 @@ bool initStorage() {
     ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, nullptr);
 
   // Prefer FATFS when a large FAT partition is selected (e.g., 16M Flash 9.9MB/12.5MB FATFS),
-  // otherwise mount SPIFFS automatically.
   if (fatPart && !spiffsPart) {
     Serial.println("[FS] Detected FAT partition - mounting FFat (first-time format may take ~15s)...");
     if (FFat.begin(true, "/ffat", FS_MAX_OPEN_FILES)) {
@@ -690,7 +686,6 @@ unsigned long lastOledDrawMs = 0;
 static char oledBootLog[3][22] = { "", "", "" };
 
 // Automatic Device Online/Offline Tracker (reads /config.json)
-static constexpr uint8_t MAX_TRACKED_DEVICES = 32;
 static constexpr unsigned long DEVICE_CHECK_INTERVAL_MS = 4000UL;  // Check 1 device every 4s
 struct TrackedDevice {
   char host[48];
@@ -3137,6 +3132,8 @@ void setupWebServer() {
     d["maxBlock"] = ESP.getMaxAllocHeap();
     d["storageUsedKb"] = roundf((fsUsedBytes() / 1024.0f) * 10.0f) / 10.0f;
     d["storageTotalKb"] = roundf((fsTotalBytes() / 1024.0f) * 10.0f) / 10.0f;
+    d["maxConfigBytes"] = MAX_CONFIG_BYTES;
+    d["maxDesignBytes"] = MAX_DESIGN_BYTES;
     d["timeSynced"] = timeSynced;
     d["lastSync"] = lastSyncTimeStr;
 

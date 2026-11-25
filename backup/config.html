@@ -2237,7 +2237,7 @@
             "
           >
             <span id="nvsByteText">0 bytes used</span>
-            <span>16,384 bytes capacity</span>
+            <span id="nvsCapText">16,384 bytes capacity</span>
           </div>
           <div class="meter-bar">
             <div class="meter-fill" id="nvsMeterFill" style="width: 10%"></div>
@@ -2823,7 +2823,8 @@
       const STORAGE_KEY = "esp_iot_hub_config_v1";
       const DESIGN_STORAGE_KEY = "esp_iot_hub_building_design_v1";
       let pendingImportedDesigns = null;
-      const NVS_MAX_BYTES = 16384;
+      let NVS_MAX_BYTES = 16384;
+      let DESIGN_MAX_BYTES = 65536;
       const KEY_SALT = "esp32_nvs_hub_v1_secret";
 
       const SWATCHES = [
@@ -3462,7 +3463,7 @@
         } else {
           const bytes = getPayloadByteSize();
           const pct = Math.min(100, Math.round((bytes / NVS_MAX_BYTES) * 100));
-          el.textContent = `${pct}% (${(bytes / 1024).toFixed(1)} KB / 16 KB)`;
+          el.textContent = `${pct}% (${fmtKbOrMb(bytes / 1024)} / ${fmtKbOrMb(NVS_MAX_BYTES / 1024)})`;
         }
       }
 
@@ -3476,7 +3477,12 @@
         }
 
         document.getElementById("nvsByteText").textContent =
-          `${bytes.toLocaleString()} bytes used (${pct}%)`;
+          `${bytes.toLocaleString()} bytes (${fmtKbOrMb(bytes / 1024)}) used (${pct}%)`;
+
+        const capEl = document.getElementById("nvsCapText");
+        if (capEl) {
+          capEl.textContent = `${NVS_MAX_BYTES.toLocaleString()} bytes (${fmtKbOrMb(NVS_MAX_BYTES / 1024)}) capacity`;
+        }
         const fill = document.getElementById("nvsMeterFill");
         fill.style.width = `${pct}%`;
         fill.style.background = pct > 85 ? "var(--err)" : "var(--accent)";
@@ -3868,6 +3874,12 @@
                   stData.storageUsedKb,
                   stData.storageTotalKb,
                 );
+              }
+              if (Number(stData.maxConfigBytes) > 0) {
+                NVS_MAX_BYTES = Number(stData.maxConfigBytes);
+              }
+              if (Number(stData.maxDesignBytes) > 0) {
+                DESIGN_MAX_BYTES = Number(stData.maxDesignBytes);
               }
 
               if (
@@ -7112,7 +7124,19 @@
 
         const bytes = getPayloadByteSize();
         if (bytes > NVS_MAX_BYTES) {
-          return showToast("Error: Config exceeds 16KB NVS limit!");
+          return showToast(
+            `Error: Config exceeds ${fmtKbOrMb(NVS_MAX_BYTES / 1024)} limit!`,
+          );
+        }
+        if (pendingImportedDesigns !== null) {
+          const designBytes = new TextEncoder().encode(
+            JSON.stringify(pendingImportedDesigns),
+          ).length;
+          if (designBytes > DESIGN_MAX_BYTES) {
+            return showToast(
+              `Error: Designs exceed ${fmtKbOrMb(DESIGN_MAX_BYTES / 1024)} limit!`,
+            );
+          }
         }
 
         const btn = document.getElementById("saveNvsBtn");

@@ -2773,10 +2773,22 @@
           const res = await fetch("/api/config", { cache: "no-store" });
           if (res.ok) {
             cachedHubConfig = await res.json();
-            localStorage.setItem(
-              HUB_CONFIG_KEY,
-              JSON.stringify(cachedHubConfig),
-            );
+            try {
+              localStorage.setItem(
+                HUB_CONFIG_KEY,
+                JSON.stringify(cachedHubConfig),
+              );
+            } catch (_) {}
+          }
+        } catch (_) {}
+
+        try {
+          const stRes = await fetch("/api/status", { cache: "no-store" });
+          if (stRes.ok) {
+            const stData = await stRes.json();
+            if (Number(stData.maxDesignBytes) > 0) {
+              DESIGN_MAX_BYTES = Number(stData.maxDesignBytes);
+            }
           }
         } catch (_) {}
         applyHubTheme();
@@ -3707,10 +3719,12 @@
             const remote = normalizeDesignsStore(await res.json());
             if (remote.length) {
               allDesigns = remote;
-              localStorage.setItem(
-                DESIGN_STORAGE_KEY,
-                JSON.stringify(allDesigns),
-              );
+              try {
+                localStorage.setItem(
+                  DESIGN_STORAGE_KEY,
+                  JSON.stringify(allDesigns),
+                );
+              } catch (_) {}
             }
           }
         } catch (_) {}
@@ -7634,7 +7648,13 @@
         return !!(await promptVerification(roleReq, `Verify: ${label}`));
       }
 
-      const DESIGN_MAX_BYTES = 65536; // 64 KB safety limit for ESP32 LittleFS / RAM
+      let DESIGN_MAX_BYTES = 65536; // Auto-updated from ESP32 /api/status (e.g. 2 MB on S3)
+
+      function fmtDesignSize(bytes) {
+        return bytes >= 1048576
+          ? `${(bytes / 1048576).toFixed(2)} MB`
+          : `${(bytes / 1024).toFixed(1)} KB`;
+      }
 
       async function saveBuildingDesign() {
         if (!(await verifyDesignAction("Save Design"))) return;
@@ -7651,12 +7671,14 @@
         const bytes = new TextEncoder().encode(payloadStr).length;
         if (bytes > DESIGN_MAX_BYTES) {
           return showToast(
-            `Design too large (${(bytes / 1024).toFixed(1)} KB / 64 KB max)!`,
+            `Design too large (${fmtDesignSize(bytes)} / ${fmtDesignSize(DESIGN_MAX_BYTES)} max)!`,
           );
         }
 
         allLoadedDesigns = allDesigns;
-        localStorage.setItem(DESIGN_STORAGE_KEY, payloadStr);
+        try {
+          localStorage.setItem(DESIGN_STORAGE_KEY, payloadStr);
+        } catch (_) {}
         history.replaceState(
           null,
           "",
@@ -7671,7 +7693,7 @@
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           showToast(
-            `Saved "${building.name}" to ESP32 (${(bytes / 1024).toFixed(1)} KB)!`,
+            `Saved "${building.name}" to ESP32 (${fmtDesignSize(bytes)})!`,
           );
         } catch {
           showToast(`Saved "${building.name}" locally (ESP32 unreachable)`);
@@ -7689,11 +7711,14 @@
           return;
         }
 
-        const remaining = getLocalDesignsList().filter(
-          (d) => d.id !== building.id,
-        );
+        const sourceList = allLoadedDesigns.length
+          ? allLoadedDesigns
+          : getLocalDesignsList();
+        const remaining = sourceList.filter((d) => d.id !== building.id);
         allLoadedDesigns = remaining;
-        localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(remaining));
+        try {
+          localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(remaining));
+        } catch (_) {}
 
         await fetch("/api/design", {
           method: "POST",
