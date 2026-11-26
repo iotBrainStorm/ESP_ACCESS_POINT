@@ -686,6 +686,14 @@
         color: var(--text);
       }
 
+      html:not(.ui-ready) header.topbar,
+      html:not(.ui-ready) nav.nav-tabs,
+      html:not(.ui-ready) .save-bar {
+        opacity: 0;
+        visibility: hidden;
+        transition: none !important;
+      }
+
       main.container {
         opacity: 0;
         transform: translateY(4px);
@@ -826,6 +834,38 @@
         }
       }
     </style>
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("esp_iot_hub_config_v1");
+          if (!raw) return;
+          var cfg = JSON.parse(raw);
+          var s = cfg && cfg.settings ? cfg.settings : {};
+          var root = document.documentElement;
+          var theme = s.theme || "dark";
+          root.setAttribute("data-theme", theme);
+
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute(
+              "content",
+              theme === "light"
+                ? "#f1f5f9"
+                : theme === "amoled"
+                  ? "#000000"
+                  : "#0b1120",
+            );
+          }
+          if (s.accentColor) {
+            root.style.setProperty("--accent", s.accentColor);
+            root.style.setProperty(
+              "--accent-soft",
+              "color-mix(in srgb, " + s.accentColor + " 16%, transparent)",
+            );
+          }
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <!-- Universal Auth & Verification Modal -->
@@ -3837,22 +3877,33 @@
          6. INITIALIZATION & TAB NAVIGATION
          ============================================================================ */
       async function init() {
+        // 1. Instant hydrate from cache (zero-flash on refresh / page switch)
+        try {
+          const cached = localStorage.getItem(STORAGE_KEY);
+          if (cached) {
+            config = sanitizeConfig(JSON.parse(cached));
+            applyTheme();
+            document.documentElement.classList.add("ui-ready");
+          }
+        } catch (_) {}
+
+        // 2. Fetch live config from ESP32 and refresh cache
         try {
           const res = await fetch("/api/config", { cache: "no-store" });
           if (!res.ok) throw new Error();
           config = sanitizeConfig(await res.json());
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
           isOfflinePreview = false;
         } catch (e) {
           isOfflinePreview = true;
-          try {
-            const cached = localStorage.getItem(STORAGE_KEY);
-            config = sanitizeConfig(cached ? JSON.parse(cached) : null);
-          } catch (_) {
+          if (!config) {
             config = sanitizeConfig(null);
           }
         }
 
         applyTheme();
+        document.documentElement.classList.add("ui-ready");
+
         if (!isOfflinePreview) {
           try {
             const stRes = await fetch("/api/status", { cache: "no-store" });

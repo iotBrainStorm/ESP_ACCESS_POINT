@@ -1252,6 +1252,12 @@
         border: 1px solid var(--border);
         color: var(--text);
       }
+      html:not(.ui-ready) header.topbar,
+      html:not(.ui-ready) footer {
+        opacity: 0;
+        visibility: hidden;
+        transition: none !important;
+      }
       main.container {
         opacity: 0;
         transform: translateY(4px);
@@ -1921,6 +1927,47 @@
         display: none;
       }
     </style>
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("esp_iot_hub_config_v1");
+          if (!raw) return;
+          var cfg = JSON.parse(raw);
+          var s = cfg && cfg.settings ? cfg.settings : {};
+          var ui = s.uiLayout || {};
+          var root = document.documentElement;
+          var theme = s.theme || "dark";
+          root.setAttribute("data-theme", theme);
+
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute(
+              "content",
+              theme === "light"
+                ? "#f1f5f9"
+                : theme === "amoled"
+                  ? "#000000"
+                  : "#0b1120",
+            );
+          }
+          if (s.accentColor) {
+            root.style.setProperty("--accent", s.accentColor);
+            root.style.setProperty(
+              "--accent-soft",
+              "color-mix(in srgb, " + s.accentColor + " 16%, transparent)",
+            );
+          }
+          if (ui.radius)
+            root.style.setProperty("--radius", Number(ui.radius) + "px");
+          if (ui.maxWidth !== undefined) {
+            root.style.setProperty(
+              "--container-max",
+              Number(ui.maxWidth) ? Number(ui.maxWidth) + "px" : "100%",
+            );
+          }
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <!-- Universal Auth & Verification Modal -->
@@ -4641,6 +4688,18 @@
       }
 
       async function loadConfig() {
+        // 1. Instant hydrate from cache (zero-flash on refresh / page switch)
+        try {
+          const cached = localStorage.getItem(STORAGE_KEY);
+          if (cached) {
+            config = sanitizeConfig(JSON.parse(cached));
+            applySettingsUI();
+            updateHomeClock();
+            document.documentElement.classList.add("ui-ready");
+          }
+        } catch (_) {}
+
+        // 2. Fetch live config from ESP32 and sync any changes
         try {
           const res = await fetch("/api/config", { cache: "no-store" });
           if (!res.ok) throw new Error("No ESP endpoint");
@@ -4650,20 +4709,16 @@
           isOfflinePreview = false;
         } catch (e) {
           isOfflinePreview = true;
-          try {
-            const cached = localStorage.getItem(STORAGE_KEY);
-            config = cached
-              ? sanitizeConfig(JSON.parse(cached))
-              : sanitizeConfig(null);
-          } catch (_) {
+          if (!config) {
             config = sanitizeConfig(null);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
           }
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
         }
 
         applySettingsUI();
         updateHomeClock();
-        await loadTelemetry(); // Also fixes Critical Issue 2 below
+        document.documentElement.classList.add("ui-ready");
+        await loadTelemetry();
 
         const loggedIn = await enforcePageLogin("homePage");
         if (!loggedIn) {

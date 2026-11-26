@@ -88,6 +88,13 @@
         user-select: none;
       }
 
+      html:not(.ui-ready) .topbar,
+      html:not(.ui-ready) .workspace {
+        opacity: 0;
+        visibility: hidden;
+        transition: none !important;
+      }
+
       /* ==========================================================================
          2. TOP NAVIGATION & WORKFLOW BAR
          ========================================================================== */
@@ -1128,6 +1135,38 @@
         }
       }
     </style>
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("esp_iot_hub_config_v1");
+          if (!raw) return;
+          var cfg = JSON.parse(raw);
+          var s = cfg && cfg.settings ? cfg.settings : {};
+          var root = document.documentElement;
+          var theme = s.theme || "dark";
+          root.setAttribute("data-theme", theme);
+
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute(
+              "content",
+              theme === "light"
+                ? "#f1f5f9"
+                : theme === "amoled"
+                  ? "#000000"
+                  : "#0b1120",
+            );
+          }
+          if (s.accentColor) {
+            root.style.setProperty("--accent", s.accentColor);
+            root.style.setProperty(
+              "--accent-soft",
+              "color-mix(in srgb, " + s.accentColor + " 16%, transparent)",
+            );
+          }
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <!-- Universal User Verification Modal -->
@@ -3712,7 +3751,75 @@
           return;
         }
 
+        const pickBuilding = (designsList) => {
+          let chosen;
+          if (isNew) {
+            chosen = createBlankBuilding();
+          } else if (requestedId) {
+            chosen =
+              designsList.find((d) => d.id === requestedId) ||
+              designsList[0] ||
+              createDefaultSampleBuilding();
+          } else {
+            chosen = designsList[0] || createDefaultSampleBuilding();
+          }
+          if (!chosen.id) chosen.id = "bldg_" + Date.now().toString(36);
+          if (!chosen.floorSwitcher) {
+            chosen.floorSwitcher = getDefaultFloorSwitcher();
+          }
+          if (!chosen.floors || !chosen.floors.length) {
+            chosen = createDefaultSampleBuilding();
+            chosen.id = "bldg_" + Date.now().toString(36);
+          }
+          return chosen;
+        };
+
+        const mountBuilding = (nextBldg, isInitialMount) => {
+          building = nextBldg;
+          const keepFloorId = isInitialMount ? requestedFloorId : activeFloorId;
+          activeFloorId =
+            keepFloorId && building.floors.some((f) => f.id === keepFloorId)
+              ? keepFloorId
+              : building.floors[0].id;
+
+          syncBuildingInputs();
+          applyHubStatesToShapes();
+          renderFloorList();
+          renderAccessoryPalette();
+          renderCanvas();
+          if (isInitialMount) setupCanvasEvents();
+          updateInspector();
+
+          if (isLiveMapMode) {
+            if (isInitialMount) {
+              enterLiveMapMode();
+            } else {
+              const switchBtn = document.getElementById("liveBldgSwitchBtn");
+              if (switchBtn) {
+                switchBtn.style.display =
+                  allLoadedDesigns.length > 1 ? "inline-flex" : "none";
+              }
+              fitMapToViewport();
+            }
+          }
+          document.documentElement.classList.add("ui-ready");
+        };
+
+        // 1. Instant hydrate from cache (zero-flash on refresh / Map View open)
         let allDesigns = getLocalDesignsList();
+        const hasCachedMatch =
+          isNew ||
+          (allDesigns.length > 0 &&
+            (!requestedId || allDesigns.some((d) => d.id === requestedId)));
+        let mounted = false;
+
+        if (hasCachedMatch) {
+          allLoadedDesigns = allDesigns;
+          mountBuilding(pickBuilding(allDesigns), true);
+          mounted = true;
+        }
+
+        // 2. Fetch live designs from ESP32 and sync any changes
         try {
           const res = await fetch("/api/design", { cache: "no-store" });
           if (res.ok) {
@@ -3731,43 +3838,22 @@
 
         allLoadedDesigns = allDesigns;
 
-        if (isNew) {
-          building = createBlankBuilding();
-        } else if (requestedId) {
-          building =
-            allDesigns.find((d) => d.id === requestedId) ||
-            allDesigns[0] ||
-            createDefaultSampleBuilding();
-        } else {
-          building = allDesigns[0] || createDefaultSampleBuilding();
+        if (!mounted) {
+          mountBuilding(pickBuilding(allDesigns), true);
+        } else if (!isNew && undoStack.length === 0 && !dragState) {
+          const fresh = pickBuilding(allDesigns);
+          if (JSON.stringify(fresh) !== JSON.stringify(building)) {
+            mountBuilding(fresh, false);
+          } else if (isLiveMapMode) {
+            const switchBtn = document.getElementById("liveBldgSwitchBtn");
+            if (switchBtn) {
+              switchBtn.style.display =
+                allLoadedDesigns.length > 1 ? "inline-flex" : "none";
+            }
+          }
         }
 
-        if (!building.id) building.id = "bldg_" + Date.now().toString(36);
-        if (!building.floorSwitcher) {
-          building.floorSwitcher = getDefaultFloorSwitcher();
-        }
-        if (!building.floors || !building.floors.length) {
-          building = createDefaultSampleBuilding();
-          building.id = "bldg_" + Date.now().toString(36);
-        }
-
-        activeFloorId =
-          requestedFloorId &&
-          building.floors.some((f) => f.id === requestedFloorId)
-            ? requestedFloorId
-            : building.floors[0].id;
-
-        syncBuildingInputs();
-        renderFloorList();
-        renderAccessoryPalette();
-        renderCanvas();
-        setupCanvasEvents();
-        updateInspector();
         syncHubConfigFromBackend();
-
-        if (isLiveMapMode) {
-          enterLiveMapMode();
-        }
       }
 
       function clearSelection() {

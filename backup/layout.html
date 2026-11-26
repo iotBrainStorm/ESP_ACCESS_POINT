@@ -92,6 +92,19 @@
         flex-direction: column;
       }
 
+      html:not(.ui-ready) header.topbar,
+      html:not(.ui-ready) .mobile-pane-switch,
+      html:not(.ui-ready) .workspace {
+        opacity: 0;
+        visibility: hidden;
+        transition: none !important;
+      }
+
+      body:not(.auth-ready) .workspace {
+        opacity: 0;
+        visibility: hidden;
+      }
+
       /* ==========================================================================
          2. TOP STUDIO BAR
          ========================================================================== */
@@ -1642,6 +1655,38 @@
         }
       }
     </style>
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("esp_iot_hub_config_v1");
+          if (!raw) return;
+          var cfg = JSON.parse(raw);
+          var s = cfg && cfg.settings ? cfg.settings : {};
+          var root = document.documentElement;
+          var theme = s.theme || "dark";
+          root.setAttribute("data-theme", theme);
+
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute(
+              "content",
+              theme === "light"
+                ? "#f1f5f9"
+                : theme === "amoled"
+                  ? "#000000"
+                  : "#0b1120",
+            );
+          }
+          if (s.accentColor) {
+            root.style.setProperty("--accent", s.accentColor);
+            root.style.setProperty(
+              "--accent-soft",
+              "color-mix(in srgb, " + s.accentColor + " 16%, transparent)",
+            );
+          }
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <!-- Top Studio Header -->
@@ -3456,32 +3501,89 @@
     </div>`;
           return;
         }
+
+        const normalizeConfig = (raw) => {
+          const c = raw && typeof raw === "object" ? raw : {};
+          if (!c.settings) {
+            c.settings = {
+              title: "ACCESS POINT",
+              subtitle: "ESP32 Central Gateway",
+              theme: "dark",
+            };
+          }
+          if (!Array.isArray(c.groups)) c.groups = [];
+          if (!Array.isArray(c.devices)) c.devices = [];
+          if (!Array.isArray(c.shortcuts)) c.shortcuts = [];
+          if (!Array.isArray(c.favorites)) c.favorites = [];
+          return c;
+        };
+
+        const hasValidCachedSession = (c) => {
+          const policy = c?.admin?.verification?.configPage || {
+            mode: "session",
+            role: "admin",
+          };
+          if (policy.mode === "none") return true;
+          if (policy.mode === "session") {
+            const savedRole = sessionStorage.getItem("hub_auth_configPage");
+            return !!(
+              savedRole &&
+              (policy.role === "all" ||
+                savedRole === policy.role ||
+                savedRole === "admin")
+            );
+          }
+          return false;
+        };
+
+        const mountLayoutStudio = () => {
+          ui = mergeLayoutConfig(config.settings.uiLayout);
+          config.settings.uiLayout = ui;
+          [...SAMPLE_DATA.shortcuts, ...config.shortcuts].forEach((s) => {
+            previewSwitchStates[s.id] = !!s.state;
+          });
+          syncControlsFromState();
+          renderPreview();
+          updateNvsBadge();
+        };
+
+        // 1. Instant hydrate from cache (zero-flash when navigating from config.html)
+        let hydratedFromCache = false;
+        try {
+          const cached = localStorage.getItem(STORAGE_KEY);
+          if (cached) {
+            config = normalizeConfig(JSON.parse(cached));
+            applyGlobalThemeAndAccent();
+            document.documentElement.classList.add("ui-ready");
+            if (hasValidCachedSession(config)) {
+              mountLayoutStudio();
+              document.body.classList.add("auth-ready");
+              hydratedFromCache = true;
+            }
+          }
+        } catch (_) {}
+
+        // 2. Fetch live config from ESP32 and refresh cache
         try {
           const res = await fetch("/api/config", { cache: "no-store" });
           if (!res.ok) throw new Error();
-          config = await res.json();
+          const remote = normalizeConfig(await res.json());
           isOfflinePreview = false;
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
+          } catch (_) {}
+          if (!hydratedFromCache || !isDirty) {
+            config = remote;
+          } else {
+            config.admin = remote.admin;
+          }
         } catch {
           isOfflinePreview = true;
-          try {
-            config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-          } catch {
-            config = {};
-          }
+          if (!config) config = normalizeConfig(null);
         }
 
-        if (!config.settings)
-          config.settings = {
-            title: "ACCESS POINT",
-            subtitle: "ESP32 Central Gateway",
-            theme: "dark",
-          };
-        if (!Array.isArray(config.groups)) config.groups = [];
-        if (!Array.isArray(config.devices)) config.devices = [];
-        if (!Array.isArray(config.shortcuts)) config.shortcuts = [];
-        if (!Array.isArray(config.favorites)) config.favorites = [];
-
         applyGlobalThemeAndAccent();
+        document.documentElement.classList.add("ui-ready");
 
         if (!isOfflinePreview) {
           try {
@@ -3501,23 +3603,17 @@
             }
           } catch (_) {}
         }
+
         const loggedIn = await enforceLayoutAuth();
         if (!loggedIn) {
           window.location.href = "config.html";
           return;
         }
 
-        ui = mergeLayoutConfig(config.settings.uiLayout);
-        config.settings.uiLayout = ui;
-
-        // Seed preview switch states
-        [...SAMPLE_DATA.shortcuts, ...config.shortcuts].forEach((s) => {
-          previewSwitchStates[s.id] = !!s.state;
-        });
-
-        syncControlsFromState();
-        renderPreview();
-        updateNvsBadge();
+        if (!hydratedFromCache || !isDirty) {
+          mountLayoutStudio();
+        }
+        document.body.classList.add("auth-ready");
 
         if (window.innerWidth <= 900) {
           setPreviewDevice("mobile");
