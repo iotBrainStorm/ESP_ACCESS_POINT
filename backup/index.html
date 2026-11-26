@@ -126,7 +126,10 @@
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         border-bottom: 1px solid var(--border);
-        transition: 0.18s ease;
+        transition:
+          background-color 0.18s ease,
+          border-color 0.18s ease,
+          box-shadow 0.18s ease;
       }
       .topbar[data-sticky="false"] {
         position: relative;
@@ -1253,7 +1256,8 @@
         color: var(--text);
       }
       html:not(.ui-ready) header.topbar,
-      html:not(.ui-ready) footer {
+      html:not(.ui-ready) footer,
+      body:not(.auth-ready) footer {
         opacity: 0;
         visibility: hidden;
         transition: none !important;
@@ -1268,6 +1272,10 @@
       body.auth-ready main.container {
         opacity: 1;
         transform: translateY(0);
+      }
+      html.instant-ready main.container {
+        transition: none !important;
+        transform: none !important;
       }
       .pin-overlay {
         position: fixed;
@@ -3416,25 +3424,10 @@
           return;
         }
         try {
-          const res = await fetch("/api/status", { cache: "no-store" });
-          if (!res.ok) return;
-          const data = await res.json();
-          if (data.rssi !== undefined) {
-            document.getElementById("hubRssi").textContent = formatRssiText(
-              data.rssi,
-            );
-          }
-          if (data.uptime !== undefined) {
-            document.getElementById("hubUptime").textContent =
-              `Uptime: ${data.uptime}`;
-          }
-          if (
-            data.bootId &&
-            getLockoutData().bootSession !== String(data.bootId)
-          ) {
-            clearLockoutData();
-            sessionStorage.setItem("esp_boot_id", String(data.bootId));
-          }
+          sessionStorage.setItem(
+            "hub_last_telemetry",
+            JSON.stringify({ rssi: data.rssi, uptime: data.uptime }),
+          );
         } catch (_) {}
       }
 
@@ -3545,16 +3538,19 @@
         topbarInner.dataset.padding = hdr.padding;
         topbarInner.dataset.rowGap = hdr.rowGap;
 
-        // Apply child order in DOM
+        // Apply child order in DOM only when order actually differs
         const childMap = {
           brand: brandEl,
           search: searchWrap,
           switcher: switcherWrap,
           actions: actionsEl,
         };
-        hdr.order.forEach((key) => {
-          if (childMap[key]) topbarInner.appendChild(childMap[key]);
-        });
+        const desiredOrder = hdr.order
+          .map((key) => childMap[key])
+          .filter(Boolean);
+        if (desiredOrder.some((el, i) => topbarInner.children[i] !== el)) {
+          desiredOrder.forEach((el) => topbarInner.appendChild(el));
+        }
 
         // Child 1: Brand
         brandEl.dataset.newRow = String(hdr.brandNewRow);
@@ -4687,36 +4683,98 @@
         setTimeout(() => location.reload(), 4000);
       }
 
+      function hasValidCachedSession(cfg) {
+        const policy = cfg?.admin?.verification?.homePage || {
+          mode: "session",
+          role: "all",
+        };
+        if (policy.mode === "none") return true;
+        if (policy.mode === "session") {
+          const savedRole = sessionStorage.getItem("hub_auth_homePage");
+          return !!(
+            savedRole &&
+            (policy.role === "all" ||
+              savedRole === policy.role ||
+              savedRole === "admin")
+          );
+        }
+        return false;
+      }
+
       async function loadConfig() {
-        // 1. Instant hydrate from cache (zero-flash on refresh / page switch)
+        let hydratedFromCache = false;
+        let cachedConfigJson = "";
+
+        // 1. Instant sync hydrate from cache (full page height before browser restores scroll)
         try {
           const cached = localStorage.getItem(STORAGE_KEY);
           if (cached) {
             config = sanitizeConfig(JSON.parse(cached));
+            cachedConfigJson = JSON.stringify(config);
             applySettingsUI();
             updateHomeClock();
-            document.documentElement.classList.add("ui-ready");
+
+            try {
+              const lastTel = JSON.parse(
+                sessionStorage.getItem("hub_last_telemetry") || "null",
+              );
+              if (lastTel) {
+                if (lastTel.rssi !== undefined) {
+                  document.getElementById("hubRssi").textContent =
+                    formatRssiText(lastTel.rssi);
+                }
+                if (lastTel.uptime !== undefined) {
+                  document.getElementById("hubUptime").textContent =
+                    `Uptime: ${lastTel.uptime}`;
+                }
+              }
+            } catch (_) {}
+
+            try {
+              savedBuildings = normalizeBuildingsList(
+                JSON.parse(localStorage.getItem(DESIGN_STORAGE_KEY)),
+              );
+              updateMapViewBadge();
+            } catch (_) {}
+
+            if (hasValidCachedSession(config)) {
+              renderAll();
+              document.documentElement.classList.add(
+                "instant-ready",
+                "ui-ready",
+              );
+              document.body.classList.add("auth-ready");
+              hydratedFromCache = true;
+            } else {
+              document.documentElement.classList.add("ui-ready");
+            }
           }
         } catch (_) {}
 
-        // 2. Fetch live config from ESP32 and sync any changes
+        // 2. Fetch live config from ESP32 and re-render only if anything changed
+        let configChanged = !hydratedFromCache;
         try {
           const res = await fetch("/api/config", { cache: "no-store" });
           if (!res.ok) throw new Error("No ESP endpoint");
-          const remote = await res.json();
-          config = sanitizeConfig(remote);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+          const fresh = sanitizeConfig(await res.json());
+          const freshJson = JSON.stringify(fresh);
+          config = fresh;
+          localStorage.setItem(STORAGE_KEY, freshJson);
           isOfflinePreview = false;
+          configChanged = !hydratedFromCache || freshJson !== cachedConfigJson;
         } catch (e) {
           isOfflinePreview = true;
           if (!config) {
             config = sanitizeConfig(null);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+            configChanged = true;
           }
         }
 
-        applySettingsUI();
-        updateHomeClock();
+        if (configChanged) {
+          applySettingsUI();
+          updateHomeClock();
+        }
         document.documentElement.classList.add("ui-ready");
         await loadTelemetry();
 
@@ -4731,12 +4789,14 @@
       <p>Please sign in to view and control your devices.</p>
       <button class="btn-primary" onclick="location.reload()">Sign In</button>
     </div>`;
+          document.body.classList.add("auth-ready");
           return;
         }
+
         document.body.classList.add("auth-ready");
         isAuthenticated = true;
         startHomeBackgroundTimers();
-        renderAll();
+        if (configChanged) renderAll();
         loadSavedBuildings();
         if (config.settings.autoPing) pingAllDevices();
       }
