@@ -1358,6 +1358,26 @@ void serviceOledDisplay() {
   if (!oledReady) return;
 
   unsigned long now = millis();
+
+  // Check override expiry early so blink state reflects live counts
+  if (webDeviceOverrideActive && (int32_t)(now - webDeviceOverrideUntil) >= 0) {
+    webDeviceOverrideActive = false;
+  }
+  uint8_t activeOffCnt = webDeviceOverrideActive ? webDevicesOffline : devicesOfflineCount;
+
+  // Toggle blink phase every 500ms only when at least 1 device is offline
+  static bool offBlinkInvert = false;
+  static unsigned long lastOffBlinkMs = 0;
+  if (activeOffCnt > 0) {
+    if (now - lastOffBlinkMs >= 500UL) {
+      lastOffBlinkMs = now;
+      offBlinkInvert = !offBlinkInvert;
+      oledForceRedraw = true;
+    }
+  } else {
+    offBlinkInvert = false;
+  }
+
   unsigned long refreshPeriod = (ufState == UF_WAIT_PRESS || ufState == UF_HOLDING) ? 200UL : 1000UL;
   if (!oledForceRedraw && (now - lastOledDrawMs < refreshPeriod)) return;
   oledForceRedraw = false;
@@ -1493,9 +1513,14 @@ void serviceOledDisplay() {
     display.setCursor(4, 51);
     display.printf("ON:%u", onCnt);
 
-    // Outlined badge for OFF count
-    display.setTextColor(SSD1306_WHITE);
-    display.drawRoundRect(48, 48, 48, 13, 2, SSD1306_WHITE);
+    // Blinking badge for OFF count (inverts white/black every 500ms when offCnt > 0)
+    if (offCnt > 0 && offBlinkInvert) {
+      display.fillRoundRect(48, 48, 48, 13, 2, SSD1306_WHITE);
+      display.setTextColor(SSD1306_BLACK);
+    } else {
+      display.drawRoundRect(48, 48, 48, 13, 2, SSD1306_WHITE);
+      display.setTextColor(SSD1306_WHITE);
+    }
     display.setCursor(52, 51);
     display.printf("OFF:%u", offCnt);
 
