@@ -659,6 +659,9 @@ Preferences prefs;
 
 SemaphoreHandle_t fsMutex = nullptr;
 SemaphoreHandle_t asyncReqMutex = nullptr;
+SemaphoreHandle_t deviceMutex = nullptr;
+SemaphoreHandle_t mdnsMutex = nullptr;
+TaskHandle_t deviceHealthTaskHandle = nullptr;
 
 // 128x64 I2C OLED Object & State
 uint8_t detectedI2cDisplayAddr = 0;
@@ -685,33 +688,30 @@ unsigned long lastOledDrawMs = 0;
 // Boot Console Rolling Log (3 lines)
 static char oledBootLog[3][22] = { "", "", "" };
 
-// Automatic Device Online/Offline Tracker (reads /config.json)
-static constexpr unsigned long DEVICE_CHECK_INTERVAL_MS = 3000UL;         // Steady-state check interval
-static constexpr unsigned long DEVICE_INITIAL_CHECK_INTERVAL_MS = 600UL;  // Fast first pass after boot/save
-// Set to 1 to match Home page (ignores devices with group "none" or hidden groups unless in visible Favorites).
-// Set to 0 if your Home page counts ALL saved devices in /config.json.
-#define OLED_ONLY_HOME_VISIBLE_DEVICES 1
+// Automatic Device Online/Offline Tracker (runs in background FreeRTOS task)
+static constexpr unsigned long DEVICE_SWEEP_PAUSE_MS = 1500UL;  // Pause between full sweeps
+static constexpr unsigned long DEVICE_INTER_PROBE_MS = 60UL;    // Yield between devices
+static constexpr int32_t DEVICE_TCP_TIMEOUT_MS = 700;           // Fast LAN TCP timeout
+static constexpr uint32_t DEVICE_MDNS_TIMEOUT_MS = 500;         // Fast mDNS lookup timeout
+#define OLED_ONLY_HOME_VISIBLE_DEVICES 0
 
 struct TrackedDevice {
+  char id[36];
   char host[48];
   char altHost[48];
   uint16_t port;
+  IPAddress cachedIp;
+  uint16_t latencyMs;
   bool online;
   bool checked;
+  uint8_t failCount;
 };
 TrackedDevice trackedDevices[MAX_TRACKED_DEVICES];
 uint8_t trackedDeviceCount = 0;
-uint8_t trackedCheckIdx = 0;
-uint8_t devicesOnlineCount = 0;
-uint8_t devicesOfflineCount = 0;
-bool deviceListReloadPending = false;
-unsigned long lastDeviceCheckMs = 0;
-
-// Optional: live override if index.html pushes counts to /api/oled/devices
-bool webDeviceOverrideActive = false;
-unsigned long webDeviceOverrideUntil = 0;
-uint8_t webDevicesOnline = 0;
-uint8_t webDevicesOffline = 0;
+volatile uint8_t devicesOnlineCount = 0;
+volatile uint8_t devicesOfflineCount = 0;
+volatile bool deviceListReloadPending = false;
+volatile bool deviceForceProbeNow = false;
 
 // Unique per-boot token so frontend resets lockout state after ESP32 restart
 static char bootIdStr[12] = "00000000";
@@ -758,6 +758,7 @@ bool pendingIpReapply = false;
 unsigned long ipReapplyAt = 0;
 
 bool portalPending = false;
+volatile bool portalActive = false;
 bool portalForgetWifi = false;
 unsigned long portalStartAt = 0;
 
@@ -1079,7 +1080,10 @@ String cleanEndpointHost(String raw, uint16_t &portOut) {
   if (raw.isEmpty()) return "";
 
   if (raw.startsWith("http://")) raw.remove(0, 7);
-  else if (raw.startsWith("https://")) raw.remove(0, 8);
+  else if (raw.startsWith("https://")) {
+    raw.remove(0, 8);
+    if (portOut == 80) portOut = 443;
+  }
 
   int slashIdx = raw.indexOf('/');
   if (slashIdx >= 0) raw = raw.substring(0, slashIdx);
@@ -1100,10 +1104,16 @@ bool extractDeviceEndpoint(JsonObjectConst obj, char *outHost, size_t hostSz,
                            char *outAltHost, size_t altHostSz, uint16_t &outPort) {
   if (obj["enabled"].is<bool>() && !obj["enabled"].as<bool>()) return false;
 
-  uint16_t port = obj["port"] | 80;
-  if (port == 0) port = 80;
+  // Handle both integer (8080) and string ("8080") port values in JSON
+  uint16_t port = 80;
+  if (obj["port"].is<int>()) {
+    int p = obj["port"].as<int>();
+    if (p > 0 && p <= 65535) port = (uint16_t)p;
+  } else if (obj["port"].is<const char *>()) {
+    int p = atoi(obj["port"].as<const char *>());
+    if (p > 0 && p <= 65535) port = (uint16_t)p;
+  }
 
-  // Explicitly check non-empty strings so `"ip": ""` properly falls back to `"mdns"`
   String ipStr = cleanEndpointHost(String(obj["ip"] | ""), port);
   if (ipStr.isEmpty()) ipStr = cleanEndpointHost(String(obj["host"] | ""), port);
   if (ipStr.isEmpty()) ipStr = cleanEndpointHost(String(obj["address"] | ""), port);
@@ -1180,137 +1190,269 @@ bool isDeviceVisibleOnHome(JsonDocument &doc, JsonObjectConst dev) {
 #endif
 }
 
-// Loads configured devices from /config.json matching Home page count
+// Loads configured devices from /config.json while preserving live state (lock-order safe)
 void reloadDevicesFromConfig() {
-  trackedDeviceCount = 0;
-  trackedCheckIdx = 0;
-  devicesOnlineCount = 0;
-  devicesOfflineCount = 0;
-  webDeviceOverrideActive = false;
+  if (!hubFS || !fsMutex || !deviceMutex) return;
 
-  if (!hubFS || !fsMutex) return;
-  if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) != pdTRUE) return;
+  TrackedDevice *nextList = new (std::nothrow) TrackedDevice[MAX_TRACKED_DEVICES];
+  if (!nextList) return;
+  uint8_t nextCount = 0;
 
-  if (hubFS->exists(CONFIG_PATH)) {
-    File f = hubFS->open(CONFIG_PATH, "r");
-    if (f) {
-      JsonDocument doc(&psramAllocator);
-      if (!deserializeJson(doc, f)) {
-        if (doc["devices"].is<JsonArrayConst>()) {
+  // Step 1: Parse /config.json under fsMutex ONLY
+  if (xSemaphoreTake(fsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+    if (hubFS->exists(CONFIG_PATH)) {
+      File f = hubFS->open(CONFIG_PATH, "r");
+      if (f) {
+        JsonDocument doc(&psramAllocator);
+        if (!deserializeJson(doc, f) && doc["devices"].is<JsonArrayConst>()) {
           for (JsonVariantConst v : doc["devices"].as<JsonArrayConst>()) {
-            if (trackedDeviceCount >= MAX_TRACKED_DEVICES) break;
+            if (nextCount >= MAX_TRACKED_DEVICES) break;
             if (!v.is<JsonObjectConst>()) continue;
             JsonObjectConst devObj = v.as<JsonObjectConst>();
             if (!isDeviceVisibleOnHome(doc, devObj)) continue;
 
+            TrackedDevice &slot = nextList[nextCount];
+            const char *idStr = devObj["id"] | "";
+            strncpy(slot.id, idStr, sizeof(slot.id) - 1);
+            slot.id[sizeof(slot.id) - 1] = '\0';
+            slot.host[0] = '\0';
+            slot.altHost[0] = '\0';
+            slot.port = 80;
+            slot.cachedIp = IPAddress(0, 0, 0, 0);
+            slot.latencyMs = 0;
+            slot.online = false;
+            slot.checked = false;
+            slot.failCount = 0;
+
             char host[48], altHost[48];
             uint16_t port = 80;
             if (extractDeviceEndpoint(devObj, host, sizeof(host), altHost, sizeof(altHost), port)) {
-              strncpy(trackedDevices[trackedDeviceCount].host, host, sizeof(trackedDevices[0].host) - 1);
-              trackedDevices[trackedDeviceCount].host[sizeof(trackedDevices[0].host) - 1] = '\0';
-              strncpy(trackedDevices[trackedDeviceCount].altHost, altHost, sizeof(trackedDevices[0].altHost) - 1);
-              trackedDevices[trackedDeviceCount].altHost[sizeof(trackedDevices[0].altHost) - 1] = '\0';
-              trackedDevices[trackedDeviceCount].port = port;
-              trackedDevices[trackedDeviceCount].online = false;
-              trackedDevices[trackedDeviceCount].checked = false;
-              trackedDeviceCount++;
+              strncpy(slot.host, host, sizeof(slot.host) - 1);
+              slot.host[sizeof(slot.host) - 1] = '\0';
+              strncpy(slot.altHost, altHost, sizeof(slot.altHost) - 1);
+              slot.altHost[sizeof(slot.altHost) - 1] = '\0';
+              slot.port = port;
+            } else {
+              slot.checked = true;  // Invalid/empty address stays offline
             }
+            nextCount++;
           }
         }
+        f.close();
       }
-      f.close();
     }
+    xSemaphoreGive(fsMutex);
+  } else {
+    delete[] nextList;
+    return;
   }
-  xSemaphoreGive(fsMutex);
 
-  devicesOfflineCount = trackedDeviceCount;
-  Serial.printf("[OLED] Loaded %u Home-visible devices from %s\n", trackedDeviceCount, CONFIG_PATH);
+  // Step 2: Preserve prior live status & swap under deviceMutex ONLY
+  uint8_t onCnt = 0, offCnt = 0;
+  if (xSemaphoreTake(deviceMutex, pdMS_TO_TICKS(500)) == pdTRUE) {
+    for (uint8_t i = 0; i < nextCount; i++) {
+      if (nextList[i].host[0] == '\0') continue;
+      for (uint8_t p = 0; p < trackedDeviceCount; p++) {
+        if (trackedDevices[p].port == nextList[i].port && strcmp(trackedDevices[p].host, nextList[i].host) == 0) {
+          nextList[i].cachedIp = trackedDevices[p].cachedIp;
+          nextList[i].latencyMs = trackedDevices[p].latencyMs;
+          nextList[i].online = trackedDevices[p].online;
+          nextList[i].checked = trackedDevices[p].checked;
+          nextList[i].failCount = trackedDevices[p].failCount;
+          break;
+        }
+      }
+    }
+
+    for (uint8_t i = 0; i < nextCount; i++) {
+      trackedDevices[i] = nextList[i];
+      if (trackedDevices[i].online) onCnt++;
+      else if (trackedDevices[i].checked) offCnt++;
+    }
+    trackedDeviceCount = nextCount;
+    devicesOnlineCount = onCnt;
+    devicesOfflineCount = offCnt;
+    xSemaphoreGive(deviceMutex);
+  }
+
+  delete[] nextList;
+  Serial.printf("[HEALTH] Loaded %u devices from %s (ON:%u OFF:%u)\n",
+                nextCount, CONFIG_PATH, onCnt, offCnt);
   oledForceRedraw = true;
 }
 
-// Probes an IP or .local mDNS hostname properly on ESP32
-bool probeEndpointHost(const char *host, uint16_t port) {
+// Fast LAN probe with mDNS IP caching, self-hub detection & duplicate-IP skip
+bool probeSingleHost(const char *host, uint16_t port, IPAddress &cachedIp,
+                     uint16_t &outLatencyMs, IPAddress skipIp = IPAddress(0, 0, 0, 0)) {
+  outLatencyMs = 0;
   if (!host || host[0] == '\0') return false;
+
+  IPAddress selfIp = WiFi.localIP();
+  String hLower = String(host);
+  hLower.toLowerCase();
+  if (hLower == selfIp.toString() || hLower == (netCfg.mdnsHost + ".local")) {
+    cachedIp = selfIp;
+    outLatencyMs = 1;
+    return true;
+  }
 
   WiFiClient probe;
   IPAddress ip;
 
+  auto tryConnectIp = [&](IPAddress targetIp) -> bool {
+    if ((uint32_t)targetIp == 0 || targetIp == INADDR_NONE || targetIp == skipIp) return false;
+    unsigned long t0 = millis();
+    bool ok = probe.connect(targetIp, port, DEVICE_TCP_TIMEOUT_MS);
+    probe.stop();
+    if (ok) {
+      unsigned long dt = millis() - t0;
+      outLatencyMs = (dt == 0) ? 1 : (uint16_t)(dt > 65535UL ? 65535UL : dt);
+      cachedIp = targetIp;
+    }
+    return ok;
+  };
+
   if (ip.fromString(host)) {
-    bool ok = probe.connect(ip, port, 750);
-    if (ok) probe.stop();
-    return ok;
+    return tryConnectIp(ip);
   }
 
-  // Resolve .local hostnames using mDNS (WiFiClient::connect only uses DNS)
-  String h = String(host);
-  h.toLowerCase();
-  if (h.endsWith(".local")) {
-    if (!mdnsRunning) return false;
-    h.remove(h.length() - 6);  // Strip ".local"
-    ip = MDNS.queryHost(h, 600);
-    if ((uint32_t)ip == 0 || ip == INADDR_NONE) return false;
-    bool ok = probe.connect(ip, port, 750);
-    if (ok) probe.stop();
-    return ok;
+  if (hLower.endsWith(".local")) {
+    // 1. Try cached IP first (avoids mDNS traffic for already-known devices)
+    if ((uint32_t)cachedIp != 0 && cachedIp != INADDR_NONE && cachedIp != skipIp) {
+      if (tryConnectIp(cachedIp)) return true;
+    }
+
+    // 2. Re-resolve via mDNS (thread-safe guard against MDNS.end/begin)
+    if (!mdnsRunning || !mdnsMutex) return false;
+    hLower.remove(hLower.length() - 6);
+    if (xSemaphoreTake(mdnsMutex, pdMS_TO_TICKS(300)) == pdTRUE) {
+      ip = mdnsRunning ? MDNS.queryHost(hLower, DEVICE_MDNS_TIMEOUT_MS) : IPAddress(0, 0, 0, 0);
+      xSemaphoreGive(mdnsMutex);
+    }
+    if ((uint32_t)ip == 0 || ip == INADDR_NONE || ip == cachedIp || ip == skipIp) return false;
+    return tryConnectIp(ip);
   }
 
-  bool ok = probe.connect(host, port, 750);
-  if (ok) probe.stop();
+  unsigned long t0 = millis();
+  bool ok = probe.connect(host, port, DEVICE_TCP_TIMEOUT_MS);
+  probe.stop();
+  if (ok) {
+    unsigned long dt = millis() - t0;
+    outLatencyMs = (dt == 0) ? 1 : (uint16_t)(dt > 65535UL ? 65535UL : dt);
+  }
   return ok;
 }
 
-// Checks 1 device per interval (fast first pass after boot, then every 3s)
-void serviceDeviceHealthCheck() {
-  if (deviceListReloadPending) {
-    deviceListReloadPending = false;
-    reloadDevicesFromConfig();
-  }
+// Dedicated non-blocking background FreeRTOS task for real-time device monitoring
+void deviceHealthTask(void *param) {
+  (void)param;
+  uint8_t idx = 0;
 
-  if (trackedDeviceCount == 0 || WiFi.status() != WL_CONNECTED) return;
-  if (uploadSession.active || fsUploadSession.active || ufState != UF_IDLE || portalPending || restartPending) return;
-
-  bool allCheckedOnce = true;
-  for (uint8_t i = 0; i < trackedDeviceCount; i++) {
-    if (!trackedDevices[i].checked) {
-      allCheckedOnce = false;
-      break;
+  while (true) {
+    if (deviceListReloadPending) {
+      deviceListReloadPending = false;
+      reloadDevicesFromConfig();
+      idx = 0;
     }
-  }
 
-  unsigned long now = millis();
-  unsigned long interval = allCheckedOnce ? DEVICE_CHECK_INTERVAL_MS : DEVICE_INITIAL_CHECK_INTERVAL_MS;
-  if (now - lastDeviceCheckMs < interval) return;
-  lastDeviceCheckMs = now;
+    bool paused = (WiFi.status() != WL_CONNECTED) || uploadSession.active || fsUploadSession.active || (ufState != UF_IDLE) || portalPending || portalActive || restartPending;
 
-  TrackedDevice &dev = trackedDevices[trackedCheckIdx];
-  bool ok = probeEndpointHost(dev.host, dev.port);
-  if (!ok && dev.altHost[0] != '\0') {
-    ok = probeEndpointHost(dev.altHost, dev.port);
-  }
-
-  dev.online = ok;
-  dev.checked = true;
-
-  // Sync any other device cards sharing the exact same endpoint from this single probe
-  for (uint8_t i = 0; i < trackedDeviceCount; i++) {
-    if (i != trackedCheckIdx && trackedDevices[i].port == dev.port && strcmp(trackedDevices[i].host, dev.host) == 0) {
-      trackedDevices[i].online = ok;
-      trackedDevices[i].checked = true;
+    uint8_t countSnapshot = 0;
+    if (xSemaphoreTake(deviceMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      countSnapshot = trackedDeviceCount;
+      xSemaphoreGive(deviceMutex);
     }
-  }
 
-  trackedCheckIdx = (trackedCheckIdx + 1) % trackedDeviceCount;
+    if (paused || countSnapshot == 0) {
+      ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(400));
+      continue;
+    }
 
-  // Recalculate totals
-  uint8_t onCnt = 0, offCnt = 0;
-  for (uint8_t i = 0; i < trackedDeviceCount; i++) {
-    if (trackedDevices[i].online) onCnt++;
-    else offCnt++;
-  }
-  if (onCnt != devicesOnlineCount || offCnt != devicesOfflineCount) {
-    devicesOnlineCount = onCnt;
-    devicesOfflineCount = offCnt;
-    oledForceRedraw = true;
+    if (idx >= countSnapshot) idx = 0;
+
+    // Copy target details briefly under mutex (NEVER hold mutex during network connect)
+    char host[48] = "";
+    char altHost[48] = "";
+    uint16_t port = 80;
+    IPAddress cachedIp(0, 0, 0, 0);
+    bool wasOnline = false;
+    uint8_t prevFailCount = 0;
+    bool skipDuplicate = false;
+
+    if (xSemaphoreTake(deviceMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      if (idx < trackedDeviceCount) {
+        TrackedDevice &d = trackedDevices[idx];
+        strncpy(host, d.host, sizeof(host) - 1);
+        strncpy(altHost, d.altHost, sizeof(altHost) - 1);
+        port = d.port;
+        cachedIp = d.cachedIp;
+        wasOnline = d.online;
+        prevFailCount = d.failCount;
+
+        // Avoid probing the exact same host:port twice in one sweep
+        for (uint8_t prev = 0; prev < idx; prev++) {
+          if (trackedDevices[prev].port == port && strcmp(trackedDevices[prev].host, host) == 0) {
+            skipDuplicate = true;
+            break;
+          }
+        }
+      }
+      xSemaphoreGive(deviceMutex);
+    }
+
+    if (!skipDuplicate && host[0] != '\0') {
+      uint16_t latencyMs = 0;
+      IPAddress primaryIp(0, 0, 0, 0);
+      primaryIp.fromString(host);
+
+      bool ok = probeSingleHost(host, port, cachedIp, latencyMs);
+
+      // Immediate 1-retry confirmation if an online device misses a single packet
+      if (!ok && wasOnline && WiFi.status() == WL_CONNECTED) {
+        vTaskDelay(pdMS_TO_TICKS(200));
+        ok = probeSingleHost(host, port, cachedIp, latencyMs);
+      }
+
+      // Check fallback altHost (.local) if it just went offline or every 5th offline pass
+      if (!ok && altHost[0] != '\0' && (wasOnline || (prevFailCount % 5 == 0))) {
+        IPAddress altIp(0, 0, 0, 0);
+        ok = probeSingleHost(altHost, port, altIp, latencyMs, primaryIp);
+        if (ok && (uint32_t)altIp != 0) cachedIp = altIp;
+      }
+
+      // Commit probe result back under mutex
+      if (xSemaphoreTake(deviceMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+        uint8_t onCnt = 0, offCnt = 0;
+        for (uint8_t i = 0; i < trackedDeviceCount; i++) {
+          TrackedDevice &t = trackedDevices[i];
+          if (t.port == port && strcmp(t.host, host) == 0) {
+            t.checked = true;
+            t.cachedIp = cachedIp;
+            t.latencyMs = ok ? latencyMs : 0;
+            t.online = ok;
+            t.failCount = ok ? 0 : (t.failCount < 255 ? t.failCount + 1 : 255);
+          }
+          if (t.online) onCnt++;
+          else if (t.checked) offCnt++;
+        }
+        if (onCnt != devicesOnlineCount || offCnt != devicesOfflineCount) {
+          devicesOnlineCount = onCnt;
+          devicesOfflineCount = offCnt;
+          oledForceRedraw = true;
+        }
+        xSemaphoreGive(deviceMutex);
+      }
+    }
+
+    idx++;
+    if (idx >= countSnapshot) {
+      idx = 0;
+      deviceForceProbeNow = false;
+      // Interruptible pause between sweeps (wakes immediately on ?force=1 or config save)
+      ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(DEVICE_SWEEP_PAUSE_MS));
+    } else {
+      vTaskDelay(pdMS_TO_TICKS(DEVICE_INTER_PROBE_MS));
+    }
   }
 }
 
@@ -1359,11 +1501,7 @@ void serviceOledDisplay() {
 
   unsigned long now = millis();
 
-  // Check override expiry early so blink state reflects live counts
-  if (webDeviceOverrideActive && (int32_t)(now - webDeviceOverrideUntil) >= 0) {
-    webDeviceOverrideActive = false;
-  }
-  uint8_t activeOffCnt = webDeviceOverrideActive ? webDevicesOffline : devicesOfflineCount;
+  uint8_t activeOffCnt = devicesOfflineCount;
 
   // Toggle blink phase every 500ms only when at least 1 device is offline
   static bool offBlinkInvert = false;
@@ -1496,12 +1634,17 @@ void serviceOledDisplay() {
   display.drawFastHLine(0, 43, 128, SSD1306_WHITE);
 
   // Bottom Bar (Y=48..63): Online / Offline Devices
-  if (webDeviceOverrideActive && (int32_t)(now - webDeviceOverrideUntil) >= 0) {
-    webDeviceOverrideActive = false;
+  uint8_t onCnt = 0, offCnt = 0, totCnt = 0;
+  if (deviceMutex && xSemaphoreTake(deviceMutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+    onCnt = devicesOnlineCount;
+    offCnt = devicesOfflineCount;
+    totCnt = trackedDeviceCount;
+    xSemaphoreGive(deviceMutex);
+  } else {
+    onCnt = devicesOnlineCount;
+    offCnt = devicesOfflineCount;
+    totCnt = trackedDeviceCount;
   }
-  uint8_t onCnt = webDeviceOverrideActive ? webDevicesOnline : devicesOnlineCount;
-  uint8_t offCnt = webDeviceOverrideActive ? webDevicesOffline : devicesOfflineCount;
-  uint8_t totCnt = onCnt + offCnt;
 
   display.setCursor(0, 50);
   if (totCnt == 0) {
@@ -1820,7 +1963,6 @@ bool syncRuntimeFromConfigFile(const char *path) {
     ipReapplyAt = millis() + 900;  // Wait for HTTP 200 to flush first
   }
 
-  deviceListReloadPending = true;
   return true;
 }
 
@@ -1847,31 +1989,37 @@ bool applyStationIpConfig() {
 }
 
 void startOrRefreshMdns() {
+  if (mdnsMutex && xSemaphoreTake(mdnsMutex, pdMS_TO_TICKS(1000)) != pdTRUE) return;
   if (mdnsRunning) {
     MDNS.end();
     mdnsRunning = false;
   }
-  if (!netCfg.mdnsEnabled || WiFi.status() != WL_CONNECTED) return;
-
-  if (MDNS.begin(netCfg.mdnsHost.c_str())) {
-    MDNS.addService("http", "tcp", 80);
-    mdnsRunning = true;
-    Serial.printf("[MDNS] Active: http://%s.local\n", netCfg.mdnsHost.c_str());
-  } else {
-    Serial.println("[MDNS] Failed to start");
+  if (netCfg.mdnsEnabled && WiFi.status() == WL_CONNECTED) {
+    if (MDNS.begin(netCfg.mdnsHost.c_str())) {
+      MDNS.addService("http", "tcp", 80);
+      mdnsRunning = true;
+      Serial.printf("[MDNS] Active: http://%s.local\n", netCfg.mdnsHost.c_str());
+    } else {
+      Serial.println("[MDNS] Failed to start");
+    }
   }
+  if (mdnsMutex) xSemaphoreGive(mdnsMutex);
 }
 
 bool runWifiConfigPortal(bool forgetBeforeStart = false, bool restartOnSuccess = true) {
+  portalActive = true;
   Serial.println("[WIFI] Launching Configuration Portal...");
 
   if (webServerRunning) {
     server.end();
     webServerRunning = false;
   }
-  if (mdnsRunning) {
-    MDNS.end();
-    mdnsRunning = false;
+  if (mdnsMutex && xSemaphoreTake(mdnsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+    if (mdnsRunning) {
+      MDNS.end();
+      mdnsRunning = false;
+    }
+    xSemaphoreGive(mdnsMutex);
   }
 
   if (forgetBeforeStart) {
@@ -1913,6 +2061,7 @@ bool runWifiConfigPortal(bool forgetBeforeStart = false, bool restartOnSuccess =
       delay(400);
       ESP.restart();
     }
+    portalActive = false;
     return true;
   }
 
@@ -1929,6 +2078,8 @@ bool runWifiConfigPortal(bool forgetBeforeStart = false, bool restartOnSuccess =
     WiFi.begin(ssid.c_str(), pass.c_str());
   }
   setupWebServer();
+  portalActive = false;
+  oledForceRedraw = true;
   return false;
 }
 
@@ -2518,6 +2669,9 @@ void finalizeStreamUpload(AsyncWebServerRequest *req) {
       ok = false;
       errCode = 500;
       errMsg = "Atomic file commit failed";
+    } else if (isConfig) {
+      deviceListReloadPending = true;
+      if (deviceHealthTaskHandle) xTaskNotifyGive(deviceHealthTaskHandle);
     }
   }
 
@@ -2880,18 +3034,43 @@ void setupWebServer() {
     req->send(200, "text/plain", "pong");
   });
 
-  // --- POST/GET /api/oled/devices?on=4&off=1 ---
-  server.on("/api/oled/devices", ASYNC_GET, [](AsyncWebServerRequest *req) {
-    if (req->hasParam("on") && req->hasParam("off")) {
-      webDevicesOnline = (uint8_t)req->getParam("on")->value().toInt();
-      webDevicesOffline = (uint8_t)req->getParam("off")->value().toInt();
-      webDeviceOverrideActive = true;
-      webDeviceOverrideUntil = millis() + 60000UL;  // Valid for 60s, then ESP32 auto-checker resumes
-      oledForceRedraw = true;
-      req->send(200, "application/json", "{\"ok\":true}");
-      return;
+  // --- GET /api/devices/status (Live real-time device status for Home UI) ---
+  server.on("/api/devices/status", ASYNC_GET, [](AsyncWebServerRequest *req) {
+    if (req->hasParam("force") && req->getParam("force")->value() == "1") {
+      deviceForceProbeNow = true;
+      if (deviceHealthTaskHandle) xTaskNotifyGive(deviceHealthTaskHandle);
     }
-    req->send(400, "application/json", "{\"ok\":false}");
+
+    JsonDocument doc(&psramAllocator);
+    JsonObject devMap = doc["devices"].to<JsonObject>();
+
+    if (deviceMutex && xSemaphoreTake(deviceMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+      doc["on"] = devicesOnlineCount;
+      doc["off"] = devicesOfflineCount;
+      doc["total"] = trackedDeviceCount;
+      for (uint8_t i = 0; i < trackedDeviceCount; i++) {
+        const TrackedDevice &t = trackedDevices[i];
+        if (t.id[0] == '\0') continue;
+        JsonObject entry = devMap[t.id].to<JsonObject>();
+        entry["s"] = !t.checked ? "checking" : (t.online ? "online" : "offline");
+        entry["ms"] = t.latencyMs;
+      }
+      xSemaphoreGive(deviceMutex);
+    } else {
+      doc["on"] = devicesOnlineCount;
+      doc["off"] = devicesOfflineCount;
+      doc["total"] = trackedDeviceCount;
+    }
+
+    AsyncResponseStream *res = req->beginResponseStream("application/json");
+    res->addHeader("Cache-Control", "no-store");
+    serializeJson(doc, *res);
+    req->send(res);
+  });
+
+  // Kept as no-op for backward compatibility (ESP32 background task owns OLED counts)
+  server.on("/api/oled/devices", ASYNC_GET, [](AsyncWebServerRequest *req) {
+    req->send(200, "application/json", "{\"ok\":true}");
   });
 
   // --- Built-in Flash Uploader Page (/upload) ---
@@ -3578,6 +3757,8 @@ void setup() {
 
   fsMutex = xSemaphoreCreateMutex();
   asyncReqMutex = xSemaphoreCreateMutex();
+  deviceMutex = xSemaphoreCreateMutex();
+  mdnsMutex = xSemaphoreCreateMutex();
 
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
@@ -3691,6 +3872,7 @@ void setup() {
     oledShowBoot("WiFi Pending...", 100);
     delay(500);
   }
+  xTaskCreate(deviceHealthTask, "devHealth", 6144, nullptr, 1, &deviceHealthTaskHandle);
   oledForceRedraw = true;
 
   Serial.printf("[READY] Free Heap: %lu B | Min Heap: %lu B | Free PSRAM: %lu KB\n",
@@ -3773,7 +3955,6 @@ void loop() {
   serviceNotifyStorage();
   serviceUploadForgetButton();
   serviceNativeMdnsScan();
-  serviceDeviceHealthCheck();
   serviceOledDisplay();
 
   // 7. Launch WiFi Config Portal safely after HTTP response has flushed

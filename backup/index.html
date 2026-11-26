@@ -3646,10 +3646,14 @@
 
       let isTelemetryInFlight = false;
       let isShortcutsInFlight = false;
+      let isDeviceSyncInFlight = false;
+      let deviceStatusTimer = null;
       let isAuthenticated = false;
 
       function startHomeBackgroundTimers() {
         clearInterval(shortcutSyncTimer);
+        clearInterval(deviceStatusTimer);
+
         const syncInterval = Math.max(
           1500,
           Number(config?.settings?.shortcutSyncMs) || 2500,
@@ -3669,6 +3673,19 @@
             isShortcutsInFlight = false;
           }
         }, syncInterval);
+
+        if (!isOfflinePreview && config?.settings?.autoPing !== false) {
+          deviceStatusTimer = setInterval(async () => {
+            if (!isAuthenticated || document.hidden || isDeviceSyncInFlight)
+              return;
+            isDeviceSyncInFlight = true;
+            try {
+              await syncDeviceStatuses(false);
+            } finally {
+              isDeviceSyncInFlight = false;
+            }
+          }, 2500);
+        }
       }
 
       function setAddressMode(useMdns) {
@@ -4007,22 +4024,56 @@
         );
       }
 
+      async function syncDeviceStatuses(force = false) {
+        if (isOfflinePreview || !config?.devices) return;
+        try {
+          const url = force
+            ? "/api/devices/status?force=1"
+            : "/api/devices/status";
+          const res = await fetch(url, { cache: "no-store" });
+          if (!res.ok) return;
+          const data = await res.json();
+          const map = data && data.devices ? data.devices : {};
+
+          config.devices.forEach((dev) => {
+            const info = map[dev.id];
+            if (info && info.s) {
+              deviceStatus[dev.id] = info.s;
+              deviceLatency[dev.id] = info.ms > 0 ? info.ms : null;
+            }
+          });
+          updateStatusIndicators();
+        } catch (_) {}
+      }
+
       async function pingAllDevices() {
         const btn = document.getElementById("refreshBtn");
         btn.classList.add("spinning");
-        const queue = [...config.devices];
-        const CONCURRENCY = 6;
-        const workers = Array.from(
-          { length: Math.min(CONCURRENCY, queue.length) },
-          async () => {
-            while (queue.length) {
-              const dev = queue.shift();
-              if (dev) await pingSingleDevice(dev);
-            }
-          },
-        );
-        await Promise.all([...workers, syncAllShortcuts(false)]);
-        btn.classList.remove("spinning");
+        try {
+          if (isOfflinePreview) {
+            const queue = [...config.devices];
+            const CONCURRENCY = 6;
+            const workers = Array.from(
+              { length: Math.min(CONCURRENCY, queue.length) },
+              async () => {
+                while (queue.length) {
+                  const dev = queue.shift();
+                  if (dev) await pingSingleDevice(dev);
+                }
+              },
+            );
+            await Promise.all([...workers, syncAllShortcuts(false)]);
+          } else {
+            await Promise.all([
+              syncDeviceStatuses(true),
+              syncAllShortcuts(false),
+            ]);
+            await new Promise((r) => setTimeout(r, 1200));
+            await syncDeviceStatuses(false);
+          }
+        } finally {
+          btn.classList.remove("spinning");
+        }
       }
 
       function updateStatusIndicators() {
@@ -4898,11 +4949,13 @@
         }
       }, 15000);
 
-      // Instant refresh when user returns to tab or saves in config.html / layout.html
       document.addEventListener("visibilitychange", () => {
         if (!document.hidden && isAuthenticated) {
           updateHomeClock();
-          if (!isOfflinePreview) loadTelemetry();
+          if (!isOfflinePreview) {
+            loadTelemetry();
+            syncDeviceStatuses(false);
+          }
           if (config?.shortcuts?.length) syncAllShortcuts(true);
         }
       });
@@ -4914,6 +4967,7 @@
             applySettingsUI();
             startHomeBackgroundTimers();
             renderAll();
+            if (!isOfflinePreview) syncDeviceStatuses(true);
             if (config?.shortcuts?.length) syncAllShortcuts(true);
           } catch (_) {}
         }
@@ -4921,6 +4975,7 @@
 
       window.addEventListener("pagehide", () => {
         clearInterval(shortcutSyncTimer);
+        clearInterval(deviceStatusTimer);
         clearInterval(clockTimer);
         clearInterval(telemetryTimer);
         clearInterval(authStatusTimer);
