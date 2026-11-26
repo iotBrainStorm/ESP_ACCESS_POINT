@@ -3424,10 +3424,31 @@
           return;
         }
         try {
-          sessionStorage.setItem(
-            "hub_last_telemetry",
-            JSON.stringify({ rssi: data.rssi, uptime: data.uptime }),
-          );
+          const res = await fetch("/api/status", { cache: "no-store" });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.rssi !== undefined) {
+            document.getElementById("hubRssi").textContent = formatRssiText(
+              data.rssi,
+            );
+          }
+          if (data.uptime !== undefined) {
+            document.getElementById("hubUptime").textContent =
+              `Uptime: ${data.uptime}`;
+          }
+          try {
+            sessionStorage.setItem(
+              "hub_last_telemetry",
+              JSON.stringify({ rssi: data.rssi, uptime: data.uptime }),
+            );
+          } catch (_) {}
+          if (
+            data.bootId &&
+            getLockoutData().bootSession !== String(data.bootId)
+          ) {
+            clearLockoutData();
+            sessionStorage.setItem("esp_boot_id", String(data.bootId));
+          }
         } catch (_) {}
       }
 
