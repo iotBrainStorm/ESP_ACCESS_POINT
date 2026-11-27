@@ -2811,7 +2811,17 @@
         try {
           const res = await fetch("/api/config", { cache: "no-store" });
           if (res.ok) {
-            cachedHubConfig = await res.json();
+            const prevCfg = getHubConfig();
+            const prevStates = new Map(
+              (prevCfg?.shortcuts || []).map((s) => [s.id, !!s.state]),
+            );
+            const freshCfg = await res.json();
+            if (Array.isArray(freshCfg?.shortcuts)) {
+              freshCfg.shortcuts.forEach((s) => {
+                s.state = prevStates.has(s.id) ? prevStates.get(s.id) : false;
+              });
+            }
+            cachedHubConfig = freshCfg;
             try {
               localStorage.setItem(
                 HUB_CONFIG_KEY,

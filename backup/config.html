@@ -3950,6 +3950,15 @@
             const res = await fetch("/api/config", { cache: "no-store" });
             if (!res.ok) throw new Error();
             const fresh = sanitizeConfig(await res.json());
+
+            // Preserve cached live shortcut states (ignore stale NVS state)
+            const prevStates = new Map(
+              (config?.shortcuts || []).map((s) => [s.id, !!s.state]),
+            );
+            fresh.shortcuts.forEach((s) => {
+              s.state = prevStates.has(s.id) ? prevStates.get(s.id) : false;
+            });
+
             const freshJson = JSON.stringify(fresh);
             config = fresh;
             localStorage.setItem(STORAGE_KEY, freshJson);
@@ -7289,10 +7298,16 @@
 
         try {
           if (!isOfflinePreview) {
+            const nvsPayload = {
+              ...config,
+              shortcuts: (config.shortcuts || []).map(
+                ({ state, ...rest }) => rest,
+              ),
+            };
             const res = await fetch("/api/config", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(config),
+              body: JSON.stringify(nvsPayload),
             });
             if (!res.ok) throw new Error("ESP32 NVS config write failed");
           }
@@ -7668,10 +7683,16 @@
           await fetch("/api/reset?mode=settings", { method: "POST" }).catch(
             () => {},
           );
+          const nvsPayload = {
+            ...config,
+            shortcuts: (config.shortcuts || []).map(
+              ({ state, ...rest }) => rest,
+            ),
+          };
           await fetch("/api/config", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(config),
+            body: JSON.stringify(nvsPayload),
           }).catch(() => {});
         }
         isDirty = false;

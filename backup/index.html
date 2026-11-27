@@ -3862,10 +3862,16 @@
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
         if (!isOfflinePreview) {
+          const nvsPayload = {
+            ...config,
+            shortcuts: (config.shortcuts || []).map(
+              ({ state, ...rest }) => rest,
+            ),
+          };
           fetch("/api/config", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(config),
+            body: JSON.stringify(nvsPayload),
           }).catch(() => {});
         }
       }
@@ -4844,6 +4850,18 @@
             const res = await fetch("/api/config", { cache: "no-store" });
             if (!res.ok) throw new Error("No ESP endpoint");
             const fresh = sanitizeConfig(await res.json());
+
+            // Keep live/cached shortcut states on refresh; default to false on first load
+            const prevStates = new Map(
+              (hydratedFromCache && config?.shortcuts
+                ? config.shortcuts
+                : []
+              ).map((s) => [s.id, !!s.state]),
+            );
+            fresh.shortcuts.forEach((s) => {
+              s.state = prevStates.has(s.id) ? prevStates.get(s.id) : false;
+            });
+
             const freshJson = JSON.stringify(fresh);
             config = fresh;
             localStorage.setItem(STORAGE_KEY, freshJson);

@@ -3568,6 +3568,18 @@
           const res = await fetch("/api/config", { cache: "no-store" });
           if (!res.ok) throw new Error();
           const remote = normalizeConfig(await res.json());
+
+          // Preserve cached live shortcut states (ignore stale NVS state)
+          const prevStates = new Map(
+            (hydratedFromCache && config?.shortcuts
+              ? config.shortcuts
+              : []
+            ).map((s) => [s.id, !!s.state]),
+          );
+          remote.shortcuts.forEach((s) => {
+            s.state = prevStates.has(s.id) ? prevStates.get(s.id) : false;
+          });
+
           isOfflinePreview = false;
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
@@ -4453,10 +4465,16 @@
 
         try {
           if (!isOfflinePreview) {
+            const nvsPayload = {
+              ...config,
+              shortcuts: (config.shortcuts || []).map(
+                ({ state, ...rest }) => rest,
+              ),
+            };
             const res = await fetch("/api/config", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(config),
+              body: JSON.stringify(nvsPayload),
             });
             if (!res.ok) throw new Error();
           }
