@@ -545,12 +545,12 @@ async function pollForgetStatus(){
       const rem = (d.remainingMs / 1000).toFixed(1);
       forgetBar.style.background = 'var(--warn)';
       forgetBar.style.width = Math.min(100, ((5000 - d.remainingMs) / 5000) * 100) + '%';
-      forgetText.textContent = 'Step 1/2: Press & hold onboard BOOT button within ' + rem + 's...';
+      forgetText.textContent = "Hold BOOT button within " + rem + "s";
     } else if(d.state === 'holding'){
       const held = (d.heldMs / 1000).toFixed(1);
       forgetBar.style.background = 'var(--acc)';
       forgetBar.style.width = Math.min(100, (d.heldMs / 10000) * 100) + '%';
-      forgetText.textContent = 'Step 2/2: Keep holding BOOT button... ' + held + 's / 10.0s';
+      forgetText.textContent = "Keep holding BOOT button " + held + "s / 10s";
     } else {
       clearInterval(forgetTimer);
       forgetTimer = null;
@@ -562,7 +562,7 @@ async function pollForgetStatus(){
         loginBtn.disabled = false;
         document.getElementById('uName').value = 'esp';
         document.getElementById('uPass').value = '';
-        showAuthAlert('ok', 'All saved users erased! Default admin created: esp / 456456');
+        showAuthAlert('ok', 'All Users erased! Default Admin: esp / 456456');
       } else {
         forgetBar.style.background = 'var(--err)';
         forgetText.textContent = d.message || 'Reset cancelled.';

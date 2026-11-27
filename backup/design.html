@@ -7685,12 +7685,12 @@
               const rem = (d.remainingMs / 1000).toFixed(1);
               bar.style.background = "var(--warn)";
               bar.style.width = `${Math.min(100, ((5000 - d.remainingMs) / 5000) * 100)}%`;
-              txt.textContent = `Step 1/2: Press & hold BOOT button within ${rem}s...`;
+              txt.textContent = `Hold BOOT button within ${rem}s`;
             } else if (d.state === "holding") {
               const held = (d.heldMs / 1000).toFixed(1);
               bar.style.background = "var(--accent)";
               bar.style.width = `${Math.min(100, (d.heldMs / 10000) * 100)}%`;
-              txt.textContent = `Step 2/2: Keep holding BOOT button... ${held}s / 10.0s`;
+              txt.textContent = `Keep holding BOOT button ${held}s / 10s`;
             } else {
               clearInterval(forgetBootTimer);
               forgetBootTimer = null;
