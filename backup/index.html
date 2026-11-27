@@ -1257,9 +1257,14 @@
       }
       html:not(.ui-ready) header.topbar,
       html:not(.ui-ready) footer,
+      body:not(.auth-ready) header.topbar,
       body:not(.auth-ready) footer {
         opacity: 0;
         visibility: hidden;
+        transition: none !important;
+      }
+      html.auth-boot .pin-overlay,
+      html.auth-boot .pin-card {
         transition: none !important;
       }
       main.container {
@@ -3218,7 +3223,8 @@
         });
       }
 
-      function submitAuthModal() {
+      async function submitAuthModal() {
+        if (liveConfigPromise) await liveConfigPromise;
         const st = checkLockoutState();
         if (st.locked) return showToast(st.msg);
 
@@ -4773,11 +4779,14 @@
         return false;
       }
 
+      let liveConfigPromise = null;
+
       async function loadConfig() {
         let hydratedFromCache = false;
         let cachedConfigJson = "";
+        let earlyLoginPromise = null;
 
-        // 1. Instant sync hydrate from cache (full page height before browser restores scroll)
+        // 1. Instant sync hydrate from cache (runs BEFORE first paint)
         try {
           const cached = localStorage.getItem(STORAGE_KEY);
           if (cached) {
@@ -4818,39 +4827,74 @@
               document.body.classList.add("auth-ready");
               hydratedFromCache = true;
             } else {
-              document.documentElement.classList.add("ui-ready");
+              // Open authModal immediately with zero flash or fade-in jump
+              document.documentElement.classList.add("auth-boot");
+              earlyLoginPromise = enforcePageLogin("homePage");
+              requestAnimationFrame(() =>
+                document.documentElement.classList.remove("auth-boot"),
+              );
             }
           }
         } catch (_) {}
 
-        // 2. Fetch live config from ESP32 and re-render only if anything changed
+        // 2. Fetch live config & telemetry in the background (does not block authModal)
         let configChanged = !hydratedFromCache;
-        try {
-          const res = await fetch("/api/config", { cache: "no-store" });
-          if (!res.ok) throw new Error("No ESP endpoint");
-          const fresh = sanitizeConfig(await res.json());
-          const freshJson = JSON.stringify(fresh);
-          config = fresh;
-          localStorage.setItem(STORAGE_KEY, freshJson);
-          isOfflinePreview = false;
-          configChanged = !hydratedFromCache || freshJson !== cachedConfigJson;
-        } catch (e) {
-          isOfflinePreview = true;
-          if (!config) {
-            config = sanitizeConfig(null);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-            configChanged = true;
+        liveConfigPromise = (async () => {
+          try {
+            const res = await fetch("/api/config", { cache: "no-store" });
+            if (!res.ok) throw new Error("No ESP endpoint");
+            const fresh = sanitizeConfig(await res.json());
+            const freshJson = JSON.stringify(fresh);
+            config = fresh;
+            localStorage.setItem(STORAGE_KEY, freshJson);
+            isOfflinePreview = false;
+            configChanged =
+              !hydratedFromCache || freshJson !== cachedConfigJson;
+          } catch (e) {
+            isOfflinePreview = true;
+            if (!config) {
+              config = sanitizeConfig(null);
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+              configChanged = true;
+            }
           }
+
+          if (configChanged) {
+            applySettingsUI();
+            updateHomeClock();
+          }
+          await loadTelemetry();
+
+          // Sync modal banner in case ESP32 rebooted (lockout cleared) or disabled login
+          if (
+            !isAuthenticated &&
+            document.getElementById("authModal")?.classList.contains("open")
+          ) {
+            if (hasValidCachedSession(config) && authResolveCallback) {
+              clearInterval(authStatusTimer);
+              document.getElementById("authModal").classList.remove("open");
+              syncModalScrollLock();
+              const cb = authResolveCallback;
+              authResolveCallback = null;
+              cb(true);
+            } else {
+              refreshAuthModalLiveStatus();
+            }
+          }
+        })();
+
+        // Only wait for network before showing modal if there was no cached config
+        if (!earlyLoginPromise) {
+          await liveConfigPromise;
         }
 
-        if (configChanged) {
-          applySettingsUI();
-          updateHomeClock();
-        }
+        const loggedIn = earlyLoginPromise
+          ? await earlyLoginPromise
+          : await enforcePageLogin("homePage");
+
+        await liveConfigPromise;
         document.documentElement.classList.add("ui-ready");
-        await loadTelemetry();
 
-        const loggedIn = await enforcePageLogin("homePage");
         if (!loggedIn) {
           document.getElementById("favSection").style.display = "none";
           document.getElementById("shortcutSection").style.display = "none";
@@ -4865,10 +4909,10 @@
           return;
         }
 
+        if (configChanged) renderAll();
         document.body.classList.add("auth-ready");
         isAuthenticated = true;
         startHomeBackgroundTimers();
-        if (configChanged) renderAll();
         loadSavedBuildings();
         if (config.settings.autoPing) pingAllDevices();
       }

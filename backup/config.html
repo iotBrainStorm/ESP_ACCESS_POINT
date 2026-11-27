@@ -688,7 +688,10 @@
 
       html:not(.ui-ready) header.topbar,
       html:not(.ui-ready) nav.nav-tabs,
-      html:not(.ui-ready) .save-bar {
+      html:not(.ui-ready) .save-bar,
+      body:not(.auth-ready) header.topbar,
+      body:not(.auth-ready) nav.nav-tabs,
+      body:not(.auth-ready) .save-bar {
         opacity: 0;
         visibility: hidden;
         transition: none !important;
@@ -705,6 +708,16 @@
       body.auth-ready main.container {
         opacity: 1;
         transform: translateY(0);
+      }
+
+      html.instant-ready main.container {
+        transition: none !important;
+        transform: none !important;
+      }
+
+      html.auth-boot .pin-overlay,
+      html.auth-boot .pin-card {
+        transition: none !important;
       }
 
       .pin-overlay {
@@ -3679,7 +3692,8 @@
         });
       }
 
-      function submitAuthModal() {
+      async function submitAuthModal() {
+        if (liveConfigPromise) await liveConfigPromise;
         const st = checkLockoutState();
         if (st.locked) return showToast(st.msg);
 
@@ -3876,81 +3890,158 @@
       /* ============================================================================
          6. INITIALIZATION & TAB NAVIGATION
          ============================================================================ */
+      let liveConfigPromise = null;
+      let isPageAuthenticated = false;
+
+      function hasValidCachedSession(cfg) {
+        const policy = cfg?.admin?.verification?.configPage || {
+          mode: "session",
+          role: "admin",
+        };
+        if (policy.mode === "none") return true;
+        if (policy.mode === "session") {
+          const savedRole = sessionStorage.getItem("hub_auth_configPage");
+          return !!(
+            savedRole &&
+            (policy.role === "all" ||
+              savedRole === policy.role ||
+              savedRole === "admin")
+          );
+        }
+        return false;
+      }
+
       async function init() {
-        // 1. Instant hydrate from cache (zero-flash on refresh / page switch)
+        let hydratedFromCache = false;
+        let cachedConfigJson = "";
+        let earlyLoginPromise = null;
+
+        // 1. Instant sync hydrate from cache (runs BEFORE first paint)
         try {
           const cached = localStorage.getItem(STORAGE_KEY);
           if (cached) {
             config = sanitizeConfig(JSON.parse(cached));
+            cachedConfigJson = JSON.stringify(config);
             applyTheme();
-            document.documentElement.classList.add("ui-ready");
+
+            if (hasValidCachedSession(config)) {
+              renderAll();
+              document.documentElement.classList.add(
+                "instant-ready",
+                "ui-ready",
+              );
+              document.body.classList.add("auth-ready");
+              hydratedFromCache = true;
+            } else {
+              // Open authModal immediately with zero flash or fade-in jump
+              document.documentElement.classList.add("auth-boot");
+              earlyLoginPromise = enforcePageLogin("configPage");
+              requestAnimationFrame(() =>
+                document.documentElement.classList.remove("auth-boot"),
+              );
+            }
           }
         } catch (_) {}
 
-        // 2. Fetch live config from ESP32 and refresh cache
-        try {
-          const res = await fetch("/api/config", { cache: "no-store" });
-          if (!res.ok) throw new Error();
-          config = sanitizeConfig(await res.json());
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-          isOfflinePreview = false;
-        } catch (e) {
-          isOfflinePreview = true;
-          if (!config) {
-            config = sanitizeConfig(null);
-          }
-        }
-
-        applyTheme();
-        document.documentElement.classList.add("ui-ready");
-
-        if (!isOfflinePreview) {
+        // 2. Fetch live config & status in the background (does not block authModal)
+        let configChanged = !hydratedFromCache;
+        liveConfigPromise = (async () => {
           try {
-            const stRes = await fetch("/api/status", { cache: "no-store" });
-            if (stRes.ok) {
-              const stData = await stRes.json();
-              if (stData.ip && isValidIpv4(stData.ip))
-                liveNetInfo.ip = stData.ip;
-              if (stData.gateway && isValidIpv4(stData.gateway))
-                liveNetInfo.gateway = stData.gateway;
-              if (stData.subnet && isValidIpv4(stData.subnet))
-                liveNetInfo.subnet = stData.subnet;
-              if (liveNetInfo.gateway || liveNetInfo.ip)
-                liveNetInfo.source = "ESP32";
-              if (
-                stData.storageUsedKb !== undefined &&
-                stData.storageTotalKb !== undefined
-              ) {
-                updateHeaderStorageBadge(
-                  stData.storageUsedKb,
-                  stData.storageTotalKb,
-                );
-              }
-              if (Number(stData.maxConfigBytes) > 0) {
-                NVS_MAX_BYTES = Number(stData.maxConfigBytes);
-              }
-              if (Number(stData.maxDesignBytes) > 0) {
-                DESIGN_MAX_BYTES = Number(stData.maxDesignBytes);
-              }
-
-              if (
-                stData.bootId &&
-                getLockoutData().bootSession !== String(stData.bootId)
-              ) {
-                clearLockoutData();
-                sessionStorage.setItem("esp_boot_id", String(stData.bootId));
-              }
+            const res = await fetch("/api/config", { cache: "no-store" });
+            if (!res.ok) throw new Error();
+            const fresh = sanitizeConfig(await res.json());
+            const freshJson = JSON.stringify(fresh);
+            config = fresh;
+            localStorage.setItem(STORAGE_KEY, freshJson);
+            isOfflinePreview = false;
+            configChanged =
+              !hydratedFromCache || freshJson !== cachedConfigJson;
+          } catch (e) {
+            isOfflinePreview = true;
+            if (!config) {
+              config = sanitizeConfig(null);
             }
-          } catch (_) {}
+            configChanged = true;
+          }
+
+          applyTheme();
+
+          if (!isOfflinePreview) {
+            try {
+              const stRes = await fetch("/api/status", { cache: "no-store" });
+              if (stRes.ok) {
+                const stData = await stRes.json();
+                if (stData.ip && isValidIpv4(stData.ip))
+                  liveNetInfo.ip = stData.ip;
+                if (stData.gateway && isValidIpv4(stData.gateway))
+                  liveNetInfo.gateway = stData.gateway;
+                if (stData.subnet && isValidIpv4(stData.subnet))
+                  liveNetInfo.subnet = stData.subnet;
+                if (liveNetInfo.gateway || liveNetInfo.ip)
+                  liveNetInfo.source = "ESP32";
+                if (
+                  stData.storageUsedKb !== undefined &&
+                  stData.storageTotalKb !== undefined
+                ) {
+                  updateHeaderStorageBadge(
+                    stData.storageUsedKb,
+                    stData.storageTotalKb,
+                  );
+                }
+                if (Number(stData.maxConfigBytes) > 0) {
+                  NVS_MAX_BYTES = Number(stData.maxConfigBytes);
+                }
+                if (Number(stData.maxDesignBytes) > 0) {
+                  DESIGN_MAX_BYTES = Number(stData.maxDesignBytes);
+                }
+                if (
+                  stData.bootId &&
+                  getLockoutData().bootSession !== String(stData.bootId)
+                ) {
+                  clearLockoutData();
+                  sessionStorage.setItem("esp_boot_id", String(stData.bootId));
+                }
+              }
+            } catch (_) {}
+          }
+
+          // Sync modal banner in case ESP32 rebooted (lockout cleared) or disabled login
+          if (
+            !isPageAuthenticated &&
+            document.getElementById("authModal")?.classList.contains("open")
+          ) {
+            if (hasValidCachedSession(config) && authResolveCallback) {
+              clearInterval(authStatusTimer);
+              document.getElementById("authModal").classList.remove("open");
+              syncModalScrollLock();
+              const cb = authResolveCallback;
+              authResolveCallback = null;
+              cb(true);
+            } else {
+              refreshAuthModalLiveStatus();
+            }
+          }
+        })();
+
+        // Only wait for network before showing modal if there was no cached config
+        if (!earlyLoginPromise) {
+          await liveConfigPromise;
         }
 
-        const loggedIn = await enforcePageLogin("configPage");
+        const loggedIn = earlyLoginPromise
+          ? await earlyLoginPromise
+          : await enforcePageLogin("configPage");
+
         if (!loggedIn) {
           window.location.href = "index.html";
           return;
         }
+
+        await liveConfigPromise;
+        isPageAuthenticated = true;
+        if (configChanged) renderAll();
+        document.documentElement.classList.add("ui-ready");
         document.body.classList.add("auth-ready");
-        renderAll();
       }
 
       function switchTab(tabName, btn) {
