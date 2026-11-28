@@ -747,7 +747,7 @@ volatile bool wifiDisconnectedFlag = false;
 volatile bool timeSynced = false;
 volatile bool syncTimestampPending = false;
 volatile bool apLedBlinkActive = false;
-volatile bool notifyRgbPulsePending = false;
+volatile bool notifyStoragePending = false;
 TaskHandle_t apLedTaskHandle = nullptr;
 
 bool webServerRunning = false;
@@ -910,22 +910,29 @@ void stopApLedBlink() {
 }
 
 void notifyStorage() {
-  digitalWrite(LED_PIN, HIGH);
-  digitalWrite(BUZZER_PIN, HIGH);
-  notifyRgbPulsePending = true;
-  notifyStorageOffAt = millis() + 90;
-  if (notifyStorageOffAt == 0) notifyStorageOffAt = 1;
+  notifyStoragePending = true;
 }
 
 void serviceNotifyStorage() {
-  if (notifyRgbPulsePending) {
-    notifyRgbPulsePending = false;
+  unsigned long now = millis();
+
+  if (notifyStoragePending) {
+    notifyStoragePending = false;
+    bool alreadyActive = (notifyStorageOffAt != 0);
+    notifyStorageOffAt = now + 90;
+    if (notifyStorageOffAt == 0) notifyStorageOffAt = 1;
+
+    if (!alreadyActive) {
+      digitalWrite(LED_PIN, HIGH);
+      digitalWrite(BUZZER_PIN, HIGH);
 #if HAS_BUILTIN_RGB_LED
-    setBuiltinLed(true, 0, 36, 0);  // Brief subtle green confirmation pulse on S3
+      setBuiltinLed(true, 0, 36, 0);  // Brief subtle green confirmation pulse on S3
 #endif
+    }
+    return;
   }
 
-  if (notifyStorageOffAt && (int32_t)(millis() - notifyStorageOffAt) >= 0) {
+  if (notifyStorageOffAt && (int32_t)(now - notifyStorageOffAt) >= 0) {
     notifyStorageOffAt = 0;
     digitalWrite(BUZZER_PIN, LOW);
     digitalWrite(LED_PIN, LOW);
@@ -2058,7 +2065,10 @@ bool runWifiConfigPortal(bool forgetBeforeStart = false, bool restartOnSuccess =
     saveCurrentWifiCredentials();
     notifyStorage();
     if (restartOnSuccess) {
-      delay(400);
+      serviceNotifyStorage();
+      delay(95);
+      serviceNotifyStorage();
+      delay(300);
       ESP.restart();
     }
     portalActive = false;
