@@ -3722,7 +3722,11 @@
         const portB = Number(b.port) || 80;
         const idxA = Number(a.index) || 0;
         const idxB = Number(b.index) || 0;
-        return hostA === hostB && portA === portB && idxA === idxB;
+        const keyA = revealApiKey(a.apiKey);
+        const keyB = revealApiKey(b.apiKey);
+        return (
+          hostA === hostB && portA === portB && idxA === idxB && keyA === keyB
+        );
       }
 
       async function openDeviceById(id, customPath = null, event = null) {
@@ -3768,6 +3772,7 @@
         matchingShortcuts.forEach((item) => (shortcutBusy[item.id] = true));
         renderAll();
 
+        let toggleOk = false;
         try {
           const res = await fetch(url, {
             method: "POST",
@@ -3787,6 +3792,7 @@
           }
 
           const newState = !!data.state;
+          toggleOk = true;
 
           matchingShortcuts.forEach((item) => {
             item.state = newState;
@@ -3796,8 +3802,6 @@
 
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
           showToast(`${sc.name} is now: ${newState ? "ON" : "OFF"}`);
-
-          syncAllShortcuts(true);
         } catch (err) {
           showToast(err.message || `Failed to toggle ${sc.name}`);
           matchingShortcuts.forEach((item) => {
@@ -3816,6 +3820,17 @@
           ) {
             handleFavoriteClick(favModal.dataset.activeFavId);
           }
+        }
+
+        if (toggleOk) {
+          const sameKeyGroup = config.shortcuts.filter(
+            (item) =>
+              cleanHostInput(item.host).toLowerCase() ===
+                cleanH.toLowerCase() &&
+              (Number(item.port) || 80) === (Number(sc.port) || 80) &&
+              revealApiKey(item.apiKey) === rawKey,
+          );
+          syncShortcutGroup(sameKeyGroup, true);
         }
       }
 
@@ -3964,7 +3979,7 @@
 
           // Step 2: Single shortcut? We already have its live state!
           if (group.length === 1) {
-            if (authData.state !== undefined) {
+            if (!shortcutBusy[first.id] && authData.state !== undefined) {
               const liveState = !!authData.state;
               if (first.state !== liveState) {
                 first.state = liveState;
@@ -3975,14 +3990,18 @@
             delete shortcutErrorReason[first.id];
           } else {
             // Multiple shortcuts sharing this verified host + key -> fetch all states once
-            const res = await fetch(`${baseUrl}/api/switches`, {
-              cache: "no-store",
-              signal: controller.signal,
-            });
+            const res = await fetch(
+              `${baseUrl}/api/switches?key=${encodeURIComponent(rawKey)}`,
+              {
+                cache: "no-store",
+                signal: controller.signal,
+              },
+            );
             if (!res.ok) throw new Error("HTTP " + res.status);
             const data = await res.json();
 
             group.forEach((s) => {
+              if (shortcutBusy[s.id]) return;
               const idx = Number(s.index) || 0;
               if (
                 Array.isArray(data.states) &&
