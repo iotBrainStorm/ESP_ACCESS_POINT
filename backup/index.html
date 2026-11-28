@@ -3714,6 +3714,100 @@
       /* ==========================================================================
          7. PING, SHORTCUT SYNC & DEVICE ACTIONS
          ========================================================================== */
+      const VERIFIED_HOST_KEYS_STORAGE = "hub_sc_verified_host_keys_v1";
+      const AUTH_BLOCKED_KEYS_STORAGE = "hub_sc_auth_blocked_keys_v1";
+
+      function readJsonStore(storage, key) {
+        try {
+          return JSON.parse(storage.getItem(key) || "{}") || {};
+        } catch {
+          return {};
+        }
+      }
+
+      function writeJsonStore(storage, key, obj) {
+        try {
+          storage.setItem(key, JSON.stringify(obj));
+        } catch (_) {}
+      }
+
+      function getHostPortKey(host, port) {
+        return `${cleanHostInput(host).toLowerCase()}:${Number(port) || 80}`;
+      }
+
+      function getAuthGroupKey(host, port, rawKey) {
+        return `${getHostPortKey(host, port)}|${String(rawKey || "")}`;
+      }
+
+      function isAuthErrorResponse(status, data, errMsg) {
+        if (status === 401 || status === 403 || status === 423) return true;
+        if (data && data.locked) return true;
+        const msg = String((data && data.error) || errMsg || "").toLowerCase();
+        return /key|auth|unauth|forbid|lock|attempt|denied|mismatch/.test(msg);
+      }
+
+      function getShortcutAuthBlockReason(host, port, rawKey) {
+        const hpKey = getHostPortKey(host, port);
+        const verified = readJsonStore(
+          localStorage,
+          VERIFIED_HOST_KEYS_STORAGE,
+        );
+        if (verified[hpKey] && verified[hpKey] !== rawKey) {
+          return "API key mismatch (different device at this host)";
+        }
+        const blocked = readJsonStore(
+          sessionStorage,
+          AUTH_BLOCKED_KEYS_STORAGE,
+        );
+        return blocked[getAuthGroupKey(host, port, rawKey)] || "";
+      }
+
+      function markHostKeyVerified(host, port, rawKey) {
+        const hpKey = getHostPortKey(host, port);
+        const gKey = getAuthGroupKey(host, port, rawKey);
+        const verified = readJsonStore(
+          localStorage,
+          VERIFIED_HOST_KEYS_STORAGE,
+        );
+        if (verified[hpKey] !== rawKey) {
+          verified[hpKey] = rawKey;
+          writeJsonStore(localStorage, VERIFIED_HOST_KEYS_STORAGE, verified);
+        }
+        const blocked = readJsonStore(
+          sessionStorage,
+          AUTH_BLOCKED_KEYS_STORAGE,
+        );
+        if (blocked[gKey]) {
+          delete blocked[gKey];
+          writeJsonStore(sessionStorage, AUTH_BLOCKED_KEYS_STORAGE, blocked);
+        }
+      }
+
+      function markShortcutKeyBlocked(host, port, rawKey, reason) {
+        const hpKey = getHostPortKey(host, port);
+        const gKey = getAuthGroupKey(host, port, rawKey);
+        const verified = readJsonStore(
+          localStorage,
+          VERIFIED_HOST_KEYS_STORAGE,
+        );
+        if (verified[hpKey] === rawKey) {
+          delete verified[hpKey];
+          writeJsonStore(localStorage, VERIFIED_HOST_KEYS_STORAGE, verified);
+        }
+        const blocked = readJsonStore(
+          sessionStorage,
+          AUTH_BLOCKED_KEYS_STORAGE,
+        );
+        blocked[gKey] = reason || "Invalid API Key";
+        writeJsonStore(sessionStorage, AUTH_BLOCKED_KEYS_STORAGE, blocked);
+      }
+
+      function clearAuthBlockedCache() {
+        try {
+          sessionStorage.removeItem(AUTH_BLOCKED_KEYS_STORAGE);
+        } catch (_) {}
+      }
+
       function isSamePhysicalSwitch(a, b) {
         if (!a || !b) return false;
         const hostA = cleanHostInput(a.host).toLowerCase();
@@ -3761,18 +3855,40 @@
 
         const cleanH = cleanHostInput(sc.host);
         if (!cleanH) return showToast("Invalid shortcut host");
-        const portPart = sc.port && Number(sc.port) !== 80 ? `:${sc.port}` : "";
+        const portNum = Number(sc.port) || 80;
+        const portPart = portNum !== 80 ? `:${portNum}` : "";
         const url = `http://${cleanH}${portPart}/api/switch/toggle`;
         const rawKey = revealApiKey(sc.apiKey);
-        const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=toggle&key=${encodeURIComponent(rawKey)}`;
+        if (!rawKey) return showToast("Missing API key");
 
         const matchingShortcuts = config.shortcuts.filter((item) =>
           isSamePhysicalSwitch(item, sc),
         );
+
+        const blockReason = getShortcutAuthBlockReason(cleanH, portNum, rawKey);
+        if (blockReason) {
+          let changed = false;
+          matchingShortcuts.forEach((item) => {
+            if (item.state) {
+              item.state = false;
+              changed = true;
+            }
+            shortcutStatus[item.id] = "offline";
+            shortcutErrorReason[item.id] = blockReason;
+          });
+          if (changed)
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+          renderAll();
+          return showToast(`${sc.name} blocked: ${blockReason}`);
+        }
+
+        const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=toggle&key=${encodeURIComponent(rawKey)}`;
         matchingShortcuts.forEach((item) => (shortcutBusy[item.id] = true));
         renderAll();
 
         let toggleOk = false;
+        let lastStatus = 0;
+        let lastData = null;
         try {
           const res = await fetch(url, {
             method: "POST",
@@ -3782,15 +3898,18 @@
             body: bodyStr,
             cache: "no-store",
           });
+          lastStatus = res.status;
           const data = await res.json().catch(() => ({
             ok: false,
             error: `Invalid response (HTTP ${res.status})`,
           }));
+          lastData = data;
 
           if (!res.ok || data.ok === false) {
             throw new Error(data.error || `HTTP ${res.status}`);
           }
 
+          markHostKeyVerified(cleanH, portNum, rawKey);
           const newState = !!data.state;
           toggleOk = true;
 
@@ -3803,12 +3922,22 @@
           localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
           showToast(`${sc.name} is now: ${newState ? "ON" : "OFF"}`);
         } catch (err) {
-          showToast(err.message || `Failed to toggle ${sc.name}`);
+          const reason = err.message || "Auth / Network error";
+          if (isAuthErrorResponse(lastStatus, lastData, reason)) {
+            markShortcutKeyBlocked(cleanH, portNum, rawKey, reason);
+          }
+          showToast(reason);
+          let cleared = false;
           matchingShortcuts.forEach((item) => {
+            if (item.state) {
+              item.state = false;
+              cleared = true;
+            }
             shortcutStatus[item.id] = "offline";
-            shortcutErrorReason[item.id] =
-              err.message || "Auth / Network error";
+            shortcutErrorReason[item.id] = reason;
           });
+          if (cleared)
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
         } finally {
           matchingShortcuts.forEach((item) => (shortcutBusy[item.id] = false));
           renderAll();
@@ -3827,7 +3956,7 @@
             (item) =>
               cleanHostInput(item.host).toLowerCase() ===
                 cleanH.toLowerCase() &&
-              (Number(item.port) || 80) === (Number(sc.port) || 80) &&
+              (Number(item.port) || 80) === portNum &&
               revealApiKey(item.apiKey) === rawKey,
           );
           syncShortcutGroup(sameKeyGroup, true);
@@ -3924,23 +4053,47 @@
       }
 
       async function syncShortcutGroup(group, silent = false) {
-        if (!group.length) return;
+        if (!group.length) return false;
 
         const first = group[0];
         const cleanH = cleanHostInput(first.host);
-        const portPart =
-          first.port && Number(first.port) !== 80 ? `:${first.port}` : "";
+        const portNum = Number(first.port) || 80;
+        const portPart = portNum !== 80 ? `:${portNum}` : "";
         const rawKey = revealApiKey(first.apiKey);
 
         if (!cleanH || !rawKey) {
+          let changed = false;
           group.forEach((s) => {
+            if (!shortcutBusy[s.id] && s.state) {
+              s.state = false;
+              changed = true;
+            }
             shortcutStatus[s.id] = "offline";
             shortcutErrorReason[s.id] = !cleanH
               ? "Invalid host"
               : "Missing API key";
           });
+          if (changed)
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
           updateStatusIndicators();
-          return;
+          return false;
+        }
+
+        const blockReason = getShortcutAuthBlockReason(cleanH, portNum, rawKey);
+        if (blockReason) {
+          let changed = false;
+          group.forEach((s) => {
+            if (!shortcutBusy[s.id] && s.state) {
+              s.state = false;
+              changed = true;
+            }
+            shortcutStatus[s.id] = "offline";
+            shortcutErrorReason[s.id] = blockReason;
+          });
+          if (changed)
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+          updateStatusIndicators();
+          return false;
         }
 
         if (!silent) {
@@ -3955,6 +4108,9 @@
         );
 
         let configDataChanged = false;
+        let authOk = false;
+        let lastStatus = 0;
+        let lastData = null;
         const baseUrl = `http://${cleanH}${portPart}`;
 
         try {
@@ -3968,14 +4124,19 @@
             cache: "no-store",
             signal: controller.signal,
           });
+          lastStatus = authRes.status;
           const authData = await authRes.json().catch(() => ({
             ok: false,
             error: `HTTP ${authRes.status}`,
           }));
+          lastData = authData;
 
           if (!authRes.ok || authData.ok === false) {
             throw new Error(authData.error || "Invalid API Key");
           }
+
+          markHostKeyVerified(cleanH, portNum, rawKey);
+          authOk = true;
 
           // Step 2: Single shortcut? We already have its live state!
           if (group.length === 1) {
@@ -4025,7 +4186,14 @@
             err.name === "AbortError"
               ? "Timeout / Unreachable"
               : err.message || "Auth failed";
+          if (isAuthErrorResponse(lastStatus, lastData, reason)) {
+            markShortcutKeyBlocked(cleanH, portNum, rawKey, reason);
+          }
           group.forEach((s) => {
+            if (!shortcutBusy[s.id] && s.state) {
+              s.state = false;
+              configDataChanged = true;
+            }
             shortcutStatus[s.id] = "offline";
             shortcutErrorReason[s.id] = reason;
           });
@@ -4036,22 +4204,60 @@
           }
           updateStatusIndicators();
         }
+        return authOk;
       }
 
       async function syncAllShortcuts(silent = false) {
-        const groupsMap = new Map();
+        if (!silent) clearAuthBlockedCache();
+
+        const hostMap = new Map();
         (config.shortcuts || []).forEach((s) => {
-          const h = cleanHostInput(s.host).toLowerCase();
-          const p = Number(s.port) || 80;
+          const hpKey = getHostPortKey(s.host, s.port);
           const k = revealApiKey(s.apiKey);
-          const groupKey = `${h}:${p}|${k}`;
-          if (!groupsMap.has(groupKey)) groupsMap.set(groupKey, []);
-          groupsMap.get(groupKey).push(s);
+          if (!hostMap.has(hpKey)) hostMap.set(hpKey, new Map());
+          const keyMap = hostMap.get(hpKey);
+          if (!keyMap.has(k)) keyMap.set(k, []);
+          keyMap.get(k).push(s);
         });
+
+        const verified = readJsonStore(
+          localStorage,
+          VERIFIED_HOST_KEYS_STORAGE,
+        );
+
         await Promise.all(
-          Array.from(groupsMap.values()).map((grp) =>
-            syncShortcutGroup(grp, silent),
-          ),
+          Array.from(hostMap.entries()).map(async ([hpKey, keyMap]) => {
+            const entries = Array.from(keyMap.entries());
+            const verifiedKey = verified[hpKey];
+            entries.sort(([kA], [kB]) => {
+              if (kA === verifiedKey) return -1;
+              if (kB === verifiedKey) return 1;
+              return 0;
+            });
+
+            let hostVerifiedThisPass = false;
+            for (const [, grp] of entries) {
+              if (hostVerifiedThisPass) {
+                let changed = false;
+                grp.forEach((s) => {
+                  if (!shortcutBusy[s.id] && s.state) {
+                    s.state = false;
+                    changed = true;
+                  }
+                  shortcutStatus[s.id] = "offline";
+                  shortcutErrorReason[s.id] =
+                    "API key mismatch (different device at this host)";
+                });
+                if (changed) {
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+                }
+                updateStatusIndicators();
+                continue;
+              }
+              const ok = await syncShortcutGroup(grp, silent);
+              if (ok) hostVerifiedThisPass = true;
+            }
+          }),
         );
       }
 

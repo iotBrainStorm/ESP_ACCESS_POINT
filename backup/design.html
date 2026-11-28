@@ -2850,13 +2850,109 @@
         }
       }
 
+      const VERIFIED_HOST_KEYS_STORAGE = "hub_sc_verified_host_keys_v1";
+      const AUTH_BLOCKED_KEYS_STORAGE = "hub_sc_auth_blocked_keys_v1";
+      let mainSwitchBusyMap = {};
+
+      function readJsonStore(storage, key) {
+        try {
+          return JSON.parse(storage.getItem(key) || "{}") || {};
+        } catch {
+          return {};
+        }
+      }
+
+      function writeJsonStore(storage, key, obj) {
+        try {
+          storage.setItem(key, JSON.stringify(obj));
+        } catch (_) {}
+      }
+
+      function getHostPortKey(host, port) {
+        return `${cleanHostInput(host).toLowerCase()}:${Number(port) || 80}`;
+      }
+
+      function getAuthGroupKey(host, port, rawKey) {
+        return `${getHostPortKey(host, port)}|${String(rawKey || "")}`;
+      }
+
+      function isAuthErrorResponse(status, data, errMsg) {
+        if (status === 401 || status === 403 || status === 423) return true;
+        if (data && data.locked) return true;
+        const msg = String((data && data.error) || errMsg || "").toLowerCase();
+        return /key|auth|unauth|forbid|lock|attempt|denied|mismatch/.test(msg);
+      }
+
+      function getShortcutAuthBlockReason(host, port, rawKey) {
+        const hpKey = getHostPortKey(host, port);
+        const verified = readJsonStore(
+          localStorage,
+          VERIFIED_HOST_KEYS_STORAGE,
+        );
+        if (verified[hpKey] && verified[hpKey] !== rawKey) {
+          return "API key mismatch (different device at this host)";
+        }
+        const blocked = readJsonStore(
+          sessionStorage,
+          AUTH_BLOCKED_KEYS_STORAGE,
+        );
+        return blocked[getAuthGroupKey(host, port, rawKey)] || "";
+      }
+
+      function markHostKeyVerified(host, port, rawKey) {
+        const hpKey = getHostPortKey(host, port);
+        const gKey = getAuthGroupKey(host, port, rawKey);
+        const verified = readJsonStore(
+          localStorage,
+          VERIFIED_HOST_KEYS_STORAGE,
+        );
+        if (verified[hpKey] !== rawKey) {
+          verified[hpKey] = rawKey;
+          writeJsonStore(localStorage, VERIFIED_HOST_KEYS_STORAGE, verified);
+        }
+        const blocked = readJsonStore(
+          sessionStorage,
+          AUTH_BLOCKED_KEYS_STORAGE,
+        );
+        if (blocked[gKey]) {
+          delete blocked[gKey];
+          writeJsonStore(sessionStorage, AUTH_BLOCKED_KEYS_STORAGE, blocked);
+        }
+      }
+
+      function markShortcutKeyBlocked(host, port, rawKey, reason) {
+        const hpKey = getHostPortKey(host, port);
+        const gKey = getAuthGroupKey(host, port, rawKey);
+        const verified = readJsonStore(
+          localStorage,
+          VERIFIED_HOST_KEYS_STORAGE,
+        );
+        if (verified[hpKey] === rawKey) {
+          delete verified[hpKey];
+          writeJsonStore(localStorage, VERIFIED_HOST_KEYS_STORAGE, verified);
+        }
+        const blocked = readJsonStore(
+          sessionStorage,
+          AUTH_BLOCKED_KEYS_STORAGE,
+        );
+        blocked[gKey] = reason || "Invalid API Key";
+        writeJsonStore(sessionStorage, AUTH_BLOCKED_KEYS_STORAGE, blocked);
+      }
+
+      function clearAuthBlockedCache() {
+        try {
+          sessionStorage.removeItem(AUTH_BLOCKED_KEYS_STORAGE);
+        } catch (_) {}
+      }
+
       function isSamePhysicalSwitch(a, b) {
         if (!a || !b) return false;
         return (
           cleanHostInput(a.host).toLowerCase() ===
             cleanHostInput(b.host).toLowerCase() &&
           (Number(a.port) || 80) === (Number(b.port) || 80) &&
-          (Number(a.index) || 0) === (Number(b.index) || 0)
+          (Number(a.index) || 0) === (Number(b.index) || 0) &&
+          revealApiKey(a.apiKey) === revealApiKey(b.apiKey)
         );
       }
 
@@ -2928,81 +3024,236 @@
         return changed;
       }
 
-      // Real-time 2.5s poller (exact same /api/switches feedback used by index.html)
+      // Verified API-key-isolated poller (matches index.html)
+      async function syncDesignShortcutGroup(group, silent = true) {
+        if (!group || !group.length) return false;
+        const hubCfg = getHubConfig();
+        const first = group[0];
+        const cleanH = cleanHostInput(first.host);
+        const portNum = Number(first.port) || 80;
+        const portPart = portNum !== 80 ? `:${portNum}` : "";
+        const rawKey = revealApiKey(first.apiKey);
+
+        let stateChanged = false;
+        let statusChanged = false;
+
+        if (!cleanH || !rawKey) {
+          group.forEach((sc) => {
+            if (!shortcutBusyMap[sc.id] && sc.state) {
+              sc.state = false;
+              stateChanged = true;
+            }
+            if (shortcutOnlineStatus[sc.id] !== "offline") {
+              shortcutOnlineStatus[sc.id] = "offline";
+              statusChanged = true;
+            }
+          });
+          if (stateChanged && hubCfg) {
+            localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+          }
+          const shapeChanged = applyHubStatesToShapes();
+          if (stateChanged || statusChanged || shapeChanged || !silent) {
+            renderCanvas();
+            refreshOpenSimModal();
+          }
+          return false;
+        }
+
+        const blockReason = getShortcutAuthBlockReason(cleanH, portNum, rawKey);
+        if (blockReason) {
+          group.forEach((sc) => {
+            if (!shortcutBusyMap[sc.id] && sc.state) {
+              sc.state = false;
+              stateChanged = true;
+            }
+            if (shortcutOnlineStatus[sc.id] !== "offline") {
+              shortcutOnlineStatus[sc.id] = "offline";
+              statusChanged = true;
+            }
+          });
+          if (stateChanged && hubCfg) {
+            localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+          }
+          const shapeChanged = applyHubStatesToShapes();
+          if (stateChanged || statusChanged || shapeChanged || !silent) {
+            renderCanvas();
+            refreshOpenSimModal();
+          }
+          return false;
+        }
+
+        const timeoutMs = hubCfg?.settings?.pingTimeoutMs || 1800;
+        const baseUrl = `http://${cleanH}${portPart}`;
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        let authOk = false;
+        let lastStatus = 0;
+        let lastData = null;
+
+        try {
+          const authRes = await fetch(`${baseUrl}/api/switch/toggle`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: `index=${encodeURIComponent(first.index ?? 0)}&state=status&key=${encodeURIComponent(rawKey)}`,
+            cache: "no-store",
+            signal: ctrl.signal,
+          });
+          lastStatus = authRes.status;
+          const authData = await authRes.json().catch(() => ({
+            ok: false,
+            error: `HTTP ${authRes.status}`,
+          }));
+          lastData = authData;
+
+          if (!authRes.ok || authData.ok === false) {
+            throw new Error(authData.error || "Invalid API Key");
+          }
+
+          markHostKeyVerified(cleanH, portNum, rawKey);
+          authOk = true;
+
+          if (group.length === 1) {
+            if (!shortcutBusyMap[first.id] && authData.state !== undefined) {
+              const liveState = !!authData.state;
+              if (first.state !== liveState) {
+                first.state = liveState;
+                stateChanged = true;
+              }
+            }
+            if (shortcutOnlineStatus[first.id] !== "online") {
+              shortcutOnlineStatus[first.id] = "online";
+              statusChanged = true;
+            }
+          } else {
+            const res = await fetch(
+              `${baseUrl}/api/switches?key=${encodeURIComponent(rawKey)}`,
+              {
+                cache: "no-store",
+                signal: ctrl.signal,
+              },
+            );
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const data = await res.json();
+
+            group.forEach((sc) => {
+              if (shortcutBusyMap[sc.id]) return;
+              const idx = Number(sc.index) || 0;
+              if (
+                Array.isArray(data.states) &&
+                data.states[idx] !== undefined
+              ) {
+                const liveState = !!data.states[idx];
+                if (sc.state !== liveState) {
+                  sc.state = liveState;
+                  stateChanged = true;
+                }
+                if (shortcutOnlineStatus[sc.id] !== "online") {
+                  shortcutOnlineStatus[sc.id] = "online";
+                  statusChanged = true;
+                }
+              } else {
+                if (sc.state) {
+                  sc.state = false;
+                  stateChanged = true;
+                }
+                if (shortcutOnlineStatus[sc.id] !== "offline") {
+                  shortcutOnlineStatus[sc.id] = "offline";
+                  statusChanged = true;
+                }
+              }
+            });
+          }
+        } catch (err) {
+          const reason =
+            err.name === "AbortError"
+              ? "Timeout / Unreachable"
+              : err.message || "Auth failed";
+          if (isAuthErrorResponse(lastStatus, lastData, reason)) {
+            markShortcutKeyBlocked(cleanH, portNum, rawKey, reason);
+          }
+          group.forEach((sc) => {
+            if (shortcutBusyMap[sc.id]) return;
+            if (sc.state) {
+              sc.state = false;
+              stateChanged = true;
+            }
+            if (shortcutOnlineStatus[sc.id] !== "offline") {
+              shortcutOnlineStatus[sc.id] = "offline";
+              statusChanged = true;
+            }
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+
+        const shapeChanged = applyHubStatesToShapes();
+        if (stateChanged && hubCfg) {
+          localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+        }
+        if (stateChanged || statusChanged || shapeChanged || !silent) {
+          renderCanvas();
+          refreshOpenSimModal();
+        }
+        return authOk;
+      }
+
       async function syncAllDesignShortcuts(silent = true) {
+        if (!silent) clearAuthBlockedCache();
         const hubCfg = getHubConfig();
         const shortcuts = hubCfg?.shortcuts || [];
         if (!shortcuts.length) return;
 
-        const hostGroups = new Map();
+        const hostMap = new Map();
         shortcuts.forEach((s) => {
-          const h = cleanHostInput(s.host).toLowerCase();
-          const p = Number(s.port) || 80;
-          if (!h) return;
-          const key = `${h}:${p}`;
-          if (!hostGroups.has(key)) hostGroups.set(key, []);
-          hostGroups.get(key).push(s);
+          const hpKey = getHostPortKey(s.host, s.port);
+          const k = revealApiKey(s.apiKey);
+          if (!hostMap.has(hpKey)) hostMap.set(hpKey, new Map());
+          const keyMap = hostMap.get(hpKey);
+          if (!keyMap.has(k)) keyMap.set(k, []);
+          keyMap.get(k).push(s);
         });
 
-        let anyChanged = false;
-        const timeoutMs = hubCfg?.settings?.pingTimeoutMs || 1800;
+        const verified = readJsonStore(
+          localStorage,
+          VERIFIED_HOST_KEYS_STORAGE,
+        );
 
         await Promise.all(
-          [...hostGroups.values()].map(async (group) => {
-            const first = group[0];
-            const cleanH = cleanHostInput(first.host);
-            const portPart =
-              first.port && Number(first.port) !== 80 ? `:${first.port}` : "";
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-            try {
-              const res = await fetch(
-                `http://${cleanH}${portPart}/api/switches`,
-                {
-                  cache: "no-store",
-                  signal: ctrl.signal,
-                },
-              );
-              if (!res.ok) throw new Error("HTTP " + res.status);
-              const data = await res.json();
-              group.forEach((sc) => {
-                const idx = Number(sc.index) || 0;
-                if (
-                  Array.isArray(data.states) &&
-                  data.states[idx] !== undefined
-                ) {
-                  const liveState = !!data.states[idx];
-                  if (sc.state !== liveState) {
-                    sc.state = liveState;
-                    anyChanged = true;
+          Array.from(hostMap.entries()).map(async ([hpKey, keyMap]) => {
+            const entries = Array.from(keyMap.entries());
+            const verifiedKey = verified[hpKey];
+            entries.sort(([kA], [kB]) => {
+              if (kA === verifiedKey) return -1;
+              if (kB === verifiedKey) return 1;
+              return 0;
+            });
+
+            let hostVerifiedThisPass = false;
+            for (const [, grp] of entries) {
+              if (hostVerifiedThisPass) {
+                let changed = false;
+                grp.forEach((sc) => {
+                  if (!shortcutBusyMap[sc.id] && sc.state) {
+                    sc.state = false;
+                    changed = true;
                   }
-                }
-                if (shortcutOnlineStatus[sc.id] !== "online") {
-                  shortcutOnlineStatus[sc.id] = "online";
-                  anyChanged = true;
-                }
-              });
-            } catch {
-              group.forEach((sc) => {
-                if (shortcutOnlineStatus[sc.id] !== "offline") {
                   shortcutOnlineStatus[sc.id] = "offline";
-                  anyChanged = true;
+                });
+                if (changed && hubCfg) {
+                  localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
                 }
-              });
-            } finally {
-              clearTimeout(timer);
+                applyHubStatesToShapes();
+                renderCanvas();
+                refreshOpenSimModal();
+                continue;
+              }
+              const ok = await syncDesignShortcutGroup(grp, silent);
+              if (ok) hostVerifiedThisPass = true;
             }
           }),
         );
-
-        const shapeChanged = applyHubStatesToShapes();
-        if (anyChanged) {
-          localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
-        }
-        if (anyChanged || shapeChanged || !silent) {
-          renderCanvas();
-          refreshOpenSimModal();
-        }
       }
 
       const SWATCHES = [
@@ -6332,14 +6583,36 @@
 
         const cleanH = cleanHostInput(sc.host);
         if (!cleanH) return showToast("Invalid shortcut host");
-        const portPart = sc.port && Number(sc.port) !== 80 ? `:${sc.port}` : "";
+        const portNum = Number(sc.port) || 80;
+        const portPart = portNum !== 80 ? `:${portNum}` : "";
         const url = `http://${cleanH}${portPart}/api/switch/toggle`;
         const rawKey = revealApiKey(sc.apiKey);
-        const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=toggle&key=${encodeURIComponent(rawKey)}`;
+        if (!rawKey) return showToast("Missing API key");
 
         const matching = hubCfg.shortcuts.filter((item) =>
           isSamePhysicalSwitch(item, sc),
         );
+
+        const blockReason = getShortcutAuthBlockReason(cleanH, portNum, rawKey);
+        if (blockReason) {
+          let cleared = false;
+          matching.forEach((item) => {
+            if (item.state) {
+              item.state = false;
+              cleared = true;
+            }
+            shortcutOnlineStatus[item.id] = "offline";
+          });
+          if (cleared) {
+            localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+          }
+          applyHubStatesToShapes();
+          renderCanvas();
+          refreshOpenSimModal();
+          return showToast(`${sc.name} blocked: ${blockReason}`);
+        }
+
+        const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=toggle&key=${encodeURIComponent(rawKey)}`;
         matching.forEach((item) => (shortcutBusyMap[item.id] = true));
         refreshOpenSimModal();
 
@@ -6349,6 +6622,9 @@
           hubCfg?.settings?.pingTimeoutMs || 2000,
         );
 
+        let toggleOk = false;
+        let lastStatus = 0;
+        let lastData = null;
         try {
           const res = await fetch(url, {
             method: "POST",
@@ -6357,11 +6633,18 @@
             cache: "no-store",
             signal: ctrl.signal,
           });
-          const data = await res.json();
+          lastStatus = res.status;
+          const data = await res.json().catch(() => ({
+            ok: false,
+            error: `Invalid response (HTTP ${res.status})`,
+          }));
+          lastData = data;
           if (!res.ok || data.ok === false)
             throw new Error(data.error || `HTTP ${res.status}`);
 
+          markHostKeyVerified(cleanH, portNum, rawKey);
           const newState = !!data.state;
+          toggleOk = true;
           matching.forEach((item) => {
             item.state = newState;
             shortcutOnlineStatus[item.id] = "online";
@@ -6372,17 +6655,40 @@
           document.getElementById("simStatusText").textContent =
             `${sc.name} is now ${newState ? "ON" : "OFF"}`;
           showToast(`${sc.name}: ${newState ? "ON" : "OFF"}`);
-          syncAllDesignShortcuts(true);
         } catch (err) {
-          matching.forEach(
-            (item) => (shortcutOnlineStatus[item.id] = "offline"),
-          );
-          showToast(err.message || `Failed to toggle ${sc.name}`);
+          const reason = err.message || `Failed to toggle ${sc.name}`;
+          if (isAuthErrorResponse(lastStatus, lastData, reason)) {
+            markShortcutKeyBlocked(cleanH, portNum, rawKey, reason);
+          }
+          let cleared = false;
+          matching.forEach((item) => {
+            if (item.state) {
+              item.state = false;
+              cleared = true;
+            }
+            shortcutOnlineStatus[item.id] = "offline";
+          });
+          if (cleared) {
+            localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+          }
+          applyHubStatesToShapes();
+          showToast(reason);
         } finally {
           clearTimeout(timer);
           matching.forEach((item) => (shortcutBusyMap[item.id] = false));
           renderCanvas();
           refreshOpenSimModal();
+        }
+
+        if (toggleOk) {
+          const sameKeyGroup = hubCfg.shortcuts.filter(
+            (item) =>
+              cleanHostInput(item.host).toLowerCase() ===
+                cleanH.toLowerCase() &&
+              (Number(item.port) || 80) === portNum &&
+              revealApiKey(item.apiKey) === rawKey,
+          );
+          syncDesignShortcutGroup(sameKeyGroup, true);
         }
       }
 
@@ -6547,6 +6853,8 @@
       }
 
       async function executeMainSwitch(shape) {
+        if (mainSwitchBusyMap[shape.id]) return;
+
         const link = shape.link;
         const targetIds = Array.isArray(link.targetIds) ? link.targetIds : [];
         const label = shape.label || "Main Switch";
@@ -6607,54 +6915,203 @@
           );
         }
 
+        mainSwitchBusyMap[shape.id] = true;
         const timeoutMs = hubCfg?.settings?.pingTimeoutMs || 1800;
-        const results = await Promise.allSettled(
-          allowed.map(async (sc) => {
-            const host = cleanHostInput(sc.host);
-            if (!host) throw new Error("Invalid host");
-            const portPart =
-              sc.port && Number(sc.port) !== 80 ? `:${sc.port}` : "";
-            const url = `http://${host}${portPart}/api/switch/toggle`;
-            const rawKey = revealApiKey(sc.apiKey);
-            const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=${targetOn ? "on" : "off"}&key=${encodeURIComponent(rawKey)}`;
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-            try {
-              const res = await fetch(url, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: bodyStr,
-                cache: "no-store",
-                signal: ctrl.signal,
-              });
-              const data = await res.json();
-              if (!res.ok || data.ok === false)
-                throw new Error(data.error || "Failed");
-              const actualState =
-                data.state !== undefined ? !!data.state : targetOn;
-              allShortcuts
-                .filter((item) => isSamePhysicalSwitch(item, sc))
-                .forEach((item) => {
-                  item.state = actualState;
-                  shortcutOnlineStatus[item.id] = "online";
-                });
-              return sc.id;
-            } finally {
-              clearTimeout(timer);
-            }
-          }),
+        const succeededGroups = new Map();
+        let okCount = 0;
+        let authMismatchCount = 0;
+        let anyStateChanged = false;
+
+        // Group by host:port -> rawKey so we NEVER fire parallel bursts at one host
+        const hostMap = new Map();
+        allowed.forEach((sc) => {
+          const hpKey = getHostPortKey(sc.host, sc.port);
+          const rawKey = revealApiKey(sc.apiKey);
+          if (!hostMap.has(hpKey)) hostMap.set(hpKey, new Map());
+          const keyMap = hostMap.get(hpKey);
+          if (!keyMap.has(rawKey)) keyMap.set(rawKey, []);
+          keyMap.get(rawKey).push(sc);
+        });
+
+        const verified = readJsonStore(
+          localStorage,
+          VERIFIED_HOST_KEYS_STORAGE,
         );
 
-        const okCount = results.filter((r) => r.status === "fulfilled").length;
-        localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+        try {
+          await Promise.all(
+            Array.from(hostMap.entries()).map(async ([hpKey, keyMap]) => {
+              const entries = Array.from(keyMap.entries());
+              const verifiedKey = verified[hpKey];
+              entries.sort(([kA], [kB]) => {
+                if (kA === verifiedKey) return -1;
+                if (kB === verifiedKey) return 1;
+                return 0;
+              });
+
+              let hostVerifiedThisPass = false;
+
+              for (const [rawKey, scGroup] of entries) {
+                const first = scGroup[0];
+                const host = cleanHostInput(first.host);
+                const portNum = Number(first.port) || 80;
+
+                const markGroupOffline = () => {
+                  scGroup.forEach((sc) => {
+                    allShortcuts
+                      .filter((item) => isSamePhysicalSwitch(item, sc))
+                      .forEach((item) => {
+                        if (item.state) {
+                          item.state = false;
+                          anyStateChanged = true;
+                        }
+                        shortcutOnlineStatus[item.id] = "offline";
+                      });
+                  });
+                };
+
+                if (!host || !rawKey) {
+                  markGroupOffline();
+                  continue;
+                }
+
+                // Skip immediately if another key matched this host OR this key is blocked
+                const blockReason = hostVerifiedThisPass
+                  ? "API key mismatch (different device at this host)"
+                  : getShortcutAuthBlockReason(host, portNum, rawKey);
+                if (blockReason) {
+                  authMismatchCount += scGroup.length;
+                  markGroupOffline();
+                  continue;
+                }
+
+                const portPart = portNum !== 80 ? `:${portNum}` : "";
+                const url = `http://${host}${portPart}/api/switch/toggle`;
+
+                // Run switches on this host ONE BY ONE and abort immediately on first error
+                for (let i = 0; i < scGroup.length; i++) {
+                  const sc = scGroup[i];
+                  const matching = allShortcuts.filter((item) =>
+                    isSamePhysicalSwitch(item, sc),
+                  );
+                  matching.forEach((item) => (shortcutBusyMap[item.id] = true));
+
+                  const ctrl = new AbortController();
+                  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+                  let lastStatus = 0;
+                  let lastData = null;
+
+                  try {
+                    const bodyStr = `index=${encodeURIComponent(sc.index ?? 0)}&state=${targetOn ? "on" : "off"}&key=${encodeURIComponent(rawKey)}`;
+                    const res = await fetch(url, {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                      },
+                      body: bodyStr,
+                      cache: "no-store",
+                      signal: ctrl.signal,
+                    });
+                    lastStatus = res.status;
+                    const data = await res.json().catch(() => ({
+                      ok: false,
+                      error: `Invalid response (HTTP ${res.status})`,
+                    }));
+                    lastData = data;
+
+                    if (!res.ok || data.ok === false) {
+                      throw new Error(data.error || `HTTP ${res.status}`);
+                    }
+
+                    markHostKeyVerified(host, portNum, rawKey);
+                    hostVerifiedThisPass = true;
+                    okCount++;
+
+                    const actualState =
+                      data.state !== undefined ? !!data.state : targetOn;
+                    matching.forEach((item) => {
+                      if (item.state !== actualState) {
+                        item.state = actualState;
+                        anyStateChanged = true;
+                      }
+                      shortcutOnlineStatus[item.id] = "online";
+                    });
+
+                    const gKey = getAuthGroupKey(host, portNum, rawKey);
+                    if (!succeededGroups.has(gKey)) {
+                      succeededGroups.set(
+                        gKey,
+                        allShortcuts.filter(
+                          (item) =>
+                            cleanHostInput(item.host).toLowerCase() ===
+                              host.toLowerCase() &&
+                            (Number(item.port) || 80) === portNum &&
+                            revealApiKey(item.apiKey) === rawKey,
+                        ),
+                      );
+                    }
+                  } catch (err) {
+                    const reason =
+                      err.name === "AbortError"
+                        ? "Timeout / Unreachable"
+                        : err.message || "Auth failed";
+                    if (isAuthErrorResponse(lastStatus, lastData, reason)) {
+                      markShortcutKeyBlocked(host, portNum, rawKey, reason);
+                      authMismatchCount += scGroup.length - i;
+                    }
+                    // Mark this and remaining switches in the group offline and stop immediately
+                    for (let j = i; j < scGroup.length; j++) {
+                      allShortcuts
+                        .filter((item) =>
+                          isSamePhysicalSwitch(item, scGroup[j]),
+                        )
+                        .forEach((item) => {
+                          if (item.state) {
+                            item.state = false;
+                            anyStateChanged = true;
+                          }
+                          shortcutOnlineStatus[item.id] = "offline";
+                        });
+                    }
+                    break;
+                  } finally {
+                    clearTimeout(timer);
+                    matching.forEach(
+                      (item) => (shortcutBusyMap[item.id] = false),
+                    );
+                  }
+                }
+              }
+            }),
+          );
+        } finally {
+          mainSwitchBusyMap[shape.id] = false;
+        }
+
         applyHubStatesToShapes();
         renderCanvas();
-        syncAllDesignShortcuts(true);
+        if (anyStateChanged) {
+          localStorage.setItem(HUB_CONFIG_KEY, JSON.stringify(hubCfg));
+        }
+        if (okCount > 0) {
+          Promise.all(
+            [...succeededGroups.values()].map((grp) =>
+              syncDesignShortcutGroup(grp, true),
+            ),
+          );
+        }
 
+        const actualMainOn = !!simSwitchStates[shape.id];
         const skipMsg = skipped ? `, ${skipped} skipped (locked)` : "";
-        const statusMsg = `${label} ${targetOn ? "ON" : "OFF"}: ${okCount}/${allowed.length} switched${skipMsg}`;
+        let statusMsg;
+        if (okCount === 0) {
+          const reasonTag = authMismatchCount
+            ? " — API key mismatch"
+            : " — device offline";
+          statusMsg = `${label} failed (0/${allowed.length} switched, still ${actualMainOn ? "ON" : "OFF"})${reasonTag}${skipMsg}`;
+        } else {
+          statusMsg = `${label} ${actualMainOn ? "ON" : "OFF"}: ${okCount}/${allowed.length} switched${skipMsg}`;
+        }
         document.getElementById("simStatusText").textContent = statusMsg;
         showToast(statusMsg);
       }
@@ -7164,7 +7621,7 @@
         const passEl = document.getElementById("msAuthPass");
         passEl.value = "";
         passEl.placeholder = link.authPassHash
-          ? "Saved (leave blank to keep)"
+          ? "Already Saved"
           : "Enter password";
       }
 
